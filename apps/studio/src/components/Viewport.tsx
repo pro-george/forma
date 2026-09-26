@@ -182,7 +182,10 @@ function ViewController({ controls }: { controls: React.RefObject<OrbitControlsI
     if (box.isEmpty()) box.set(new THREE.Vector3(-50, -50, 0), new THREE.Vector3(50, 50, 30));
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3()).length();
-    const dist = Math.max(60, size * 1.25);
+    const cam = camera as THREE.PerspectiveCamera;
+    const vfov = THREE.MathUtils.degToRad(cam.fov ?? 38);
+    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * (cam.aspect ?? 1));
+    const dist = Math.max(60, (size / 2) / Math.tan(Math.min(vfov, hfov) / 2) * 1.05);
     const dir = new THREE.Vector3();
     if (preset === 'top') dir.set(0, -0.0001, 1);
     else if (preset === 'front') dir.set(0, -1, 0.0001);
