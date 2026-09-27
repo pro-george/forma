@@ -2,7 +2,10 @@ import { useEffect } from 'react';
 import { useStore } from './state/store';
 import { TopBar } from './components/TopBar';
 import { ToolRail } from './components/ToolRail';
-import { Viewport, useViewStore } from './components/Viewport';
+import { Viewport } from './components/Viewport';
+import { useViewStore } from './state/view';
+import { useSketch } from './state/sketch';
+import { SketchHUD } from './components/SketchHUD';
 import { Tree } from './components/Tree';
 import { Inspector } from './components/Inspector';
 import { StatusBar } from './components/StatusBar';
@@ -16,6 +19,19 @@ function useShortcuts() {
       const v = useViewStore.getState();
       const meta = e.metaKey || e.ctrlKey;
       const k = e.key.toLowerCase();
+      const sketch = useSketch.getState();
+      if (sketch.active) {
+        if (meta && k === 'z') { e.preventDefault(); e.shiftKey ? s.redo() : s.undo(); return; }
+        if (meta) return;
+        if (/^[0-9.]$/.test(e.key)) { sketch.typeChar(e.key); return; }
+        if (e.key === 'Backspace' || e.key === 'Delete') { sketch.backspace(); return; }
+        if (e.key === 'Enter') { sketch.enter(); return; }
+        if (e.key === 'Escape') { sketch.escape(); return; }
+        const tool = ({ v: 'select', l: 'line', r: 'rect', c: 'circle', a: 'arc' } as const)[k as 'v' | 'l' | 'r' | 'c' | 'a'];
+        if (tool) { sketch.setTool(tool); return; }
+        if (k === 'f') v.fit();
+        return;
+      }
       if (meta && k === 'z') { e.preventDefault(); e.shiftKey ? s.redo() : s.undo(); return; }
       if (meta && k === 'y') { e.preventDefault(); s.redo(); return; }
       if (meta && k === 'g') { e.preventDefault(); e.shiftKey ? s.ungroupSelected() : s.combineSelected(); return; }
@@ -23,8 +39,7 @@ function useShortcuts() {
       if (meta && k === 's') { e.preventDefault(); s.saveFile(); return; }
       if (meta && k === 'a') { e.preventDefault(); s.select(s.doc.features.filter((f) => f.parentId === null && f.visible).map((f) => f.id)); return; }
       if (meta) return;
-      if (e.key === 'Escape') { if (s.tool === 'sketch') s.cancelSketch(); else s.clearSelection(); return; }
-      if (e.key === 'Enter' && s.tool === 'sketch') { s.finishSketch(); return; }
+      if (e.key === 'Escape') { s.clearSelection(); return; }
       if (e.key === 'Delete' || e.key === 'Backspace') { s.deleteSelected(); return; }
       const nudge = e.shiftKey ? 10 : 1;
       if (e.key === 'ArrowLeft') { s.moveSelectionBy(-nudge, 0, 0); return; }
@@ -36,7 +51,7 @@ function useShortcuts() {
         case 'c': s.addPrimitive('cylinder'); break;
         case 's': s.addPrimitive('sphere'); break;
         case 'v': s.addPrimitive('revolve'); break;
-        case 'k': s.setTool(s.tool === 'sketch' ? 'select' : 'sketch'); break;
+        case 'k': sketch.createAndStart(); break;
         case 'h': s.toggleRole(); break;
         case 'r': s.rotateSelected(e.shiftKey ? -90 : 90); break;
         case 'w': v.setGizmoMode('translate'); break;
@@ -55,20 +70,6 @@ function Toasts() {
   return <div className="toasts" aria-live="polite">{toasts.map((t) => <div key={t.id} className={`toast ${t.kind ?? ''}`}>{t.text}</div>)}</div>;
 }
 
-function SketchHint() {
-  const tool = useStore((s) => s.tool);
-  const n = useStore((s) => s.sketchPoints.length);
-  const s = useStore();
-  if (tool !== 'sketch') return null;
-  return (
-    <div className="overlay-hint">
-      <b>Sketch</b> click on the plate to add points ({n}) · click the first point, double-click or Enter to extrude
-      <button onClick={s.finishSketch} disabled={n < 3}>Extrude</button>
-      <button onClick={s.cancelSketch}>Cancel</button>
-    </div>
-  );
-}
-
 export default function App() {
   useShortcuts();
   const ready = useStore((s) => s.ready);
@@ -79,7 +80,7 @@ export default function App() {
         <ToolRail />
         <section className="viewport">
           <Viewport />
-          <SketchHint />
+          <SketchHUD />
           <StatusBar />
           {!ready && <div className="loading"><div><div className="spin" />Loading geometry kernel…</div></div>}
         </section>

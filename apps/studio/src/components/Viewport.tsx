@@ -3,17 +3,12 @@ import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Grid, GizmoHelper, GizmoViewport, TransformControls, Edges, Line } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
-import { create } from 'zustand';
 import { topLevel, type EvaluatedFeature, type Feature } from '@forma/core';
 import { useStore } from '../state/store';
-
-/** View commands from outside the canvas (toolbar, keyboard). */
-export const useViewStore = create<{ fitToken: number; preset: 'iso' | 'top' | 'front' | 'right' | null; gizmoMode: 'translate' | 'rotate'; fit(): void; setPreset(p: 'iso' | 'top' | 'front' | 'right'): void; setGizmoMode(m: 'translate' | 'rotate'): void }>((set) => ({
-  fitToken: 0, preset: null, gizmoMode: 'translate',
-  fit: () => set((s) => ({ fitToken: s.fitToken + 1 })),
-  setPreset: (preset) => set((s) => ({ preset, fitToken: s.fitToken + 1 })),
-  setGizmoMode: (gizmoMode) => set({ gizmoMode }),
-}));
+import { useViewStore } from '../state/view';
+import { SketchLayer } from './SketchLayer';
+import { useSketch } from '../state/sketch';
+export { useViewStore };
 
 const cssVar = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888';
 
@@ -40,8 +35,8 @@ function toGeometry(m: EvaluatedFeature['mesh']): THREE.BufferGeometry {
 
 const deg = THREE.MathUtils.degToRad;
 
-function Part({ feature, result, selected, colors, wireframe, onSelect }: {
-  feature: Feature; result: EvaluatedFeature | undefined; selected: boolean; colors: ReturnType<typeof useThemeColors>; wireframe: boolean;
+function Part({ feature, result, selected, colors, wireframe, ghost, onSelect }: {
+  feature: Feature; result: EvaluatedFeature | undefined; selected: boolean; colors: ReturnType<typeof useThemeColors>; wireframe: boolean; ghost?: boolean;
   onSelect: (e: ThreeEvent<MouseEvent>) => void;
 }) {
   const geometry = useMemo(() => (result ? toGeometry(result.mesh) : null), [result]);
@@ -58,10 +53,10 @@ function Part({ feature, result, selected, colors, wireframe, onSelect }: {
             emissive={selected ? colors.accent : '#000000'}
             emissiveIntensity={selected ? 0.12 : 0}
             roughness={0.55} metalness={0.12}
-            transparent={isHole} opacity={isHole ? 0.42 : 1} depthWrite={!isHole}
+            transparent={isHole || ghost} opacity={isHole ? 0.42 : ghost ? 0.3 : 1} depthWrite={!isHole && !ghost}
             wireframe={wireframe}
           />
-          {selected && <Edges threshold={28} color={colors.accent} lineWidth={1} />}
+          {selected && !ghost && <Edges threshold={28} color={colors.accent} lineWidth={1} />}
         </mesh>
       )}
       {hasError && (
@@ -119,45 +114,6 @@ function SelectionGizmo({ primary, mode }: { primary: Feature; mode: 'translate'
 }
 const round = (v: number) => Math.round(v * 100) / 100;
 
-function SketchLayer() {
-  const tool = useStore((s) => s.tool);
-  const pts = useStore((s) => s.sketchPoints);
-  const addSketchPoint = useStore((s) => s.addSketchPoint);
-  const [cursor, setCursor] = useState<[number, number] | null>(null);
-  const colors = useThemeColors();
-  if (tool !== 'sketch') return null;
-  const snap = (v: number) => Math.round(v);
-  const line: [number, number, number][] = pts.map(([x, y]) => [x, y, 0.05]);
-  if (cursor) line.push([cursor[0], cursor[1], 0.05]);
-  if (pts.length >= 2) line.push([pts[0]![0], pts[0]![1], 0.05]);
-  return (
-    <group>
-      <mesh
-        position={[0, 0, 0]}
-        onPointerMove={(e) => { e.stopPropagation(); setCursor([snap(e.point.x), snap(e.point.y)]); }}
-        onClick={(e) => { e.stopPropagation(); addSketchPoint([snap(e.point.x), snap(e.point.y)]); }}
-        onDoubleClick={(e) => { e.stopPropagation(); useStore.getState().finishSketch(); }}
-      >
-        <planeGeometry args={[2000, 2000]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
-      {line.length >= 2 && <Line points={line} color={colors.accent} lineWidth={1.5} />}
-      {pts.map((p, i) => (
-        <mesh key={i} position={[p[0], p[1], 0.1]}>
-          <circleGeometry args={[0.9, 16]} />
-          <meshBasicMaterial color={colors.accent} />
-        </mesh>
-      ))}
-      {cursor && (
-        <mesh position={[cursor[0], cursor[1], 0.1]}>
-          <ringGeometry args={[0.7, 1, 16]} />
-          <meshBasicMaterial color={colors.accent} />
-        </mesh>
-      )}
-    </group>
-  );
-}
-
 function ViewController({ controls }: { controls: React.RefObject<OrbitControlsImpl | null> }) {
   const { camera } = useThree();
   const fitToken = useViewStore((s) => s.fitToken);
@@ -179,7 +135,12 @@ function ViewController({ controls }: { controls: React.RefObject<OrbitControlsI
       const b = new THREE.Box3(new THREE.Vector3(r.bbox.min.x, r.bbox.min.y, r.bbox.min.z), new THREE.Vector3(r.bbox.max.x, r.bbox.max.y, r.bbox.max.z)).applyMatrix4(m);
       box.union(b);
     }
-    if (box.isEmpty()) box.set(new THREE.Vector3(-50, -50, 0), new THREE.Vector3(50, 50, 30));
+    if (box.isEmpty()) {
+      // nothing evaluated yet (e.g. a fresh sketch): frame the selected feature's position
+      const f = selection.length ? doc.features.find((x) => x.id === selection[0]) : undefined;
+      const c = f ? f.transform.position : { x: 0, y: 0, z: 0 };
+      box.set(new THREE.Vector3(c.x - 40, c.y - 40, c.z), new THREE.Vector3(c.x + 40, c.y + 40, c.z + 20));
+    }
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3()).length();
     const cam = camera as THREE.PerspectiveCamera;
@@ -209,7 +170,7 @@ function Scene() {
   const select = useStore((s) => s.select);
   const showGrid = useStore((s) => s.showGrid);
   const wireframe = useStore((s) => s.wireframe);
-  const tool = useStore((s) => s.tool);
+  const sketching = useSketch((s) => s.active?.featureId ?? null);
   const gizmoMode = useViewStore((s) => s.gizmoMode);
   const colors = useThemeColors();
   const controls = useRef<OrbitControlsImpl | null>(null);
@@ -224,12 +185,13 @@ function Scene() {
       <directionalLight position={[-150, 120, 80]} intensity={0.35} />
       {showGrid && <Grid args={[400, 400]} cellSize={1} cellThickness={0.6} cellColor={colors.gridMinor} sectionSize={10} sectionThickness={1} sectionColor={colors.gridMajor} rotation={[Math.PI / 2, 0, 0]} fadeDistance={700} fadeStrength={1} infiniteGrid />}
       {parts.map((f) => (
-        <Part key={f.id} feature={f} result={results.get(f.id)} selected={selection.includes(f.id)} colors={colors} wireframe={wireframe}
-          onSelect={(e) => { if (tool !== 'select') return; e.stopPropagation(); select([f.id], e.shiftKey || e.metaKey || e.ctrlKey ? 'toggle' : 'replace'); }} />
+        <Part key={f.id} feature={f} result={results.get(f.id)} selected={selection.includes(f.id)} colors={colors} wireframe={wireframe} ghost={sketching === f.id}
+          onSelect={(e) => { if (sketching) return; e.stopPropagation(); select([f.id], e.shiftKey || e.metaKey || e.ctrlKey ? 'toggle' : 'replace'); }} />
       ))}
-      {primary && tool === 'select' && <SelectionGizmo key={primary.id + gizmoMode} primary={primary} mode={gizmoMode} />}
-      <SketchLayer />
-      <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.12} minDistance={10} maxDistance={3000} maxPolarAngle={Math.PI / 2 + 0.25} />
+      {primary && !sketching && <SelectionGizmo key={primary.id + gizmoMode} primary={primary} mode={gizmoMode} />}
+      <SketchLayer colors={colors} />
+      <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.12} minDistance={10} maxDistance={3000} maxPolarAngle={Math.PI / 2 + 0.25}
+        mouseButtons={sketching ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }} />
       <GizmoHelper alignment="bottom-right" margin={[70, 110]}>
         <GizmoViewport axisColors={['#e0574f', '#5fb37a', '#6ea0ff']} labelColor="white" />
       </GizmoHelper>
@@ -240,14 +202,13 @@ function Scene() {
 
 export function Viewport() {
   const clearSelection = useStore((s) => s.clearSelection);
-  const tool = useStore((s) => s.tool);
   return (
     <Canvas
       shadows
       dpr={[1, 2]}
       camera={{ position: [170, -170, 130], up: [0, 0, 1], fov: 38, near: 0.5, far: 6000 }}
       onCreated={({ camera }) => { camera.up.set(0, 0, 1); camera.lookAt(0, 0, 0); }}
-      onPointerMissed={(e) => { if (tool === 'select' && e.button === 0) clearSelection(); }}
+      onPointerMissed={(e) => { if (!useSketch.getState().active && e.button === 0) clearSelection(); }}
       gl={{ antialias: true, preserveDrawingBuffer: true }}
     >
       <Scene />

@@ -6,6 +6,7 @@
 import type { Manifold, ManifoldToplevel, Mesh } from 'manifold-3d';
 import type { Feature, FeatureOf, Modifiers, Vec2 } from '../document/types.js';
 import { chaikin, ensureCCW, profileContours } from './profile.js';
+import { sketchToProfiles } from '../sketch/sketch.js';
 import { dispose } from './manifold.js';
 
 export class BuildError extends Error {
@@ -45,7 +46,9 @@ export function buildPrimitive(wasm: ManifoldToplevel, f: Exclude<Feature, Featu
       break;
     }
     case 'extrude': {
-      const cs = new CrossSection(profileContours(f.profile), 'Positive');
+      const profiles = f.sketch ? sketchToProfiles(f.sketch).profiles : f.profile ? [f.profile] : [];
+      if (profiles.length === 0) throw new BuildError(f.sketch ? 'Sketch has no closed outline yet' : 'Extrusion has no outline', f.id);
+      const cs = new CrossSection(profiles.flatMap(profileContours), 'Positive');
       const divisions = f.twist !== 0 ? Math.max(1, Math.round(Math.abs(f.twist) / 5)) : 0;
       m = cs.extrude(f.height, divisions, f.twist, [f.scaleTop, f.scaleTop]);
       dispose(cs);

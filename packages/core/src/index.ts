@@ -7,6 +7,7 @@ export * from './geometry/transform.js';
 export { Evaluator, emptyMesh, type EvaluatorOptions } from './geometry/evaluator.js';
 export { BuildError, revolveProfile } from './geometry/build.js';
 export * from './raster/trace.js';
+export * from './sketch/sketch.js';
 export * from './export/stl.js';
 export * from './export/threemf.js';
 export * from './modules/index.js';

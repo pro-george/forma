@@ -4,6 +4,7 @@ import { useStore } from '../state/store';
 import type { ModuleInfo } from '../state/worker-client';
 import { Field, NumberField, Slider, TextField, formatNum } from './fields';
 import { ProfileEditor } from './ProfileEditor';
+import { useSketch } from '../state/sketch';
 
 type NumKey<T> = { [K in keyof T]: T[K] extends number ? K : never }[keyof T];
 interface FieldDef<T extends Feature> { key: NumKey<T>; label: string; min?: number; max?: number; step?: number; unit?: string }
@@ -129,7 +130,12 @@ function FeaturePanel({ feature }: { feature: Feature }) {
         </Field>
       ))}
       {feature.type === 'revolve' && <><h3>Profile</h3><ProfileEditor feature={feature} /></>}
-      {feature.type === 'extrude' && <div className="note">{feature.profile.outer.length} outline points{feature.profile.holes.length ? `, ${feature.profile.holes.length} holes` : ''}. Height, top scale and twist are parametric.</div>}
+      {feature.type === 'extrude' && (
+        <>
+          <div className="actions"><button className="primary" onClick={() => useSketch.getState().start(feature.id)}>Edit sketch</button></div>
+          <div className="note">{feature.sketch ? `${feature.sketch.entities.length} sketch segments` : `${feature.profile?.outer.length ?? 0} outline points`}. Height, top scale and twist are parametric; the outline is edited in the sketcher.</div>
+        </>
+      )}
       {feature.type === 'combine' && (
         <div className="note">{feature.childIds.length} children, {feature.childIds.filter((id) => featureById(doc, id)?.role === 'hole').length} of them holes. Solids are unioned, holes subtracted. Edit any child in the tree to change the result.</div>
       )}

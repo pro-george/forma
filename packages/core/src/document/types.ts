@@ -12,6 +12,7 @@
  * `.forma` file, diffed, and evaluated in a worker without any class instances.
  */
 import { z } from 'zod';
+import { SketchSchema } from '../sketch/sketch.js';
 
 export const Vec2Schema = z.tuple([z.number(), z.number()]);
 export type Vec2 = z.infer<typeof Vec2Schema>;
@@ -77,7 +78,10 @@ export const TubeFeature = z.object({ ...base, type: z.literal('tube'), radius: 
 export const ExtrudeFeature = z.object({
   ...base,
   type: z.literal('extrude'),
-  profile: ProfileSchema,
+  /** fixed outline (modules, imports). Ignored when `sketch` is present. */
+  profile: ProfileSchema.optional(),
+  /** editable 2D sketch; closed loops become the outline(s), nested loops become holes */
+  sketch: z.lazy(() => SketchSchema).optional(),
   height: z.number().positive(),
   /** scale of the top face relative to the bottom, 1 = straight walls */
   scaleTop: z.number().min(0).default(1),

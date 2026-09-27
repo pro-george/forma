@@ -9,8 +9,6 @@ export function StatusBar() {
   const evaluating = useStore((s) => s.evaluating);
   const ms = useStore((s) => s.lastEvalMs);
   const ready = useStore((s) => s.ready);
-  const tool = useStore((s) => s.tool);
-  const sketchPoints = useStore((s) => s.sketchPoints);
 
   const parts = topLevel(doc).filter((f) => f.visible);
   let tris = 0, vol = 0;
@@ -33,7 +31,6 @@ export function StatusBar() {
       {selRes.length > 0
         ? <span>sel <b>{formatNum(sv / 1000)}</b> cm³ · ≈<b>{formatNum((sv / 1000) * 1.24)}</b> g PLA</span>
         : <span><b>{formatNum(vol / 1000)}</b> cm³ · ≈<b>{formatNum((vol / 1000) * 1.24)}</b> g PLA</span>}
-      {tool === 'sketch' && <span className="busy">sketch · {sketchPoints.length} pts</span>}
     </div>
   );
 }

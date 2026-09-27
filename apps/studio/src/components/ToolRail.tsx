@@ -1,10 +1,12 @@
 import { useStore } from '../state/store';
-import { useViewStore } from './Viewport';
+import { useViewStore } from '../state/view';
+import { useSketch } from '../state/sketch';
 import { Icon } from './icons';
 
 export function ToolRail() {
   const s = useStore();
   const view = useViewStore();
+  const sketching = useSketch((st) => !!st.active);
   const primitives = [
     ['box', 'Box', 'B'], ['cylinder', 'Cylinder', 'C'], ['cone', 'Cone', ''], ['sphere', 'Sphere', 'S'], ['torus', 'Torus', ''], ['tube', 'Tube', ''], ['revolve', 'Revolve', 'V'],
   ] as const;
@@ -15,7 +17,7 @@ export function ToolRail() {
         const I = Icon[type];
         return <button key={type} onClick={() => s.addPrimitive(type)}><I />{label}{key && <kbd>{key}</kbd>}</button>;
       })}
-      <button className={s.tool === 'sketch' ? 'on' : ''} onClick={() => (s.tool === 'sketch' ? s.cancelSketch() : s.setTool('sketch'))}><Icon.extrude />Sketch → Extrude<kbd>K</kbd></button>
+      <button className={sketching ? 'on' : ''} onClick={() => useSketch.getState().createAndStart()}><Icon.extrude />Sketch → Extrude<kbd>K</kbd></button>
 
       <h3>Modules</h3>
       {s.modules.length === 0 && <div className="module-desc">Loading…</div>}

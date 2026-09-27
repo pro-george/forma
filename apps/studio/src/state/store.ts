@@ -6,8 +6,6 @@ import {
 } from '@forma/core';
 import { workerClient, type ModuleInfo } from './worker-client';
 
-export type Tool = 'select' | 'sketch';
-
 export interface Toast { id: number; text: string; kind?: 'info' | 'error'; }
 
 interface State {
@@ -18,8 +16,6 @@ interface State {
   ready: boolean;
   modules: ModuleInfo[];
   selection: string[];
-  tool: Tool;
-  sketchPoints: [number, number][];
   showGrid: boolean;
   wireframe: boolean;
   toasts: Toast[];
@@ -39,7 +35,6 @@ interface Actions {
   saveFile(): void;
   // features
   addPrimitive(type: Exclude<FeatureType, 'combine' | 'module' | 'mesh' | 'extrude'>): void;
-  addExtrude(points: [number, number][]): void;
   addModule(id: string): void;
   patchFeature(id: string, patch: Partial<Feature> | ((f: Feature) => Feature), opts?: { undoable?: boolean }): void;
   setTransform(id: string, t: Partial<Transform>, opts?: { undoable?: boolean }): void;
@@ -55,10 +50,6 @@ interface Actions {
   // selection & view
   select(ids: string[], mode?: 'replace' | 'toggle' | 'add'): void;
   clearSelection(): void;
-  setTool(t: Tool): void;
-  addSketchPoint(p: [number, number]): void;
-  finishSketch(): void;
-  cancelSketch(): void;
   toggleGrid(): void; toggleWireframe(): void;
   // export
   exportModel(format: 'stl' | '3mf', onlySelection?: boolean): Promise<void>;
@@ -127,8 +118,6 @@ export const useStore = create<State & Actions>((set, get) => {
     ready: false,
     modules: [],
     selection: [],
-    tool: 'select',
-    sketchPoints: [],
     showGrid: true,
     wireframe: false,
     toasts: [],
@@ -176,14 +165,6 @@ export const useStore = create<State & Actions>((set, get) => {
       }
       apply(addFeature(doc, f));
       set({ selection: [f.id] });
-    },
-    addExtrude: (points) => {
-      const doc = get().doc;
-      const cx = points.reduce((s, p) => s + p[0], 0) / points.length, cy = points.reduce((s, p) => s + p[1], 0) / points.length;
-      const outer = points.map(([x, y]): [number, number] => [Math.round((x - cx) * 100) / 100, Math.round((y - cy) * 100) / 100]);
-      const f = makeFeature(doc, 'extrude', { profile: { outer, holes: [] }, height: 10, transform: { position: { x: Math.round(cx), y: Math.round(cy), z: 0 }, rotation: { x: 0, y: 0, z: 0 } } });
-      apply(addFeature(doc, f));
-      set({ selection: [f.id], tool: 'select', sketchPoints: [] });
     },
     addModule: (moduleId) => {
       const doc = get().doc;
@@ -271,15 +252,6 @@ export const useStore = create<State & Actions>((set, get) => {
       else set({ selection: ids.reduce((acc, id) => (acc.includes(id) ? acc.filter((x) => x !== id) : [...acc, id]), cur) });
     },
     clearSelection: () => set({ selection: [] }),
-    setTool: (t) => set({ tool: t, sketchPoints: [] }),
-    addSketchPoint: (p) => {
-      const pts = get().sketchPoints;
-      const first = pts[0];
-      if (first && pts.length >= 3 && Math.hypot(p[0] - first[0], p[1] - first[1]) <= 1.5) { get().finishSketch(); return; }
-      set({ sketchPoints: [...pts, p] });
-    },
-    finishSketch: () => { const pts = get().sketchPoints; if (pts.length >= 3) get().addExtrude(pts); else set({ tool: 'select', sketchPoints: [] }); },
-    cancelSketch: () => set({ tool: 'select', sketchPoints: [] }),
     toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
     toggleWireframe: () => set((s) => ({ wireframe: !s.wireframe })),
 
