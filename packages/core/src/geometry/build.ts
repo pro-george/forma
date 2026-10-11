@@ -87,6 +87,12 @@ function sequentialIndices(n: number): Uint32Array {
 /** Closed CCW polygon (x = radius, y = height) for Manifold.revolve. */
 export function revolveProfile(f: FeatureOf<'revolve'>): Vec2[] {
   const side = chaikin(f.profile, f.smoothing).map(([r, t]): Vec2 => [Math.max(0.01, r), t * f.height]);
+  if (f.open && f.wall > 0) {
+    // A sleeve: outer side up, inner side back down. Never touches the axis.
+    const inner = side.map(([r, y]): Vec2 => [Math.max(0.01, r - f.wall), y]).reverse();
+    if (inner.some(([r], i) => r >= side[side.length - 1 - i]![0])) throw new BuildError('Wall is thicker than the radius', f.id);
+    return ensureCCW([...side, ...inner]);
+  }
   const pts: Vec2[] = [[0, 0], ...side];
   if (f.wall > 0) {
     const floor = Math.min(f.floor, f.height - 0.5);
@@ -111,7 +117,7 @@ export function applyModifiers(m: Manifold, mods: Modifiers): Manifold {
   const z0 = box.min[2], h = Math.max(1e-6, box.max[2] - z0);
   const radius = Math.max(box.max[0] - box.min[0], box.max[1] - box.min[1]) / 2;
   // edge length that keeps curvature smooth without exploding the triangle count
-  const targetEdge = Math.max(0.6, Math.min(h, radius * 2) / 40);
+  const targetEdge = Math.max(0.6, Math.min(h, radius * 2) / 40) * (mods.coarseness ?? 1);
   const refined = m.refineToLength(targetEdge);
   dispose(m);
   const twist = mods.twist * deg2rad, taper = mods.taper / 100;

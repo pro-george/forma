@@ -51,6 +51,8 @@ export const ModifiersSchema = z.object({
   /** grooves around the perimeter, mm amplitude */
   grooveAmplitude: z.number().default(0),
   grooveCount: z.number().default(12),
+  /** mesh refinement before warping: 1 = default edge length, 2 = twice as coarse (faster previews) */
+  coarseness: z.number().min(0.25).max(4).default(1),
 });
 export type Modifiers = z.infer<typeof ModifiersSchema>;
 export const defaultModifiers = (): Modifiers => ModifiersSchema.parse({});
@@ -100,6 +102,8 @@ export const RevolveFeature = z.object({
   /** rounds of Chaikin smoothing applied to the profile */
   smoothing: z.number().int().min(0).max(5).default(2),
   segments: z.number().int().min(8).default(96),
+  /** with a wall: leave both ends open (a sleeve, e.g. a lampshade) instead of a cup with a floor */
+  open: z.boolean().default(false),
 });
 export const MeshFeature = z.object({
   ...base,

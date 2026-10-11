@@ -2,7 +2,8 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import {
   initManifold, Evaluator, createDefaultRegistry, createModuleApi, createDocument, addFeature, makeFeature,
   combine, ungroup, removeFeatures, duplicate, parseDocument, serializeDocument, History, toBinarySTL, to3MF,
-  traceRaster, loopsToProfiles, composeTransforms, sampleDocument, type TextRasterizer, type FormaDocument,
+  traceRaster, loopsToProfiles, composeTransforms, sampleDocument, LAMP_FAMILIES, SOCKET_HOLE_RADIUS, familyInputs,
+  type TextRasterizer, type FormaDocument,
 } from './index.js';
 
 /** Node has no canvas: fake rasterizer draws a filled rectangle with a square hole ("O"-like glyph). */
@@ -131,6 +132,37 @@ describe('modules', () => {
     doc = addFeature(doc, m);
     const feats = ev.bakeModule(doc, m.id);
     expect(feats.filter((f) => f.name === 'Divider')).toHaveLength(2);
+  });
+  it('open revolve makes a sleeve with no floor or lid', () => {
+    let doc = createDocument();
+    doc = addFeature(doc, makeFeature(doc, 'revolve', { profile: [[10, 0], [10, 1]], height: 20, wall: 2, floor: 0, smoothing: 0, segments: 128, open: true }));
+    const [r] = ev.evaluate(doc);
+    expect(r!.error).toBeUndefined();
+    // a pure ring: pi * (10^2 - 8^2) * 20
+    expect(near(r!.volume, Math.PI * (100 - 64) * 20, 0.02)).toBe(true);
+  });
+  it('every Artea lamp family builds a watertight shade with a socket collar', () => {
+    for (const fam of LAMP_FAMILIES) {
+      let doc = createDocument();
+      doc = addFeature(doc, makeFeature(doc, 'module', { moduleId: 'artea-lamp', inputs: familyInputs(fam.id) }));
+      const [r] = ev.evaluate(doc);
+      expect(r!.error, fam.id).toBeUndefined();
+      expect(r!.bbox.min.z, fam.id).toBeCloseTo(0, 1);
+      expect(r!.bbox.max.z, fam.id).toBeCloseTo(fam.defaults.height, 0);
+      // a thin shell: far less material than a solid of the same size
+      const solid = Math.PI * (fam.defaults.width / 2) ** 2 * fam.defaults.height;
+      expect(r!.volume, fam.id).toBeGreaterThan(solid * 0.02);
+      expect(r!.volume, fam.id).toBeLessThan(solid * 0.25);
+    }
+  });
+  it('lamp collar keeps the socket hole open and widens a narrow bottom', () => {
+    let doc = createDocument();
+    const m = makeFeature(doc, 'module', { moduleId: 'artea-lamp', inputs: { ...familyInputs('lumi'), width: 90, socket: 'e27' } });
+    doc = addFeature(doc, m);
+    const feats = ev.bakeModule(doc, m.id);
+    const collar = feats.find((f) => f.type === 'tube');
+    expect(collar && collar.type === 'tube' && collar.innerRadius).toBe(SOCKET_HOLE_RADIUS.e27);
+    expect(collar && collar.type === 'tube' && collar.radius).toBeGreaterThan(SOCKET_HOLE_RADIUS.e27 + 7);
   });
   it('unknown module reports an error instead of throwing', () => {
     let doc = createDocument();
