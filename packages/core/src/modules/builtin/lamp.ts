@@ -34,7 +34,7 @@ export const LAMP_FAMILIES: LampFamily[] = [
     defaults: { height: 170, width: 170, ribs: 72, ribDepth: 0.7, waves: 0, waveDepth: 0, twist: 0 } },
   { id: 'onda', name: 'Onda', socket: 'e14',
     curve: [[0.5, 0], [0.82, 0.14], [1, 0.36], [1, 0.62], [0.86, 0.82], [0.62, 1]],
-    defaults: { height: 180, width: 170, ribs: 7, ribDepth: 12, waves: 3, waveDepth: 6, twist: 40 } },
+    defaults: { height: 180, width: 170, ribs: 9, ribDepth: 9, waves: 4, waveDepth: 4.5, twist: 24 } },
   { id: 'lumi', name: 'Lumi', socket: 'e14',
     curve: [[0.9, 0], [1, 0.05], [1, 0.95], [0.92, 1]],
     defaults: { height: 180, width: 110, ribs: 0, ribDepth: 0, waves: 0, waveDepth: 0, twist: 0 } },
