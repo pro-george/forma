@@ -35,92 +35,137 @@ function triNormal(p: Float32Array, i: Uint32Array, t: number): Vec3Tuple | null
 }
 
 /**
+ * Per-mesh adjacency, built once and cached on the mesh object: vertex ids
+ * merged by position, the two triangles across each edge, and triangle
+ * normals. Everything else here is O(size of the face), not of the mesh.
+ */
+interface Adjacency {
+  /** merged vertex id per corner (3 per triangle) */
+  vid: Int32Array;
+  /** for corner k of triangle t (edge k→k+1): the triangle across, or -1 */
+  across: Int32Array;
+  /** unit normals, 3 per triangle; NaN for degenerate triangles */
+  normals: Float32Array;
+}
+const adjacency = new WeakMap<TriangleMesh, Adjacency>();
+function adjacencyOf(mesh: TriangleMesh): Adjacency {
+  let a = adjacency.get(mesh);
+  if (a) return a;
+  const p = mesh.positions, idx = mesh.indices;
+  const triCount = idx.length / 3;
+  const vid = new Int32Array(idx.length);
+  const ids = new Map<string, number>();
+  for (let c = 0; c < idx.length; c++) {
+    const vi = idx[c]! * 3;
+    const k = key(p[vi]!, p[vi + 1]!, p[vi + 2]!);
+    let id = ids.get(k);
+    if (id === undefined) { id = ids.size; ids.set(k, id); }
+    vid[c] = id;
+  }
+  // directed edge (a→b) → corner index; the reverse edge's owner is the triangle across
+  const owner = new Map<number, number>();
+  const n = ids.size;
+  for (let c = 0; c < idx.length; c++) {
+    const t = (c / 3) | 0, k = c % 3;
+    owner.set(vid[c]! * n + vid[t * 3 + ((k + 1) % 3)]!, c);
+  }
+  const across = new Int32Array(idx.length).fill(-1);
+  for (let c = 0; c < idx.length; c++) {
+    const t = (c / 3) | 0, k = c % 3;
+    const rev = owner.get(vid[t * 3 + ((k + 1) % 3)]! * n + vid[c]!);
+    if (rev !== undefined) across[c] = (rev / 3) | 0;
+  }
+  const normals = new Float32Array(triCount * 3);
+  for (let t = 0; t < triCount; t++) {
+    const nn = triNormal(p, idx, t);
+    normals[t * 3] = nn ? nn[0] : NaN; normals[t * 3 + 1] = nn ? nn[1] : NaN; normals[t * 3 + 2] = nn ? nn[2] : NaN;
+  }
+  a = { vid, across, normals };
+  adjacency.set(mesh, a);
+  return a;
+}
+
+/** Flood-fill the coplanar region containing `start`; `taken` marks triangles already assigned (optional). */
+function growFace(mesh: TriangleMesh, adj: Adjacency, start: number, cosTol: number, distTol: number, taken?: Int32Array, mark = 0): Set<number> | null {
+  const p = mesh.positions, idx = mesh.indices;
+  const nx = adj.normals[start * 3]!, ny = adj.normals[start * 3 + 1]!, nz = adj.normals[start * 3 + 2]!;
+  if (Number.isNaN(nx)) return null;
+  const a0 = idx[start * 3]! * 3;
+  const d0 = nx * p[a0]! + ny * p[a0 + 1]! + nz * p[a0 + 2]!;
+  const inPlane = (t: number) => {
+    const tx = adj.normals[t * 3]!;
+    if (Number.isNaN(tx)) return false;
+    if (tx * nx + adj.normals[t * 3 + 1]! * ny + adj.normals[t * 3 + 2]! * nz < cosTol) return false;
+    for (let e = 0; e < 3; e++) {
+      const vi = idx[t * 3 + e]! * 3;
+      if (Math.abs(nx * p[vi]! + ny * p[vi + 1]! + nz * p[vi + 2]! - d0) > distTol) return false;
+    }
+    return true;
+  };
+  const face = new Set<number>([start]);
+  if (taken) taken[start] = mark;
+  const stack = [start];
+  while (stack.length) {
+    const t = stack.pop()!;
+    for (let k = 0; k < 3; k++) {
+      const u = adj.across[t * 3 + k]!;
+      if (u < 0 || face.has(u)) continue;
+      if (taken && taken[u] !== -1) continue;
+      if (!inPlane(u)) continue;
+      face.add(u);
+      if (taken) taken[u] = mark;
+      stack.push(u);
+    }
+  }
+  return face;
+}
+
+/** Boundary loops of a set of triangles, as 3D polygons, outer first. */
+function faceLoops(mesh: TriangleMesh, adj: Adjacency, face: Set<number>, n0: Vec3Tuple): Vec3Tuple[][] {
+  const p = mesh.positions, idx = mesh.indices;
+  // boundary corner → next boundary corner, keyed by merged vertex id of the edge start
+  const next = new Map<number, number>();
+  for (const t of face) for (let k = 0; k < 3; k++) {
+    const u = adj.across[t * 3 + k]!;
+    if (u >= 0 && face.has(u)) continue;
+    next.set(adj.vid[t * 3 + k]!, t * 3 + k);
+  }
+  const loops: Vec3Tuple[][] = [];
+  const used = new Set<number>();
+  for (const [startV, corner0] of next) {
+    if (used.has(startV)) continue;
+    const loop: Vec3Tuple[] = [];
+    let v = startV, c: number | undefined = corner0;
+    while (c !== undefined && !used.has(v)) {
+      used.add(v);
+      const vi = idx[c]! * 3;
+      loop.push([p[vi]!, p[vi + 1]!, p[vi + 2]!]);
+      const t = (c / 3) | 0, k = c % 3;
+      v = adj.vid[t * 3 + ((k + 1) % 3)]!;
+      c = next.get(v);
+    }
+    if (loop.length >= 3) loops.push(simplifyCollinear(loop, n0));
+  }
+  loops.sort((x, y) => Math.abs(loopArea(y, n0)) - Math.abs(loopArea(x, n0)));
+  return loops;
+}
+
+/**
  * Grow the planar face containing triangle `start`. `angleTol` is the max
  * normal deviation in degrees, `distTol` the max distance from the plane (mm).
  */
 export function planarFace(mesh: TriangleMesh, start: number, angleTol = 1, distTol = 0.02): PlanarFace | null {
-  const p = mesh.positions, idx = mesh.indices;
-  const triCount = idx.length / 3;
-  if (start < 0 || start >= triCount) return null;
-  const n0 = triNormal(p, idx, start);
-  if (!n0) return null;
-  const a0 = idx[start * 3]! * 3;
-  const d0 = n0[0] * p[a0]! + n0[1] * p[a0 + 1]! + n0[2] * p[a0 + 2]!;
-  const cosTol = Math.cos((angleTol * Math.PI) / 180);
-
-  // edge → triangles adjacency by position keys
-  const vkey = (vi: number) => key(p[vi * 3]!, p[vi * 3 + 1]!, p[vi * 3 + 2]!);
-  const edgeKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
-  const edgeTris = new Map<string, number[]>();
-  const triKeys: string[][] = new Array(triCount);
-  for (let t = 0; t < triCount; t++) {
-    const ks = [vkey(idx[t * 3]!), vkey(idx[t * 3 + 1]!), vkey(idx[t * 3 + 2]!)];
-    triKeys[t] = ks;
-    for (let e = 0; e < 3; e++) {
-      const ek = edgeKey(ks[e]!, ks[(e + 1) % 3]!);
-      const list = edgeTris.get(ek);
-      if (list) list.push(t); else edgeTris.set(ek, [t]);
-    }
-  }
-  const inPlane = (t: number) => {
-    const n = triNormal(p, idx, t);
-    if (!n) return false;
-    if (n[0] * n0[0] + n[1] * n0[1] + n[2] * n0[2] < cosTol) return false;
-    for (let e = 0; e < 3; e++) {
-      const vi = idx[t * 3 + e]! * 3;
-      const d = n0[0] * p[vi]! + n0[1] * p[vi + 1]! + n0[2] * p[vi + 2]! - d0;
-      if (Math.abs(d) > distTol) return false;
-    }
-    return true;
-  };
-
-  // flood fill across shared edges
-  const inFace = new Set<number>([start]);
-  const stack = [start];
-  while (stack.length) {
-    const t = stack.pop()!;
-    const ks = triKeys[t]!;
-    for (let e = 0; e < 3; e++) {
-      for (const u of edgeTris.get(edgeKey(ks[e]!, ks[(e + 1) % 3]!)) ?? []) {
-        if (!inFace.has(u) && inPlane(u)) { inFace.add(u); stack.push(u); }
-      }
-    }
-  }
-
-  // boundary = directed edges whose reverse is not in the face
-  const directed = new Map<string, { to: string; toPos: Vec3Tuple; fromPos: Vec3Tuple }>();
-  const has = new Set<string>();
-  for (const t of inFace) { const ks = triKeys[t]!; for (let e = 0; e < 3; e++) has.add(`${ks[e]}>${ks[(e + 1) % 3]}`); }
-  for (const t of inFace) {
-    const ks = triKeys[t]!;
-    for (let e = 0; e < 3; e++) {
-      const a = ks[e]!, b = ks[(e + 1) % 3]!;
-      if (has.has(`${b}>${a}`)) continue; // interior edge
-      const ai = idx[t * 3 + e]! * 3, bi = idx[t * 3 + ((e + 1) % 3)]! * 3;
-      directed.set(a, { to: b, fromPos: [p[ai]!, p[ai + 1]!, p[ai + 2]!], toPos: [p[bi]!, p[bi + 1]!, p[bi + 2]!] });
-    }
-  }
-  const loops: Vec3Tuple[][] = [];
-  const used = new Set<string>();
-  for (const [startKey] of directed) {
-    if (used.has(startKey)) continue;
-    const loop: Vec3Tuple[] = [];
-    let k: string | undefined = startKey;
-    while (k && !used.has(k)) {
-      used.add(k);
-      const e = directed.get(k);
-      if (!e) break;
-      loop.push(e.fromPos);
-      k = e.to;
-    }
-    if (loop.length >= 3) loops.push(simplifyCollinear(loop, n0));
-  }
+  const idx = mesh.indices, p = mesh.positions;
+  if (start < 0 || start >= idx.length / 3) return null;
+  const adj = adjacencyOf(mesh);
+  const face = growFace(mesh, adj, start, Math.cos((angleTol * Math.PI) / 180), distTol);
+  if (!face) return null;
+  const n0: Vec3Tuple = [adj.normals[start * 3]!, adj.normals[start * 3 + 1]!, adj.normals[start * 3 + 2]!];
+  const loops = faceLoops(mesh, adj, face, n0);
   if (loops.length === 0) return null;
-  // outer loop = largest absolute area
-  loops.sort((x, y) => Math.abs(loopArea(y, n0)) - Math.abs(loopArea(x, n0)));
   const c = idx[start * 3]! * 3, c2 = idx[start * 3 + 1]! * 3, c3 = idx[start * 3 + 2]! * 3;
   const origin: Vec3Tuple = [(p[c]! + p[c2]! + p[c3]!) / 3, (p[c + 1]! + p[c2 + 1]! + p[c3 + 1]!) / 3, (p[c + 2]! + p[c2 + 2]! + p[c3 + 2]!) / 3];
-  return { normal: n0, origin, loops, triangles: [...inFace] };
+  return { normal: n0, origin, loops, triangles: [...face] };
 }
 
 /** Signed area of a 3D loop projected along `n` (positive = CCW seen from the normal side). */
@@ -179,51 +224,48 @@ export function meshEdges(mesh: TriangleMesh, minAngleDeg = 8): { faces: PlanarF
   const faces: PlanarFace[] = [];
   const edges: MeshEdge[] = [];
   if (mesh.indices.length > EDGE_INDEX_LIMIT || mesh.indices.length === 0) return { faces, edges };
-  const triFace = new Int32Array(mesh.indices.length / 3).fill(-1);
-  for (let t = 0; t < triFace.length; t++) {
-    if (triFace[t] !== -1) continue;
-    const f = planarFace(mesh, t);
-    if (!f) { triFace[t] = -2; continue; }
-    const id = faces.push(f) - 1;
-    for (const k of f.triangles) triFace[k] = id;
-  }
-  // directed boundary edges per face, keyed by quantised endpoints, with the owning face
+  const adj = adjacencyOf(mesh);
   const p = mesh.positions, idx = mesh.indices;
-  const vk = (vi: number) => key(p[vi * 3]!, p[vi * 3 + 1]!, p[vi * 3 + 2]!);
-  const owner = new Map<string, { face: number; a: Vec3Tuple; b: Vec3Tuple }>();
-  for (let t = 0; t < triFace.length; t++) {
-    const f = triFace[t]!;
-    if (f < 0) continue;
-    for (let e = 0; e < 3; e++) {
-      const ai = idx[t * 3 + e]!, bi = idx[t * 3 + ((e + 1) % 3)]!;
-      owner.set(`${vk(ai)}>${vk(bi)}`, { face: f, a: [p[ai * 3]!, p[ai * 3 + 1]!, p[ai * 3 + 2]!], b: [p[bi * 3]!, p[bi * 3 + 1]!, p[bi * 3 + 2]!] });
-    }
+  const triCount = idx.length / 3;
+  const triFace = new Int32Array(triCount).fill(-1);
+  const cosTol = Math.cos((1 * Math.PI) / 180);
+  for (let t = 0; t < triCount; t++) {
+    if (triFace[t] !== -1) continue;
+    const id = faces.length;
+    const set = growFace(mesh, adj, t, cosTol, 0.02, triFace, id);
+    if (!set) { triFace[t] = -2; continue; }
+    const n0: Vec3Tuple = [adj.normals[t * 3]!, adj.normals[t * 3 + 1]!, adj.normals[t * 3 + 2]!];
+    const loops = faceLoops(mesh, adj, set, n0);
+    const c = idx[t * 3]! * 3;
+    faces.push({ normal: n0, origin: [p[c]!, p[c + 1]!, p[c + 2]!], loops, triangles: [...set] });
   }
+  if (faces.length > 4000) return { faces, edges }; // an organic surface: no straight edges worth picking
   const cosMin = Math.cos((minAngleDeg * Math.PI) / 180);
-  const seen = new Set<string>();
   const raw: MeshEdge[] = [];
-  for (const [k, e] of owner) {
-    const [ka = '', kb = ''] = k.split('>');
-    const rev = owner.get(`${kb}>${ka}`);
-    if (!rev || rev.face === e.face) continue;
-    const ek = ka < kb ? ka + kb : kb + ka;
-    const pair = `${Math.min(e.face, rev.face)}|${Math.max(e.face, rev.face)}|${ek}`;
-    if (seen.has(pair)) continue;
-    seen.add(pair);
-    const A = faces[e.face]!, B = faces[rev.face]!;
-    const dot = A.normal[0] * B.normal[0] + A.normal[1] * B.normal[1] + A.normal[2] * B.normal[2];
-    if (dot > cosMin) continue; // nearly coplanar: not a real edge
-    const d: Vec3Tuple = [e.b[0] - e.a[0], e.b[1] - e.a[1], e.b[2] - e.a[2]];
-    const len = Math.hypot(...d);
-    if (len < 1e-6) continue;
-    // convex when face B's centre lies behind face A's plane
-    const cB = centroid(B.loops[0]!);
-    const side = (cB[0] - e.a[0]) * A.normal[0] + (cB[1] - e.a[1]) * A.normal[1] + (cB[2] - e.a[2]) * A.normal[2];
-    raw.push({ a: e.a, b: e.b, dir: [d[0] / len, d[1] / len, d[2] / len], length: len, nA: A.normal, nB: B.normal, convex: side < 0, faceA: e.face, faceB: rev.face });
+  for (let t = 0; t < triCount; t++) {
+    const fa = triFace[t]!;
+    if (fa < 0) continue;
+    for (let k = 0; k < 3; k++) {
+      const u = adj.across[t * 3 + k]!;
+      if (u < 0) continue;
+      const fb = triFace[u]!;
+      if (fb < 0 || fb === fa || fb < fa) continue; // each face pair once, from the lower face id
+      const A = faces[fa]!, B = faces[fb]!;
+      const dot = A.normal[0] * B.normal[0] + A.normal[1] * B.normal[1] + A.normal[2] * B.normal[2];
+      if (dot > cosMin) continue;
+      const ai = idx[t * 3 + k]! * 3, bi = idx[t * 3 + ((k + 1) % 3)]! * 3;
+      const a: Vec3Tuple = [p[ai]!, p[ai + 1]!, p[ai + 2]!], b: Vec3Tuple = [p[bi]!, p[bi + 1]!, p[bi + 2]!];
+      const d: Vec3Tuple = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const len = Math.hypot(...d);
+      if (len < 1e-6) continue;
+      const cB = centroid(B.loops[0] ?? [B.origin]);
+      const side = (cB[0] - a[0]) * A.normal[0] + (cB[1] - a[1]) * A.normal[1] + (cB[2] - a[2]) * A.normal[2];
+      raw.push({ a, b, dir: [d[0] / len, d[1] / len, d[2] / len], length: len, nA: A.normal, nB: B.normal, convex: side < 0, faceA: fa, faceB: fb });
+    }
   }
   // merge collinear segments between the same face pair into one edge
   const groups = new Map<string, MeshEdge[]>();
-  for (const e of raw) { const g = `${Math.min(e.faceA, e.faceB)}|${Math.max(e.faceA, e.faceB)}`; (groups.get(g) ?? groups.set(g, []).get(g)!).push(e); }
+  for (const e of raw) { const g = `${e.faceA}|${e.faceB}`; (groups.get(g) ?? groups.set(g, []).get(g)!).push(e); }
   for (const list of groups.values()) {
     const used = new Array(list.length).fill(false);
     for (let i = 0; i < list.length; i++) {

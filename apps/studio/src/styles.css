@@ -242,6 +242,12 @@ h4.group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; 
 .hdot.future i { background: transparent; border: 1.5px solid var(--ink); opacity: .4; }
 .hlabel { font-size: 11px; color: var(--muted); margin-left: 6px; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 
+.crash { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); padding: 20px; }
+.crash-card { max-width: 520px; background: var(--panel); border-radius: var(--radius-panel); box-shadow: var(--shadow); padding: 24px; }
+.crash-card h2 { margin: 0 0 8px; font-size: 18px; letter-spacing: -.01em; }
+.crash-card p { color: var(--muted); margin: 0 0 12px; }
+.crash-card pre { background: var(--panel-2); border-radius: 12px; padding: 10px; font: 11.5px/1.45 var(--mono); white-space: pre-wrap; margin: 0 0 12px; }
+
 .toasts { position: fixed; left: 50%; bottom: 54px; transform: translateX(-50%); display: grid; gap: 6px; z-index: 50; }
 .toast { background: var(--ink); color: #f2f1ef; padding: 9px 16px; border-radius: var(--pill); font-size: 12.5px; box-shadow: var(--shadow); }
 .toast.error { background: var(--hole); color: #fff; }

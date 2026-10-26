@@ -14,7 +14,7 @@ import { BuildError, buildPrimitive, placed } from './build.js';
 import { applyRepeat } from './edges.js';
 import { dispose } from './manifold.js';
 
-interface CacheEntry { mesh: TriangleMesh; volume: number; bbox: { min: Vec3; max: Vec3 }; }
+interface CacheEntry { mesh: TriangleMesh; volume: number; bbox: { min: Vec3; max: Vec3 }; bytes: number; }
 
 export interface EvaluatorOptions {
   registry: ModuleRegistry;
@@ -22,16 +22,21 @@ export interface EvaluatorOptions {
   /** sharp-edge threshold for smooth normals, degrees */
   sharpAngle?: number;
   cacheSize?: number;
+  /** cap on cached mesh bytes (LRU eviction); keeps long slider sessions from eating the tab's memory */
+  cacheBytes?: number;
 }
 
 export class Evaluator {
   private cache = new Map<string, CacheEntry>();
   private readonly sharpAngle: number;
   private readonly cacheSize: number;
+  private readonly cacheBytes: number;
+  private bytes = 0;
 
   constructor(private readonly wasm: ManifoldToplevel, private readonly opts: EvaluatorOptions) {
     this.sharpAngle = opts.sharpAngle ?? 32;
     this.cacheSize = opts.cacheSize ?? 400;
+    this.cacheBytes = opts.cacheBytes ?? 160 * 1024 * 1024;
   }
 
   /** Evaluate all visible top-level features. Errors are reported per feature, never thrown. */
@@ -77,7 +82,12 @@ export class Evaluator {
     try {
       const entry = this.toEntry(m);
       this.cache.set(key, entry);
-      if (this.cache.size > this.cacheSize) this.cache.delete(this.cache.keys().next().value as string);
+      this.bytes += entry.bytes;
+      while (this.cache.size > 1 && (this.cache.size > this.cacheSize || this.bytes > this.cacheBytes)) {
+        const oldest = this.cache.keys().next().value as string;
+        this.bytes -= this.cache.get(oldest)!.bytes;
+        this.cache.delete(oldest);
+      }
       return entry;
     } finally { dispose(m); }
   }
@@ -179,13 +189,14 @@ export class Evaluator {
       const box = withNormals.boundingBox();
       return {
         mesh: { positions, normals, indices },
+        bytes: positions.byteLength + normals.byteLength + indices.byteLength,
         volume: withNormals.volume(),
         bbox: { min: { x: box.min[0], y: box.min[1], z: box.min[2] }, max: { x: box.max[0], y: box.max[1], z: box.max[2] } },
       };
     } finally { if (withNormals !== m) dispose(withNormals); }
   }
 
-  clearCache(): void { this.cache.clear(); }
+  clearCache(): void { this.cache.clear(); this.bytes = 0; }
 
   /** Expand a module feature into concrete features placed in world space (for baking). */
   bakeModule(doc: FormaDocument, moduleFeatureId: string): Feature[] {
