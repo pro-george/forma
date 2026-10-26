@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Set BASE_PATH when deploying under a sub-path (GitHub Pages serves the repo at /forma/).
-const base = (process.env.BASE_PATH ?? '/') + 'artea/';
+// Set BASE_PATH to the site root when deploying (studio.artea.ro serves Artea Studio at / and Forma at /forma/).
+const base = (process.env.BASE_PATH ?? '/') + '';
 
 export default defineConfig({
   base,

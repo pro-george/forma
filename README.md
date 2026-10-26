@@ -2,7 +2,7 @@
 
 Browser-based 3D modeler for makers: parametric solids, booleans that always stay watertight, generator **modules** (nametag keychains, flexi toys, storage boxes, lampshades, relief vases…), and direct STL / 3MF export for printing.
 
-**Live:** Studio at https://pro-george.github.io/forma/ · Artea Studio at https://pro-george.github.io/forma/artea/ (deployed from `main` by `.github/workflows/pages.yml`).
+**Live:** Artea Studio at https://studio.artea.ro/ · Forma Studio at https://studio.artea.ro/forma/ (deployed from `main` by `.github/workflows/pages.yml` to GitHub Pages with the custom domain).
 
 ```
 pnpm install

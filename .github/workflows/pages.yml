@@ -1,7 +1,8 @@
 name: Deploy to GitHub Pages
 
-# Builds Studio (served at /forma/) and Artea Studio (/forma/artea/) and
-# pushes the static site to the gh-pages branch, which GitHub Pages serves.
+# Builds Artea Studio (served at the root, studio.artea.ro) and Forma Studio
+# (/forma/) and pushes the static site to the gh-pages branch, which GitHub
+# Pages serves under the custom domain below.
 
 on:
   push:
@@ -29,13 +30,14 @@ jobs:
       - run: pnpm test
       - name: Build Studio and Artea Studio
         run: |
-          BASE_PATH=/${{ github.event.repository.name }}/ pnpm -r build
-          mkdir -p site/artea
-          cp -r apps/studio/dist/. site/
-          cp -r apps/artea-studio/dist/. site/artea/
+          BASE_PATH=/ pnpm -r build
+          mkdir -p site/forma
+          cp -r apps/artea-studio/dist/. site/
+          cp -r apps/studio/dist/. site/forma/
           touch site/.nojekyll
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./site
+          cname: studio.artea.ro
           force_orphan: true
