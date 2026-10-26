@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../state/store';
 import { useUI, type PanelId } from '../state/ui';
 import { useSketch } from '../state/sketch';
@@ -28,6 +28,7 @@ export function MobileShell() {
   const partCount = useStore((s) => s.doc.features.filter((f) => f.parentId === null).length);
   const s = useStore();
   const pushArmed = usePushPull((st) => st.armed);
+  const [exp, setExp] = useState(false);
   useEffect(() => { if (sketching) useUI.setState({ sheet: null }); }, [sketching]);
   return (
     <>
@@ -37,8 +38,13 @@ export function MobileShell() {
         <button className="ghost" title="Undo" disabled={!s.canUndo()} onClick={s.undo}><Icon.undo /></button>
         <button className="ghost" title="Redo" disabled={!s.canRedo()} onClick={s.redo}><Icon.redo /></button>
         <button className={pushArmed ? 'on' : ''} onClick={() => (pushArmed ? usePushPull.getState().disarm() : usePushPull.getState().arm())} title="Push / pull a face">Pull</button>
-        <button className="primary" onClick={() => s.exportModel('stl')} title="Export STL"><Icon.download /></button>
+        <button className="primary" onClick={() => setExp((v) => !v)} title="Export" aria-expanded={exp}><Icon.download /></button>
       </header>
+      {exp && (
+        <div className="m-export glass-strong" onClick={() => setExp(false)}>
+          {(['stl', '3mf', 'obj'] as const).map((f) => <button key={f} onClick={() => s.exportModel(f)}>{f.toUpperCase()}</button>)}
+        </div>
+      )}
       {sheet && !sketching && (
         <section className={`m-sheet m-sheet-${sheet}`}>
           <div className="m-handle" onClick={() => open(null)} role="button" aria-label="Close" />

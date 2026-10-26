@@ -281,6 +281,8 @@ h4.group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; 
 .m-top button.on { background: #f2f1ef; color: var(--ink); }
 .m-top button.primary { background: var(--accent); color: #fff; }
 .m-top svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.m-export { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 62px); right: 10px; z-index: 26; display: flex; gap: 4px; padding: 4px; border-radius: var(--pill); }
+.m-export button { min-height: 38px; background: transparent; font-weight: 500; }
 .m-tabs { position: absolute; left: 10px; right: 10px; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); z-index: 25; display: flex; gap: 4px; padding: 4px; border-radius: var(--pill); }
 .m-tabs button { flex: 1; min-height: 42px; background: transparent; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .m-tabs button.on { background: var(--ink); color: #fff; }

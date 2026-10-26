@@ -6,7 +6,7 @@
 import * as Comlink from 'comlink';
 import {
   initManifold, Evaluator, createDefaultRegistry, createModuleApi, canvasTextRasterizer,
-  toBinarySTL, to3MF, topLevel, featureById,
+  toBinarySTL, to3MF, toOBJ, topLevel, featureById,
   type FormaDocument, type EvaluatedFeature, type ModuleDefinition, type Feature, type TriangleMesh,
 } from '@forma/core';
 import wasmUrl from 'manifold-3d/manifold.wasm?url';
@@ -68,7 +68,7 @@ const api = {
   },
 
   /** Export as one unioned watertight shell (STL) or one object per part (3MF). */
-  exportModel(doc: FormaDocument, format: 'stl' | '3mf', ids?: string[]): Uint8Array {
+  exportModel(doc: FormaDocument, format: 'stl' | '3mf' | 'obj', ids?: string[]): Uint8Array {
     if (!evaluator) throw new Error('worker not initialised');
     if (format === 'stl') {
       const m = evaluator.worldManifold(doc, ids);
@@ -96,7 +96,7 @@ const api = {
         objects.push({ name: featureById(doc, f.id)?.name ?? f.id, mesh: { positions, normals: new Float32Array(0), indices: new Uint32Array(mesh.triVerts) } });
       } finally { m.delete(); }
     }
-    const bytes = to3MF(objects, doc.name);
+    const bytes = format === 'obj' ? toOBJ(objects, doc.name) : to3MF(objects, doc.name);
     return Comlink.transfer(bytes, [bytes.buffer as ArrayBuffer]);
   },
 };

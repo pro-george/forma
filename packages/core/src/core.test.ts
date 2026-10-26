@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   initManifold, Evaluator, createDefaultRegistry, createModuleApi, createDocument, addFeature, makeFeature,
-  combine, ungroup, removeFeatures, duplicate, addToCombine, splitFeature, parseDocument, serializeDocument, History, toBinarySTL, to3MF,
+  combine, ungroup, removeFeatures, duplicate, addToCombine, splitFeature, parseDocument, serializeDocument, History, toBinarySTL, to3MF, toOBJ,
   traceRaster, loopsToProfiles, composeTransforms, sampleDocument, LAMP_FAMILIES, SOCKET_HOLE_RADIUS, familyInputs,
   planarFace, loopArea, meshEdges, edgeToolSection, eulerFromBasis,
   encodeHeightMap, decodeHeightMap, sampleHeightMap, blurHeightMap, proceduralHeightMap, rasterToHeightMap, VASE_SHAPES,
@@ -459,6 +459,19 @@ describe('document', () => {
 });
 
 describe('export', () => {
+  it('OBJ lists every vertex and face with shared numbering across objects', () => {
+    let doc = createDocument();
+    doc = addFeature(doc, makeFeature(doc, 'box', { width: 10, depth: 10, height: 10 }));
+    const [r] = ev.evaluate(doc);
+    const text = new TextDecoder().decode(toOBJ([{ name: 'A box', mesh: r!.mesh }, { name: 'B', mesh: r!.mesh }]));
+    const v = (text.match(/^v /gm) ?? []).length, f = (text.match(/^f /gm) ?? []).length;
+    expect(v).toBe((r!.mesh.positions.length / 3) * 2);
+    expect(f).toBe((r!.mesh.indices.length / 3) * 2);
+    expect(text).toContain('o A_box');
+    // the second object's faces reference vertices after the first object's
+    const lastFace = text.trim().split('\n').pop()!;
+    expect(Math.max(...lastFace.slice(2).split(' ').map(Number))).toBe(v);
+  });
   it('binary STL and 3MF have the right sizes', () => {
     let doc = createDocument();
     doc = addFeature(doc, makeFeature(doc, 'box', { width: 1, depth: 1, height: 1 }));

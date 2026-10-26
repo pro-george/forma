@@ -5,7 +5,7 @@
 import * as Comlink from 'comlink';
 import {
   initManifold, Evaluator, createDefaultRegistry, createModuleApi, createDocument, addFeature, makeFeature,
-  toBinarySTL, to3MF, type FormaDocument, type TriangleMesh,
+  toBinarySTL, to3MF, toOBJ, type FormaDocument, type TriangleMesh,
 } from '@forma/core';
 import wasmUrl from 'manifold-3d/manifold.wasm?url';
 
@@ -66,10 +66,10 @@ const api = {
     return Comlink.transfer(out, [positions.buffer as ArrayBuffer, normals.buffer as ArrayBuffer, indices.buffer as ArrayBuffer]);
   },
 
-  exportModel(inputs: Record<string, string | number>, format: 'stl' | '3mf', name: string): Uint8Array {
+  exportModel(inputs: Record<string, string | number>, format: 'stl' | '3mf' | 'obj', name: string): Uint8Array {
     if (!evaluator) throw new Error('worker not initialised');
     const mesh = plainMesh(docFor(inputs));
-    const bytes = format === 'stl' ? toBinarySTL([mesh]) : to3MF([{ name, mesh }], name);
+    const bytes = format === 'stl' ? toBinarySTL([mesh]) : format === 'obj' ? toOBJ([{ name, mesh }], name) : to3MF([{ name, mesh }], name);
     return Comlink.transfer(bytes, [bytes.buffer as ArrayBuffer]);
   },
 };

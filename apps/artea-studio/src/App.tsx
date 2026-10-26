@@ -95,9 +95,9 @@ export default function App() {
     try { await navigator.clipboard.writeText(location.href); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* clipboard blocked */ }
   };
 
-  const download = async (format: 'stl' | '3mf') => {
+  const download = async (format: 'stl' | '3mf' | 'obj') => {
     const bytes = await geometry.exportModel(moduleInputs(design, 'print'), format, code);
-    const blob = new Blob([new Uint8Array(bytes)], { type: format === 'stl' ? 'model/stl' : 'model/3mf' });
+    const blob = new Blob([new Uint8Array(bytes)], { type: format === 'stl' ? 'model/stl' : format === 'obj' ? 'model/obj' : 'model/3mf' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `${code}.${format}`;
@@ -230,6 +230,7 @@ export default function App() {
               <div className="cta">
                 <button type="button" className="btn ghost" onClick={() => void download('stl')}>Descarcă STL</button>
                 <button type="button" className="btn ghost" onClick={() => void download('3mf')}>Descarcă 3MF</button>
+                <button type="button" className="btn ghost" onClick={() => void download('obj')}>Descarcă OBJ</button>
               </div>
               <form className="load" onSubmit={(e) => { e.preventDefault(); const d = decode(adminCode); if (d) setDesign(d); }}>
                 <label htmlFor="code-in" className="small">Deschide un cod din comandă</label>

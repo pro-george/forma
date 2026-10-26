@@ -53,9 +53,11 @@ export function TopBar() {
         <>
           <button onClick={() => { s.exportModel('stl'); close(); }}>STL <small>one unioned shell</small></button>
           <button onClick={() => { s.exportModel('3mf'); close(); }}>3MF <small>one object per part</small></button>
+          <button onClick={() => { s.exportModel('obj'); close(); }}>OBJ <small>for other 3D apps</small></button>
           <hr />
           <button disabled={!s.selection.length} onClick={() => { s.exportModel('stl', true); close(); }}>STL of selection</button>
           <button disabled={!s.selection.length} onClick={() => { s.exportModel('3mf', true); close(); }}>3MF of selection</button>
+          <button disabled={!s.selection.length} onClick={() => { s.exportModel('obj', true); close(); }}>OBJ of selection</button>
         </>
       )}</Menu>
       <input ref={fileInput} type="file" accept=".forma,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) s.openFile(f); e.target.value = ''; }} />

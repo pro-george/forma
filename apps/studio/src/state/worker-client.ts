@@ -57,7 +57,7 @@ class WorkerClient {
   }
 
   bake(doc: FormaDocument, id: string) { return this.remote.bake(doc, id); }
-  exportModel(doc: FormaDocument, format: 'stl' | '3mf', ids?: string[]) { return this.remote.exportModel(doc, format, ids); }
+  exportModel(doc: FormaDocument, format: 'stl' | '3mf' | 'obj', ids?: string[]) { return this.remote.exportModel(doc, format, ids); }
 }
 
 export const workerClient = new WorkerClient();

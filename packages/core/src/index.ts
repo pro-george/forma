@@ -14,5 +14,6 @@ export * from './raster/heightmap.js';
 export * from './sketch/sketch.js';
 export * from './export/stl.js';
 export * from './export/threemf.js';
+export * from './export/obj.js';
 export * from './modules/index.js';
 export { sampleDocument } from './samples.js';

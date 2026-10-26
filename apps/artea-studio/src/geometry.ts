@@ -36,7 +36,7 @@ class Geometry {
     this.running = false;
   }
 
-  async exportModel(inputs: Record<string, string | number>, format: 'stl' | '3mf', name: string) {
+  async exportModel(inputs: Record<string, string | number>, format: 'stl' | '3mf' | 'obj', name: string) {
     await this.ready;
     return this.remote.exportModel(inputs, format, name);
   }
