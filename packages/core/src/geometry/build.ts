@@ -6,6 +6,7 @@
 import type { Manifold, ManifoldToplevel, Mesh } from 'manifold-3d';
 import type { Feature, FeatureOf, Modifiers, Vec2 } from '../document/types.js';
 import { chaikin, ensureCCW, profileContours } from './profile.js';
+import { buildDisplacedRevolve, displacementAt, hasModifiers, modifierEdgeLength, reliefMap, reliefOf } from './revolve.js';
 import { sketchToProfiles } from '../sketch/sketch.js';
 import { dispose } from './manifold.js';
 
@@ -55,6 +56,11 @@ export function buildPrimitive(wasm: ManifoldToplevel, f: Exclude<Feature, Featu
       break;
     }
     case 'revolve': {
+      if (hasModifiers(f.modifiers)) {
+        // modifiers are baked into a direct grid mesh: far faster than refine + warp at rib/relief density
+        revolveProfile(f); // validates the profile (wall vs radius) with the same errors as the plain path
+        try { return buildDisplacedRevolve(wasm, f); } catch (e) { throw new BuildError(`Revolve failed: ${(e as Error).message}`, f.id); }
+      }
       m = Manifold.revolve([revolveProfile(f)], f.segments);
       break;
     }
@@ -108,17 +114,15 @@ export function revolveProfile(f: FeatureOf<'revolve'>): Vec2[] {
   return ensureCCW(pts);
 }
 
-const hasMods = (m: Modifiers) => m.twist !== 0 || m.taper !== 0 || m.rippleAmplitude !== 0 || m.grooveAmplitude !== 0;
-
 /** Non-destructive surface modifiers via Manifold.warp; refines the mesh first so curves can bend. */
 export function applyModifiers(m: Manifold, mods: Modifiers): Manifold {
-  if (!hasMods(mods)) return m;
+  if (!hasModifiers(mods)) return m;
+  const relief = reliefOf(mods);
+  const map = reliefMap(relief);
   const box = m.boundingBox();
   const z0 = box.min[2], h = Math.max(1e-6, box.max[2] - z0);
   const radius = Math.max(box.max[0] - box.min[0], box.max[1] - box.min[1]) / 2;
-  // edge length that keeps curvature smooth without exploding the triangle count
-  const targetEdge = Math.max(0.6, Math.min(h, radius * 2) / 40) * (mods.coarseness ?? 1);
-  const refined = m.refineToLength(targetEdge);
+  const refined = m.refineToLength(modifierEdgeLength(mods, relief, map, radius, h));
   dispose(m);
   const twist = mods.twist * deg2rad, taper = mods.taper / 100;
   const warped = refined.warp((v) => {
@@ -127,9 +131,7 @@ export function applyModifiers(m: Manifold, mods: Modifiers): Manifold {
     let r = Math.hypot(x, y);
     if (r < 1e-9) return;
     let a = Math.atan2(y, x);
-    r *= 1 + taper * t;
-    if (mods.rippleAmplitude) r += mods.rippleAmplitude * Math.sin(t * mods.rippleWaves * Math.PI * 2);
-    if (mods.grooveAmplitude) r += mods.grooveAmplitude * 0.5 * (1 + Math.cos(a * mods.grooveCount));
+    r = r * (1 + taper * t) + displacementAt(mods, relief, map, a, t);
     a += twist * t;
     v[0] = Math.cos(a) * r;
     v[1] = Math.sin(a) * r;

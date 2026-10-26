@@ -114,6 +114,12 @@ kbd { font: 11px var(--mono); color: var(--muted); }
 .props { overflow: auto; padding: 6px 12px 18px; }
 .field { display: grid; grid-template-columns: 1fr 112px; align-items: center; gap: 8px; padding: 3px 0; }
 .field > label { font-size: 12px; color: var(--muted); }
+.field-block { padding: 6px 0; }
+.field-block > label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.field-block .help { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+.imagefield { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: center; }
+.imagefield-thumb { width: 56px; height: 56px; border: 1px dashed var(--line-strong); border-radius: 6px; background: var(--panel-2); }
+.imagefield-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .field input[type=text], .field select, .numfield input { width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: 12.5px; }
 .numfield { position: relative; }
 .numfield input { font-family: var(--mono); font-variant-numeric: tabular-nums; padding-right: 30px; }

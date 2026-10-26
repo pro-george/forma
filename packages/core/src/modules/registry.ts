@@ -12,7 +12,9 @@ export type ModuleInput =
   | { key: string; type: 'number'; label: string; default: number; min: number; max: number; step: number; unit?: string; help?: string }
   | { key: string; type: 'select'; label: string; default: string; options: { value: string; label: string }[]; help?: string }
   | { key: string; type: 'toggle'; label: string; default: boolean; help?: string }
-  | { key: string; type: 'color'; label: string; default: string; help?: string };
+  | { key: string; type: 'color'; label: string; default: string; help?: string }
+  /** an uploaded picture, stored as an encoded height map (see raster/heightmap.ts); '' = none */
+  | { key: string; type: 'image'; label: string; default: string; help?: string };
 
 export type ModuleInputValues = Record<string, string | number | boolean>;
 

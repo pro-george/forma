@@ -3,6 +3,7 @@ import {
   initManifold, Evaluator, createDefaultRegistry, createModuleApi, createDocument, addFeature, makeFeature,
   combine, ungroup, removeFeatures, duplicate, parseDocument, serializeDocument, History, toBinarySTL, to3MF,
   traceRaster, loopsToProfiles, composeTransforms, sampleDocument, LAMP_FAMILIES, SOCKET_HOLE_RADIUS, familyInputs,
+  encodeHeightMap, decodeHeightMap, sampleHeightMap, blurHeightMap, proceduralHeightMap, rasterToHeightMap, VASE_SHAPES,
   type TextRasterizer, type FormaDocument,
 } from './index.js';
 
@@ -164,6 +165,37 @@ describe('modules', () => {
     expect(collar && collar.type === 'tube' && collar.innerRadius).toBe(SOCKET_HOLE_RADIUS.e27);
     expect(collar && collar.type === 'tube' && collar.radius).toBeGreaterThan(SOCKET_HOLE_RADIUS.e27 + 7);
   });
+  it('relief vase: every shape builds watertight, ribs and relief add material', () => {
+    for (const shape of VASE_SHAPES) {
+      let doc = createDocument();
+      doc = addFeature(doc, makeFeature(doc, 'module', { moduleId: 'relief-vase', inputs: { shape: shape.id, height: 60, diameter: 40, ribs: 40, detail: 'preview' } }));
+      const [r] = ev.evaluate(doc);
+      expect(r!.error, shape.id).toBeUndefined();
+      expect(r!.bbox.min.z, shape.id).toBeCloseTo(0, 1);
+      expect(r!.bbox.max.z, shape.id).toBeCloseTo(60, 0);
+    }
+    // the same vase without ribs or relief is slimmer: plain < ribs only < ribs + relief
+    const vol = (inputs: Record<string, unknown>) => {
+      let doc = createDocument();
+      doc = addFeature(doc, makeFeature(doc, 'module', { moduleId: 'relief-vase', inputs: { height: 60, diameter: 40, detail: 'preview', ...inputs } }));
+      const [r] = ev.evaluate(doc);
+      expect(r!.error).toBeUndefined();
+      return { volume: r!.volume, maxX: r!.bbox.max.x };
+    };
+    const plain = vol({ ribs: 0, pattern: 'none' });
+    const ribbed = vol({ ribs: 40, ribDepth: 1, pattern: 'none' });
+    const relief = vol({ ribs: 40, ribDepth: 1, pattern: 'flower', depth: 2 });
+    expect(ribbed.maxX).toBeGreaterThan(plain.maxX + 0.5);
+    expect(relief.maxX).toBeGreaterThan(ribbed.maxX + 1);
+    expect(relief.volume).toBeGreaterThan(ribbed.volume);
+    // an uploaded map takes precedence over the sample pattern
+    const custom = encodeHeightMap(proceduralHeightMap('checker', 32));
+    const uploaded = vol({ ribs: 0, pattern: 'none', image: custom, depth: 3, soften: 0 });
+    expect(uploaded.maxX).toBeGreaterThan(plain.maxX + 2);
+    // negative depth carves inward instead
+    const carved = vol({ ribs: 0, pattern: 'flower', depth: -2 });
+    expect(carved.volume).toBeLessThan(plain.volume);
+  });
   it('unknown module reports an error instead of throwing', () => {
     let doc = createDocument();
     doc = addFeature(doc, makeFeature(doc, 'module', { moduleId: 'nope', inputs: {} }));
@@ -208,6 +240,42 @@ describe('export', () => {
     const mf = to3MF([{ name: 'cube', mesh: r!.mesh }]);
     expect(mf.length).toBeGreaterThan(300);
     expect(mf[0]).toBe(0x50); // 'P' of PK zip signature
+  });
+});
+
+describe('height maps', () => {
+  it('encode/decode round-trips and rejects garbage', () => {
+    const m = proceduralHeightMap('dots', 16);
+    const s = encodeHeightMap(m);
+    expect(s.startsWith('hm1:16:16:')).toBe(true);
+    const back = decodeHeightMap(s)!;
+    expect(back.width).toBe(16);
+    expect(Array.from(back.data)).toEqual(Array.from(m.data));
+    expect(decodeHeightMap('')).toBeNull();
+    expect(decodeHeightMap('hm1:4:4:!!!!')).toBeNull();
+    expect(decodeHeightMap('hm1:4:4:AAAA')).toBeNull(); // 3 bytes for 16 pixels
+  });
+  it('samples bilinearly with v=0 at the bottom row and wraps around u', () => {
+    const data = new Uint8Array([0, 255, 0, 255]); // 2x2: top row [0,255], bottom row [0,255]
+    const m = { width: 2, height: 2, data };
+    expect(sampleHeightMap(m, 0.25, 0.25)).toBeCloseTo(0, 5);
+    expect(sampleHeightMap(m, 0.75, 0.75)).toBeCloseTo(1, 5);
+    expect(sampleHeightMap(m, 0.5, 0.5)).toBeCloseTo(0.5, 5);
+    expect(sampleHeightMap(m, 1.25, 0.5)).toBeCloseTo(sampleHeightMap(m, 0.25, 0.5), 5);
+    const topHeavy = { width: 1, height: 2, data: new Uint8Array([255, 0]) };
+    expect(sampleHeightMap(topHeavy, 0, 0)).toBeLessThan(sampleHeightMap(topHeavy, 0, 1));
+  });
+  it('blur keeps the mean and softens edges; raster downsampling keeps the aspect', () => {
+    const m = proceduralHeightMap('checker', 32);
+    const b = blurHeightMap(m, 3);
+    const mean = (x: Uint8Array) => x.reduce((a, v) => a + v, 0) / x.length;
+    expect(Math.abs(mean(b.data) - mean(m.data))).toBeLessThan(2);
+    const edges = (x: Uint8Array) => { let n = 0; for (let i = 1; i < x.length; i++) if (Math.abs(x[i]! - x[i - 1]!) > 200) n++; return n; };
+    expect(edges(b.data)).toBeLessThan(edges(m.data));
+    const hm = rasterToHeightMap({ data: new Float32Array(1000 * 500).fill(0.5), width: 1000, height: 500 }, 256);
+    expect(hm.width).toBe(256);
+    expect(hm.height).toBe(128);
+    expect(hm.data[0]).toBe(128);
   });
 });
 

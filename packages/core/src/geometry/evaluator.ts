@@ -134,29 +134,39 @@ export class Evaluator {
   }
 
   private toEntry(m: Manifold): CacheEntry {
-    const withNormals = m.calculateNormals(0, this.sharpAngle);
+    // Manifold's calculateNormals splits vertices along sharp edges, which is
+    // right for boxes and bevels but takes tens of seconds on a ribbed or
+    // relief surface with hundreds of thousands of creased edges. Big meshes
+    // are organic by construction, so they get fast smooth normals instead.
+    const big = m.numTri() > SMOOTH_NORMALS_ABOVE;
+    const withNormals = big ? m : m.calculateNormals(0, this.sharpAngle);
     try {
       const mesh = withNormals.getMesh();
       const np = mesh.numProp;
       const n = mesh.vertProperties.length / np;
-      const positions = new Float32Array(n * 3), normals = new Float32Array(n * 3);
+      const positions = new Float32Array(n * 3);
       for (let i = 0; i < n; i++) {
         positions[i * 3] = mesh.vertProperties[i * np]!;
         positions[i * 3 + 1] = mesh.vertProperties[i * np + 1]!;
         positions[i * 3 + 2] = mesh.vertProperties[i * np + 2]!;
-        if (np >= 6) {
+      }
+      const indices = new Uint32Array(mesh.triVerts);
+      let normals: Float32Array;
+      if (np >= 6) {
+        normals = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) {
           normals[i * 3] = mesh.vertProperties[i * np + 3]!;
           normals[i * 3 + 1] = mesh.vertProperties[i * np + 4]!;
           normals[i * 3 + 2] = mesh.vertProperties[i * np + 5]!;
         }
-      }
+      } else normals = smoothNormals(positions, indices);
       const box = withNormals.boundingBox();
       return {
-        mesh: { positions, normals, indices: new Uint32Array(mesh.triVerts) },
+        mesh: { positions, normals, indices },
         volume: withNormals.volume(),
         bbox: { min: { x: box.min[0], y: box.min[1], z: box.min[2] }, max: { x: box.max[0], y: box.max[1], z: box.max[2] } },
       };
-    } finally { dispose(withNormals); }
+    } finally { if (withNormals !== m) dispose(withNormals); }
   }
 
   clearCache(): void { this.cache.clear(); }
@@ -170,6 +180,28 @@ export class Evaluator {
     const specs = def.build(resolveInputs(def, f.inputs), this.opts.api);
     return specsToFeatures(specs, f.id);
   }
+}
+
+/** Above this many triangles, normals are area-weighted smooth normals computed here (see toEntry). */
+const SMOOTH_NORMALS_ABOVE = 40_000;
+
+/** Area-weighted vertex normals for an indexed mesh (no vertex splitting). */
+export function smoothNormals(positions: Float32Array, indices: Uint32Array): Float32Array {
+  const normals = new Float32Array(positions.length);
+  for (let t = 0; t < indices.length; t += 3) {
+    const a = indices[t]! * 3, b = indices[t + 1]! * 3, c = indices[t + 2]! * 3;
+    const abx = positions[b]! - positions[a]!, aby = positions[b + 1]! - positions[a + 1]!, abz = positions[b + 2]! - positions[a + 2]!;
+    const acx = positions[c]! - positions[a]!, acy = positions[c + 1]! - positions[a + 1]!, acz = positions[c + 2]! - positions[a + 2]!;
+    const nx = aby * acz - abz * acy, ny = abz * acx - abx * acz, nz = abx * acy - aby * acx;
+    normals[a] = normals[a]! + nx; normals[a + 1] = normals[a + 1]! + ny; normals[a + 2] = normals[a + 2]! + nz;
+    normals[b] = normals[b]! + nx; normals[b + 1] = normals[b + 1]! + ny; normals[b + 2] = normals[b + 2]! + nz;
+    normals[c] = normals[c]! + nx; normals[c + 1] = normals[c + 1]! + ny; normals[c + 2] = normals[c + 2]! + nz;
+  }
+  for (let i = 0; i < normals.length; i += 3) {
+    const l = Math.hypot(normals[i]!, normals[i + 1]!, normals[i + 2]!) || 1;
+    normals[i] = normals[i]! / l; normals[i + 1] = normals[i + 1]! / l; normals[i + 2] = normals[i + 2]! / l;
+  }
+  return normals;
 }
 
 export function emptyMesh(): TriangleMesh {

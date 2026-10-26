@@ -39,8 +39,36 @@ export const ProfileSchema = z.object({
 });
 export type Profile = z.infer<typeof ProfileSchema>;
 
+/**
+ * Image-driven relief: a height map (see raster/heightmap.ts) wrapped around
+ * the part and pushed outward along the radius. Zero depth or an empty map
+ * disables it.
+ */
+export const ReliefSchema = z.object({
+  /** encoded height map (`hm1:w:h:base64`), '' = none */
+  map: z.string().default(''),
+  /** mm at full white; negative carves inward */
+  depth: z.number().default(0),
+  /** tiles around the perimeter */
+  repeat: z.number().int().min(1).max(64).default(1),
+  /** tiles over the covered height */
+  rows: z.number().int().min(1).max(32).default(1),
+  /** covered height band as fractions of the part height, bottom → top */
+  from: z.number().min(0).max(1).default(0),
+  to: z.number().min(0).max(1).default(1),
+  /** blur radius in map pixels, rounds the edges of flat shapes */
+  soften: z.number().min(0).max(32).default(0),
+  /** swap raised and flat */
+  invert: z.boolean().default(false),
+  /** rotate the pattern around the part, degrees */
+  phase: z.number().default(0),
+});
+export type Relief = z.infer<typeof ReliefSchema>;
+export const defaultRelief = (): Relief => ReliefSchema.parse({});
+
 /** Non-destructive surface modifiers, applied after the base shape is built. */
 export const ModifiersSchema = z.object({
+  relief: ReliefSchema.default({}),
   /** total rotation around Z over the part height, degrees */
   twist: z.number().default(0),
   /** radial scale change from bottom (0 %) to top, percent; -50 halves the top */

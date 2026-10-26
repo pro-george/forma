@@ -4,6 +4,7 @@ import { useStore } from '../state/store';
 import type { ModuleInfo } from '../state/worker-client';
 import { Field, NumberField, Slider, TextField, formatNum } from './fields';
 import { ProfileEditor } from './ProfileEditor';
+import { ImageField } from './ImageField';
 import { useSketch } from '../state/sketch';
 
 type NumKey<T> = { [K in keyof T]: T[K] extends number ? K : never }[keyof T];
@@ -23,7 +24,8 @@ const FIELDS: { [T in Feature['type']]?: FieldDef<FeatureOf<T>>[] } = {
   mesh: [{ key: 'scale', label: 'Scale', min: 0.1, max: 20, step: 0.1, unit: '×' }],
 };
 
-const MOD_DEFS: { key: keyof Modifiers; label: string; min: number; max: number; step: number; unit: string }[] = [
+type NumModKey = { [K in keyof Modifiers]: Modifiers[K] extends number ? K : never }[keyof Modifiers];
+const MOD_DEFS: { key: NumModKey; label: string; min: number; max: number; step: number; unit: string }[] = [
   { key: 'twist', label: 'Twist', min: -360, max: 360, step: 5, unit: '°' },
   { key: 'taper', label: 'Taper', min: -90, max: 200, step: 1, unit: '%' },
   { key: 'rippleAmplitude', label: 'Ripple', min: 0, max: 10, step: 0.1, unit: 'mm' },
@@ -170,6 +172,13 @@ function ModulePanel({ feature }: { feature: FeatureOf<'module'> }) {
           case 'select': return <Field key={inp.key} label={inp.label} htmlFor={id}><select id={id} value={String(v)} onChange={(e) => setInput(inp.key, e.target.value, true)}>{inp.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></Field>;
           case 'toggle': return <Field key={inp.key} label={inp.label} htmlFor={id}><label className="check"><input id={id} type="checkbox" checked={Boolean(v)} onChange={(e) => setInput(inp.key, e.target.checked, true)} /></label></Field>;
           case 'color': return <Field key={inp.key} label={inp.label} htmlFor={id}><input id={id} type="color" value={String(v)} onChange={(e) => setInput(inp.key, e.target.value, true)} /></Field>;
+          case 'image': return (
+            <div key={inp.key} className="field-block">
+              <label htmlFor={id}>{inp.label}</label>
+              <ImageField id={id} value={String(v)} onChange={(s) => setInput(inp.key, s, true)} />
+              {inp.help && <div className="help">{inp.help}</div>}
+            </div>
+          );
         }
       })}
       <Placement feature={feature} />

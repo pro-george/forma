@@ -1,6 +1,8 @@
 # Forma
 
-Browser-based 3D modeler for makers: parametric solids, booleans that always stay watertight, generator **modules** (nametag keychains, flexi toys, storage boxes…), and direct STL / 3MF export for printing.
+Browser-based 3D modeler for makers: parametric solids, booleans that always stay watertight, generator **modules** (nametag keychains, flexi toys, storage boxes, lampshades, relief vases…), and direct STL / 3MF export for printing.
+
+**Live:** Studio at https://pro-george.github.io/forma/ · Artea Studio at https://pro-george.github.io/forma/artea/ (deployed from `main` by `.github/workflows/pages.yml`).
 
 ```
 pnpm install
@@ -46,6 +48,8 @@ export const coasterModule = {
 ```
 
 `api` gives you `roundedRect`, `circle`, `regularPolygon`, `text(str, font, capHeightMm)` and `traceRaster(...)`.
+
+An input of type `image` is an uploaded picture stored as a compact height-map string (`hm1:w:h:base64`, see `raster/heightmap.ts`). Pass it to the `relief` modifier on a revolve to push the picture out of the wall as low relief — the **Relief vase** module does exactly this: fine vertical ribs plus an SVG/PNG relief, meant for spiral-vase printing. Revolves with modifiers are generated as a direct (angle × height) grid mesh, so rib-and-relief density stays fast.
 
 ## Roadmap
 
