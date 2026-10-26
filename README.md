@@ -18,6 +18,12 @@ pnpm build
 | `packages/core` (`@forma/core`) | No UI. Document model (zod-validated JSON), immutable operations + undo history, the **evaluator** on top of [Manifold](https://github.com/elalish/manifold) (WASM), surface modifiers, the module SDK, raster→outline tracing (text in any font, logos), STL/3MF writers. |
 | `apps/studio` (`@forma/studio`) | React + react-three-fiber app. Geometry runs in a Web Worker; the UI only ever receives meshes. |
 
+## Modelling
+
+* **Sketch on a face** (⇧K, or *Sketch on face* in the Create panel): click any flat face of a part, draw on it, then **Join** (extrude outward) or **Cut** (extrude into the part). The extrusion is added to the part's combine so the boolean stays live and editable.
+* Extrusions have a **Direction** (up/down from their sketch plane) next to height, top scale and twist.
+* The UI is a set of floating glass panels (Create, Parts, Properties) that collapse to pill tabs; the layout is remembered per browser.
+
 ## Conventions
 
 * Millimetres, **Z up**, build plate = XY plane at Z = 0 (same as every slicer).

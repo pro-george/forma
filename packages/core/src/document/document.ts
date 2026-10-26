@@ -119,6 +119,24 @@ export function combine(doc: FormaDocument, ids: string[], name?: string): { doc
   return { doc: { ...doc, features: [...features, c] }, combineId: c.id };
 }
 
+/** Add a top-level feature to an existing combine (at the end, so holes cut what came before). */
+export function addToCombine(doc: FormaDocument, combineId: string, featureId: string): FormaDocument {
+  const c = featureById(doc, combineId);
+  const f = featureById(doc, featureId);
+  if (!c || c.type !== 'combine' || !f) throw new Error('addToCombine: bad ids');
+  if (c.childIds.includes(featureId)) return doc;
+  const p = c.transform.position;
+  return {
+    ...doc,
+    features: doc.features.map((x) => {
+      if (x.id === combineId && x.type === 'combine') return { ...x, childIds: [...x.childIds, featureId] };
+      // children are placed in the combine's frame: compensate the combine's own offset
+      if (x.id === featureId) return { ...x, parentId: combineId, transform: { ...x.transform, position: { x: x.transform.position.x - p.x, y: x.transform.position.y - p.y, z: x.transform.position.z - p.z } } };
+      return x;
+    }),
+  };
+}
+
 /** Dissolve a combine: children go back to the top level, offset by the combine's position. */
 export function ungroup(doc: FormaDocument, combineId: string): FormaDocument {
   const c = featureById(doc, combineId);

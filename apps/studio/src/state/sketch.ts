@@ -5,7 +5,8 @@
  * numbers, selection.
  */
 import { create } from 'zustand';
-import { addFeature, featureById, makeFeature, removeFeatures, sk, sketchToProfiles, endpoints, type FeatureOf, type FormaDocument, type Sketch, type SketchEntity, type Vec2 } from '@forma/core';
+import { addFeature, addToCombine, combine as combineDoc, featureById, makeFeature, removeFeatures, sk, sketchToProfiles, endpoints, type FeatureOf, type FormaDocument, type Sketch, type SketchEntity, type Transform, type Vec2 } from '@forma/core';
+import * as THREE from 'three';
 import { useStore } from './store';
 import { useViewStore } from './view';
 
@@ -26,8 +27,18 @@ interface SketchState {
     dragVertex: { from: Vec2; ids: string[] } | null;
     docAtEntry: FormaDocument;
   };
+  /** true while the user is asked to click a face to sketch on */
+  pickingFace: boolean;
+  /** the part the current face sketch was started on (its combine gets the join/cut) */
+  host: { partId: string; combineId: string } | null;
   start(featureId: string): void;
   createAndStart(): void;
+  armFacePick(): void;
+  disarmFacePick(): void;
+  /** Start a sketch on a planar face of `partId`: `point` and `normal` are in world space. */
+  startOnFace(partId: string, point: [number, number, number], normal: [number, number, number]): void;
+  /** Make the current face sketch join (extrude outward) or cut (extrude into the part). */
+  setMode(mode: 'join' | 'cut'): void;
   setTool(t: SketchTool): void;
   move(local: Vec2, mods: { shift: boolean; alt: boolean }): void;
   click(local: Vec2, mods: { shift: boolean; alt: boolean }): void;
@@ -121,7 +132,38 @@ export const useSketch = create<SketchState>((set, get) => {
       }
       st.select([featureId]);
       set({ active: { featureId, tool: 'line', draft: [], cursor: null, snap: null, typed: '', selected: null, hoverVertex: null, dragVertex: null, docAtEntry: useStore.getState().doc } });
-      useViewStore.getState().setPreset('top');
+      if (!get().host) useViewStore.getState().setPreset('top');
+    },
+    pickingFace: false,
+    host: null,
+    armFacePick: () => { set({ pickingFace: true }); useStore.getState().toast('Click a flat face to sketch on it (Esc to cancel)'); },
+    disarmFacePick: () => set({ pickingFace: false }),
+    startOnFace: (partId, point, normal) => {
+      const st = useStore.getState();
+      const part = featureById(st.doc, partId);
+      if (!part) return;
+      const t = planeTransform(point, normal);
+      const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [] }, height: 10, transform: t });
+      let doc = addFeature(st.doc, f);
+      // the sketch must live in the same combine as the part so its extrusion joins or cuts it
+      let combineId: string;
+      if (part.parentId) {
+        combineId = part.parentId;
+        doc = addToCombine(doc, combineId, f.id);
+      } else {
+        const r = combineDoc(doc, [partId, f.id], part.name);
+        doc = r.doc; combineId = r.combineId;
+      }
+      const docBefore = st.doc;
+      st.setDoc(doc);
+      set({ pickingFace: false, host: { partId, combineId } });
+      get().start(f.id);
+      set((state) => (state.active ? { active: { ...state.active, docAtEntry: docBefore } } : {}));
+      useViewStore.getState().alignTo(point, normal);
+    },
+    setMode: (mode) => {
+      const a = get().active; if (!a) return;
+      useStore.getState().patchFeature(a.featureId, { role: mode === 'cut' ? 'hole' : 'solid', flip: mode === 'cut' } as Partial<FeatureOf<'extrude'>>, { undoable: true });
     },
     createAndStart: () => {
       const st = useStore.getState();
@@ -252,16 +294,28 @@ export const useSketch = create<SketchState>((set, get) => {
         st.clearSelection();
         st.toast('Sketch had no closed outline, nothing was created');
       }
-      set({ active: null });
+      set({ active: null, host: null });
     },
     cancel: () => {
       const a = get().active; if (!a) return;
       useStore.getState().setDoc(a.docAtEntry);
       useStore.getState().clearSelection();
-      set({ active: null });
+      set({ active: null, host: null });
     },
   };
 });
+
+/** A feature transform whose local XY plane sits at `point` with local +Z along `normal` (world space). */
+export function planeTransform(point: [number, number, number], normal: [number, number, number]): Transform {
+  const n = new THREE.Vector3(...normal).normalize();
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
+  // keep the sketch's X axis as close to world X (or world Y for vertical faces) as the normal allows
+  const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+  const r2d = 180 / Math.PI;
+  const round = (v: number) => Math.round(v * r2d * 1000) / 1000;
+  return { position: { x: round1(point[0]), y: round1(point[1]), z: round1(point[2]) }, rotation: { x: round(e.x), y: round(e.y), z: round(e.z) } };
+}
+const round1 = (v: number) => Math.round(v * 1000) / 1000;
 
 /** Summary line for the HUD. */
 export function sketchStatus(featureId: string): { closed: number; holes: number; open: number } {

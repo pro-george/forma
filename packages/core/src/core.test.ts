@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   initManifold, Evaluator, createDefaultRegistry, createModuleApi, createDocument, addFeature, makeFeature,
-  combine, ungroup, removeFeatures, duplicate, parseDocument, serializeDocument, History, toBinarySTL, to3MF,
+  combine, ungroup, removeFeatures, duplicate, addToCombine, parseDocument, serializeDocument, History, toBinarySTL, to3MF,
   traceRaster, loopsToProfiles, composeTransforms, sampleDocument, LAMP_FAMILIES, SOCKET_HOLE_RADIUS, familyInputs,
   encodeHeightMap, decodeHeightMap, sampleHeightMap, blurHeightMap, proceduralHeightMap, rasterToHeightMap, VASE_SHAPES,
   type TextRasterizer, type FormaDocument,
@@ -72,6 +72,37 @@ describe('primitives', () => {
     expect(r!.volume).toBeGreaterThan(1000);
     expect(r!.volume).toBeLessThan(Math.PI * 100 * 30);
     expect(r!.mesh.indices.length / 3).toBeGreaterThan(2000);
+  });
+});
+
+describe('sketch on a face', () => {
+  it('a flipped hole extrude on a side face cuts into the box; addToCombine keeps world placement', () => {
+    let doc = createDocument();
+    const box = makeFeature(doc, 'box', { width: 40, depth: 30, height: 20, transform: { position: { x: 10, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } } });
+    doc = addFeature(doc, box);
+    const solidVol = ev.evaluate(doc)[0]!.volume;
+    // sketch plane on the +X face (x = 30): local Z = +X means rotation Y = 90°
+    const cut = makeFeature(doc, 'extrude', {
+      profile: { outer: [[-5, 2], [5, 2], [5, 12], [-5, 12]], holes: [] }, height: 8, flip: true, role: 'hole',
+      transform: { position: { x: 30, y: 0, z: 0 }, rotation: { x: 0, y: 90, z: 0 } },
+    });
+    doc = addFeature(doc, cut);
+    const r = combine(doc, [box.id, cut.id]);
+    doc = r.doc;
+    const [c] = ev.evaluate(doc);
+    expect(c!.error).toBeUndefined();
+    expect(near(c!.volume, solidVol - 10 * 10 * 8, 0.02)).toBe(true);
+    // the same extrude without flip grows outward instead
+    const joined = addFeature(createDocument(), { ...box, id: 'b2' });
+    const bump = makeFeature(joined, 'extrude', { profile: { outer: [[-5, 2], [5, 2], [5, 12], [-5, 12]], holes: [] }, height: 8, transform: { position: { x: 30, y: 0, z: 0 }, rotation: { x: 0, y: 90, z: 0 } } });
+    const j = combine(addFeature(joined, bump), ['b2', bump.id]).doc;
+    expect(near(ev.evaluate(j)[0]!.volume, solidVol + 10 * 10 * 8, 0.02)).toBe(true);
+    // adding a later cut to the existing combine
+    const more = makeFeature(doc, 'extrude', { profile: { outer: [[-2, 14], [2, 14], [2, 18], [-2, 18]], holes: [] }, height: 5, flip: true, role: 'hole', transform: { position: { x: 30, y: 0, z: 0 }, rotation: { x: 0, y: 90, z: 0 } } });
+    doc = addToCombine(addFeature(doc, more), r.combineId, more.id);
+    const [c2] = ev.evaluate(doc);
+    expect(c2!.error).toBeUndefined();
+    expect(c2!.volume).toBeLessThan(c!.volume - 1);
   });
 });
 

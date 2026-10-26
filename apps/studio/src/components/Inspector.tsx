@@ -43,7 +43,7 @@ export function Inspector() {
   const results = useStore((s) => s.results);
   const features = selection.map((id) => featureById(doc, id)).filter((f): f is Feature => !!f);
 
-  if (features.length === 0) return <div className="props"><h3>Parameters</h3><div className="empty">Select a part to edit it. Every value stays live: change a hole's radius inside a combined part and the boolean is recomputed by the geometry kernel.<br /><br />Shortcuts: <b>B</b> box · <b>C</b> cylinder · <b>S</b> sphere · <b>V</b> revolve · <b>K</b> sketch · <b>H</b> hole/solid · <b>W</b>/<b>E</b> move/rotate gizmo · <b>⌘G</b> combine · <b>⌘D</b> duplicate · <b>⌫</b> delete · <b>⌘Z</b> undo · <b>F</b> fit.</div></div>;
+  if (features.length === 0) return <div className="props"><div className="empty">Select a part to edit it. Every value stays live: change a hole's radius inside a combined part and the boolean is recomputed by the geometry kernel.<br /><br />Shortcuts: <b>B</b> box · <b>C</b> cylinder · <b>S</b> sphere · <b>V</b> revolve · <b>K</b> sketch · <b>H</b> hole/solid · <b>W</b>/<b>E</b> move/rotate gizmo · <b>⌘G</b> combine · <b>⌘D</b> duplicate · <b>⌫</b> delete · <b>⌘Z</b> undo · <b>F</b> fit.</div></div>;
   if (features.length > 1) return <MultiPanel features={features} />;
   const f = features[0]!;
   const err = results.get(f.id)?.error;
@@ -134,6 +134,12 @@ function FeaturePanel({ feature }: { feature: Feature }) {
       {feature.type === 'revolve' && <><h3>Profile</h3><ProfileEditor feature={feature} /></>}
       {feature.type === 'extrude' && (
         <>
+          <Field label="Direction">
+            <div className="seg">
+              <button className={!feature.flip ? 'on' : ''} onClick={() => patch(feature.id, { flip: false } as Partial<FeatureOf<'extrude'>>)}>Up</button>
+              <button className={feature.flip ? 'on' : ''} onClick={() => patch(feature.id, { flip: true } as Partial<FeatureOf<'extrude'>>)}>Down</button>
+            </div>
+          </Field>
           <div className="actions"><button className="primary" onClick={() => useSketch.getState().start(feature.id)}>Edit sketch</button></div>
           <div className="note">{feature.sketch ? `${feature.sketch.entities.length} sketch segments` : `${feature.profile?.outer.length ?? 0} outline points`}. Height, top scale and twist are parametric; the outline is edited in the sketcher.</div>
         </>

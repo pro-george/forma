@@ -31,7 +31,6 @@ export function Tree() {
 
   return (
     <div className="tree">
-      <h3>Parts</h3>
       {roots.length === 0 && <div className="empty">Nothing here yet. Add a primitive or a module from the left, or draw a sketch and extrude it.</div>}
       {[...roots].reverse().map((f) => (
         <div key={f.id}>

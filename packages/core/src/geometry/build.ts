@@ -53,6 +53,7 @@ export function buildPrimitive(wasm: ManifoldToplevel, f: Exclude<Feature, Featu
       const divisions = f.twist !== 0 ? Math.max(1, Math.round(Math.abs(f.twist) / 5)) : 0;
       m = cs.extrude(f.height, divisions, f.twist, [f.scaleTop, f.scaleTop]);
       dispose(cs);
+      if (f.flip) { const down = m.translate([0, 0, -f.height]); dispose(m); m = down; }
       break;
     }
     case 'revolve': {

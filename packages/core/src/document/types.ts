@@ -131,6 +131,8 @@ export const ExtrudeFeature = z.object({
   scaleTop: z.number().min(0).default(1),
   /** rotation of the top face relative to the bottom, degrees */
   twist: z.number().default(0),
+  /** extrude towards -Z (into the part the sketch sits on) instead of +Z */
+  flip: z.boolean().default(false),
 });
 export const RevolveFeature = z.object({
   ...base,

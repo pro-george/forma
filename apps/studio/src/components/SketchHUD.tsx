@@ -13,6 +13,7 @@ const TOOLS: { id: SketchTool; label: string; key: string }[] = [
 
 export function SketchHUD() {
   const active = useSketch((s) => s.active);
+  const host = useSketch((s) => s.host);
   const doc = useStore((s) => s.doc);
   const patch = useStore((s) => s.patchFeature);
   if (!active) return null;
@@ -20,6 +21,7 @@ export function SketchHUD() {
   if (!f || f.type !== 'extrude') return null;
   const st = sketchStatus(active.featureId);
   const api = useSketch.getState();
+  const mode = f.role === 'hole' ? 'cut' : 'join';
   const hint = {
     select: active.selected ? 'Backspace removes the selected segment · drag a point to move it' : 'Click a segment to select it · drag a corner to move it',
     line: active.draft.length ? 'Click the next point · type a length and press Enter · click the first point to close' : 'Click to start a line or polyline',
@@ -34,7 +36,13 @@ export function SketchHUD() {
           <button key={t.id} className={active.tool === t.id ? 'on' : ''} onClick={() => api.setTool(t.id)} title={`${t.label} (${t.key})`}>{t.label}<kbd>{t.key}</kbd></button>
         ))}
         <span className="sep" />
-        <label className="hud-field">Height<NumberField value={f.height} min={0.1} step={1} unit="mm" onChange={(v) => patch(f.id, { height: v }, { undoable: false })} /></label>
+        {host && (
+          <span className="seg hud-seg">
+            <button className={mode === 'join' ? 'on' : ''} onClick={() => api.setMode('join')} title="Extrude outward and merge with the part">Join</button>
+            <button className={mode === 'cut' ? 'on hole' : ''} onClick={() => api.setMode('cut')} title="Extrude into the part and remove the material">Cut</button>
+          </span>
+        )}
+        <label className="hud-field">{mode === 'cut' ? 'Depth' : 'Height'}<NumberField value={f.height} min={0.1} step={1} unit="mm" onChange={(v) => patch(f.id, { height: v }, { undoable: false })} /></label>
         <span className="sep" />
         <span className={`hud-status ${st.open ? 'warn' : st.closed ? 'ok' : ''}`}>
           {st.closed ? `${st.closed} outline${st.closed > 1 ? 's' : ''}${st.holes ? `, ${st.holes} hole${st.holes > 1 ? 's' : ''}` : ''}` : 'no closed outline yet'}

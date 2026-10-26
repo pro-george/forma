@@ -10,12 +10,19 @@ interface Colors { accent: string; solid: string; hole: string; vp: string }
 
 const d2r = Math.PI / 180;
 
-/** World ↔ sketch-local (feature frame; only Z rotation + position are considered for the sketch plane). */
+/** World ↔ sketch-local for the feature frame (any orientation: the sketch plane is the feature's local XY). */
 function frame(t: Transform) {
-  const a = t.rotation.z * d2r, c = Math.cos(a), s = Math.sin(a);
-  const toLocal = (wx: number, wy: number): Vec2 => { const dx = wx - t.position.x, dy = wy - t.position.y; return [dx * c + dy * s, -dx * s + dy * c]; };
-  const toWorld = (p: Vec2, z = 0): [number, number, number] => [t.position.x + p[0] * c - p[1] * s, t.position.y + p[0] * s + p[1] * c, t.position.z + z];
-  return { toLocal, toWorld };
+  const m = new THREE.Matrix4().compose(
+    new THREE.Vector3(t.position.x, t.position.y, t.position.z),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(t.rotation.x * d2r, t.rotation.y * d2r, t.rotation.z * d2r, 'XYZ')),
+    new THREE.Vector3(1, 1, 1),
+  );
+  const inv = m.clone().invert();
+  const v = new THREE.Vector3();
+  const toLocal = (wx: number, wy: number, wz = 0): Vec2 => { v.set(wx, wy, wz).applyMatrix4(inv); return [v.x, v.y]; };
+  const toWorld = (p: Vec2, z = 0): [number, number, number] => { const w = new THREE.Vector3(p[0], p[1], z).applyMatrix4(m); return [w.x, w.y, w.z]; };
+  const euler: [number, number, number] = [t.rotation.x * d2r, t.rotation.y * d2r, t.rotation.z * d2r];
+  return { toLocal, toWorld, euler };
 }
 
 export function SketchLayer({ colors }: { colors: Colors }) {
@@ -38,10 +45,10 @@ export function SketchLayer({ colors }: { colors: Colors }) {
   }, [profiles]);
 
   if (!active || !feature || !sketch || !fr || !t) return null;
-  const z = t.position.z;
   const lift = 0.15;
   const mods = (e: { shiftKey: boolean; altKey: boolean }) => ({ shift: e.shiftKey, alt: e.altKey });
-  const localOf = (e: ThreeEvent<PointerEvent | MouseEvent>) => fr.toLocal(e.point.x, e.point.y);
+  const localOf = (e: ThreeEvent<PointerEvent | MouseEvent>) => fr.toLocal(e.point.x, e.point.y, e.point.z);
+  const planePos: [number, number, number] = [t.position.x, t.position.y, t.position.z];
   const sk3 = (pts: Vec2[], lz = lift) => pts.map((p) => fr.toWorld(p, lz));
   const openIds = new Set(profiles?.openIds ?? []);
   const api = useSketch.getState();
@@ -91,7 +98,7 @@ export function SketchLayer({ colors }: { colors: Colors }) {
     <group>
       {/* pointer plane at the sketch level */}
       <mesh
-        position={[t.position.x, t.position.y, z]}
+        position={planePos} rotation={fr.euler}
         onPointerMove={(e) => { e.stopPropagation(); if (active.dragVertex) api.dragVertexTo(localOf(e), mods(e)); else api.move(localOf(e), mods(e)); }}
         onPointerDown={(e) => { if (e.button !== 0) return; if (active.tool === 'select') { if (api.beginVertexDrag(localOf(e))) e.stopPropagation(); } }}
         onPointerUp={(e) => { if (active.dragVertex) { e.stopPropagation(); api.endVertexDrag(); } }}
@@ -104,7 +111,7 @@ export function SketchLayer({ colors }: { colors: Colors }) {
 
       {/* closed area fill */}
       {fillGeometry && (
-        <mesh geometry={fillGeometry} position={[t.position.x, t.position.y, z + lift * 0.5]} rotation={[0, 0, t.rotation.z * d2r]}>
+        <mesh geometry={fillGeometry} position={fr.toWorld([0, 0], lift * 0.5)} rotation={fr.euler}>
           <meshBasicMaterial color={colors.accent} transparent opacity={0.12} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
       )}

@@ -9,6 +9,7 @@ import { SketchHUD } from './components/SketchHUD';
 import { Tree } from './components/Tree';
 import { Inspector } from './components/Inspector';
 import { StatusBar } from './components/StatusBar';
+import { Panel } from './components/Panel';
 
 function useShortcuts() {
   useEffect(() => {
@@ -32,6 +33,7 @@ function useShortcuts() {
         if (k === 'f') v.fit();
         return;
       }
+      if (sketch.pickingFace && e.key === 'Escape') { sketch.disarmFacePick(); return; }
       if (meta && k === 'z') { e.preventDefault(); e.shiftKey ? s.redo() : s.undo(); return; }
       if (meta && k === 'y') { e.preventDefault(); s.redo(); return; }
       if (meta && k === 'g') { e.preventDefault(); e.shiftKey ? s.ungroupSelected() : s.combineSelected(); return; }
@@ -51,7 +53,7 @@ function useShortcuts() {
         case 'c': s.addPrimitive('cylinder'); break;
         case 's': s.addPrimitive('sphere'); break;
         case 'v': s.addPrimitive('revolve'); break;
-        case 'k': sketch.createAndStart(); break;
+        case 'k': e.shiftKey ? sketch.armFacePick() : sketch.createAndStart(); break;
         case 'h': s.toggleRole(); break;
         case 'r': s.rotateSelected(e.shiftKey ? -90 : 90); break;
         case 'w': v.setGizmoMode('translate'); break;
@@ -73,22 +75,24 @@ function Toasts() {
 export default function App() {
   useShortcuts();
   const ready = useStore((s) => s.ready);
+  const selection = useStore((s) => s.selection);
+  const partCount = useStore((s) => s.doc.features.filter((f) => f.parentId === null).length);
   return (
     <div className="app">
+      <section className="viewport">
+        <Viewport />
+        {!ready && <div className="loading"><div><div className="spin" />Loading geometry kernel…</div></div>}
+      </section>
       <TopBar />
-      <main className="work">
-        <ToolRail />
-        <section className="viewport">
-          <Viewport />
-          <SketchHUD />
-          <StatusBar />
-          {!ready && <div className="loading"><div><div className="spin" />Loading geometry kernel…</div></div>}
-        </section>
-        <aside className="side">
-          <Tree />
-          <Inspector />
-        </aside>
-      </main>
+      <SketchHUD />
+      <div className="dock left">
+        <Panel id="create" title="Create" side="left"><ToolRail /></Panel>
+      </div>
+      <div className="dock right">
+        <Panel id="parts" title="Parts" side="right" badge={<span className="count">{partCount}</span>}><Tree /></Panel>
+        <Panel id="props" title={selection.length ? 'Properties' : 'Scene'} side="right"><Inspector /></Panel>
+      </div>
+      <StatusBar />
       <Toasts />
     </div>
   );

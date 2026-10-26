@@ -25,7 +25,7 @@ export function TopBar() {
   const [, force] = useState(0);
   useEffect(() => useStore.subscribe(() => force((n) => n + 1)), []);
   return (
-    <header className="topbar">
+    <header className="topbar glass-dark">
       <div className="brand">
         <span className="logo">F</span>
         <input aria-label="Project name" value={s.doc.name} onChange={(e) => s.setDoc({ ...s.doc, name: e.target.value }, { undoable: false })} />

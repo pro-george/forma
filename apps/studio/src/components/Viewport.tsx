@@ -38,8 +38,8 @@ const deg = THREE.MathUtils.degToRad;
 /** Above this many indices the selection edge overlay is skipped: it costs seconds and hides the surface under lines. */
 const EDGE_OVERLAY_MAX_INDICES = 150_000;
 
-function Part({ feature, result, selected, colors, wireframe, printLook, ghost, onSelect }: {
-  feature: Feature; result: EvaluatedFeature | undefined; selected: boolean; colors: ReturnType<typeof useThemeColors>; wireframe: boolean; printLook: boolean; ghost?: boolean;
+function Part({ feature, result, selected, colors, wireframe, printLook, ghost, picking, onSelect }: {
+  feature: Feature; result: EvaluatedFeature | undefined; selected: boolean; colors: ReturnType<typeof useThemeColors>; wireframe: boolean; printLook: boolean; ghost?: boolean; picking?: boolean;
   onSelect: (e: ThreeEvent<MouseEvent>) => void;
 }) {
   const geometry = useMemo(() => (result ? toGeometry(result.mesh) : null), [result]);
@@ -50,11 +50,20 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
   return (
     <group position={[t.position.x, t.position.y, t.position.z]} rotation={[deg(t.rotation.x), deg(t.rotation.y), deg(t.rotation.z)]}>
       {geometry && (geometry.attributes.position?.count ?? 0) > 0 && (
-        <mesh geometry={geometry} onClick={onSelect} castShadow receiveShadow userData={{ id: feature.id }}>
+        <mesh geometry={geometry} castShadow receiveShadow userData={{ id: feature.id }}
+          onClick={(e) => {
+            if (!picking) { onSelect(e); return; }
+            if (!e.face) return;
+            e.stopPropagation();
+            // face normal → world space, point → world space
+            const nm = new THREE.Matrix3().getNormalMatrix(e.object.matrixWorld);
+            const n = e.face.normal.clone().applyMatrix3(nm).normalize();
+            useSketch.getState().startOnFace(feature.id, [e.point.x, e.point.y, e.point.z], [n.x, n.y, n.z]);
+          }}>
           <meshStandardMaterial
             color={isHole ? colors.hole : printLook ? '#e8e4dc' : colors.solid}
             emissive={selected ? colors.accent : '#000000'}
-            emissiveIntensity={selected && !printLook ? 0.12 : 0}
+            emissiveIntensity={selected && !printLook ? 0.07 : 0}
             roughness={printLook ? 0.92 : 0.55} metalness={printLook ? 0 : 0.12}
             transparent={isHole || ghost} opacity={isHole ? 0.42 : ghost ? 0.3 : 1} depthWrite={!isHole && !ghost}
             wireframe={wireframe}
@@ -121,6 +130,17 @@ function ViewController({ controls }: { controls: React.RefObject<OrbitControlsI
   const { camera } = useThree();
   const fitToken = useViewStore((s) => s.fitToken);
   const preset = useViewStore((s) => s.preset);
+  const align = useViewStore((s) => s.align);
+  useEffect(() => {
+    if (!align) return;
+    const p = new THREE.Vector3(...align.point), n = new THREE.Vector3(...align.normal).normalize();
+    const dist = Math.max(80, camera.position.distanceTo(controls.current?.target ?? p) * 0.8);
+    camera.position.copy(p).addScaledVector(n, dist);
+    // "up" on screen: world Z unless the face is horizontal, then world Y
+    camera.up.copy(Math.abs(n.z) > 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1));
+    camera.lookAt(p);
+    if (controls.current) { controls.current.target.copy(p); controls.current.update(); }
+  }, [align, camera, controls]);
   useEffect(() => {
     if (fitToken === 0 && !preset) return;
     const { doc, results, selection } = useStore.getState();
@@ -175,6 +195,7 @@ function Scene() {
   const wireframe = useStore((s) => s.wireframe);
   const printLook = useStore((s) => s.printLook);
   const sketching = useSketch((s) => s.active?.featureId ?? null);
+  const pickingFace = useSketch((s) => s.pickingFace);
   const gizmoMode = useViewStore((s) => s.gizmoMode);
   const colors = useThemeColors();
   const controls = useRef<OrbitControlsImpl | null>(null);
@@ -190,12 +211,12 @@ function Scene() {
       <directionalLight position={[-150, 120, 80]} intensity={0.35} />
       {showGrid && <Grid args={[400, 400]} cellSize={1} cellThickness={0.6} cellColor={colors.gridMinor} sectionSize={10} sectionThickness={1} sectionColor={colors.gridMajor} rotation={[Math.PI / 2, 0, 0]} fadeDistance={700} fadeStrength={1} infiniteGrid />}
       {parts.map((f) => (
-        <Part key={f.id} feature={f} result={results.get(f.id)} selected={selection.includes(f.id)} colors={colors} wireframe={wireframe} printLook={printLook} ghost={sketching === f.id}
+        <Part key={f.id} feature={f} result={results.get(f.id)} selected={selection.includes(f.id)} colors={colors} wireframe={wireframe} printLook={printLook} ghost={sketching === f.id} picking={pickingFace}
           onSelect={(e) => { if (sketching) return; e.stopPropagation(); select([f.id], e.shiftKey || e.metaKey || e.ctrlKey ? 'toggle' : 'replace'); }} />
       ))}
       {primary && !sketching && <SelectionGizmo key={primary.id + gizmoMode} primary={primary} mode={gizmoMode} />}
       <SketchLayer colors={colors} />
-      <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.12} minDistance={10} maxDistance={3000} maxPolarAngle={Math.PI / 2 + 0.25}
+      <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.12} minDistance={10} maxDistance={3000} maxPolarAngle={sketching ? Math.PI : Math.PI / 2 + 0.25}
         mouseButtons={sketching ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }} />
       <GizmoHelper alignment="bottom-right" margin={[70, 110]}>
         <GizmoViewport axisColors={['#e0574f', '#5fb37a', '#6ea0ff']} labelColor="white" />

@@ -7,17 +7,19 @@ export function ToolRail() {
   const s = useStore();
   const view = useViewStore();
   const sketching = useSketch((st) => !!st.active);
+  const pickingFace = useSketch((st) => st.pickingFace);
   const primitives = [
     ['box', 'Box', 'B'], ['cylinder', 'Cylinder', 'C'], ['cone', 'Cone', ''], ['sphere', 'Sphere', 'S'], ['torus', 'Torus', ''], ['tube', 'Tube', ''], ['revolve', 'Revolve', 'V'],
   ] as const;
   return (
-    <aside className="rail">
+    <div className="rail">
       <h3>Add</h3>
       {primitives.map(([type, label, key]) => {
         const I = Icon[type];
         return <button key={type} onClick={() => s.addPrimitive(type)}><I />{label}{key && <kbd>{key}</kbd>}</button>;
       })}
       <button className={sketching ? 'on' : ''} onClick={() => useSketch.getState().createAndStart()}><Icon.extrude />Sketch → Extrude<kbd>K</kbd></button>
+      <button className={pickingFace ? 'on' : ''} onClick={() => (pickingFace ? useSketch.getState().disarmFacePick() : useSketch.getState().armFacePick())} title="Click a flat face of a part, draw on it, then join or cut"><Icon.extrude />Sketch on face<kbd>⇧K</kbd></button>
 
       <h3>Modules</h3>
       {s.modules.length === 0 && <div className="module-desc">Loading…</div>}
@@ -45,6 +47,6 @@ export function ToolRail() {
         <button onClick={() => view.setPreset('right')}>Right</button>
       </div>
       <button onClick={view.fit}>Fit selection / all<kbd>F</kbd></button>
-    </aside>
+    </div>
   );
 }

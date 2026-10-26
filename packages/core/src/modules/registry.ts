@@ -37,8 +37,10 @@ export type ModuleInputValues = Record<string, string | number | boolean>;
 
 /** What build() returns: a feature without bookkeeping fields. */
 export type FeatureSpec = {
-  [T in Exclude<FeatureType, 'combine' | 'module'>]: Omit<FeatureOf<T>, 'id' | 'parentId' | 'name' | 'role' | 'visible' | 'transform' | 'modifiers'> & {
+  [T in Exclude<FeatureType, 'combine' | 'module'>]: Omit<FeatureOf<T>, 'id' | 'parentId' | 'name' | 'role' | 'visible' | 'transform' | 'modifiers' | 'flip'> & {
     name?: string;
+    /** extrude only: build towards -Z */
+    flip?: boolean;
     role?: Role;
     transform?: Partial<Transform>;
     position?: Partial<Transform['position']>;
@@ -110,7 +112,7 @@ export function resolveInputs(def: ModuleDefinition, stored: Record<string, unkn
 /** Turn specs into full features (ids are synthetic; used for evaluation or baking). */
 export function specsToFeatures(specs: FeatureSpec[], idPrefix = 'm'): Feature[] {
   return specs.map((s, i) => {
-    const { name, role, visible, transform, position, rotation, modifiers, ...rest } = s as FeatureSpec & { visible?: boolean };
+    const { name, role, visible, transform, position, rotation, modifiers, flip, ...rest } = s as FeatureSpec & { visible?: boolean };
     const t: Transform = { ...identityTransform(), ...(transform ?? {}) };
     if (position) t.position = { ...t.position, ...position };
     if (rotation) t.rotation = { ...t.rotation, ...rotation };
@@ -122,6 +124,7 @@ export function specsToFeatures(specs: FeatureSpec[], idPrefix = 'm'): Feature[]
       transform: t,
       parentId: null,
       modifiers: { ...defaultModifiers(), ...(modifiers ?? {}) },
+      ...(rest.type === 'extrude' ? { flip: flip ?? false } : {}),
       ...rest,
     } as Feature;
     return f;
