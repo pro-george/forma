@@ -23,6 +23,8 @@ export function Tree() {
         <span className="nm">{f.name}</span>
         {f.type === 'module' && <span className="badge mod">module</span>}
         {f.role === 'hole' && <span className="badge hole">hole</span>}
+        {f.role === 'intersect' && <span className="badge mod">keep</span>}
+        {f.repeat && f.repeat.mode !== 'none' && <span className="badge mod">×{f.repeat.mode === 'grid' ? f.repeat.count * f.repeat.count2 : f.repeat.mode === 'mirror' ? 2 : f.repeat.count}</span>}
         {err && <span className="badge err">error</span>}
         <button className={`eye${f.visible ? '' : ' off'}`} title={f.visible ? 'Hide' : 'Show'} onClick={(e) => { e.stopPropagation(); toggleVisible(f.id); }}><Icon.eye /></button>
       </div>

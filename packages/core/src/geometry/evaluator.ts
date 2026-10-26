@@ -11,6 +11,7 @@ import { childrenOf, featureById, topLevel } from '../document/document.js';
 import { ModuleRegistry, resolveInputs, specsToFeatures } from '../modules/registry.js';
 import type { ModuleApi } from '../modules/api.js';
 import { BuildError, buildPrimitive, placed } from './build.js';
+import { applyRepeat } from './edges.js';
 import { dispose } from './manifold.js';
 
 interface CacheEntry { mesh: TriangleMesh; volume: number; bbox: { min: Vec3; max: Vec3 }; }
@@ -62,7 +63,7 @@ export class Evaluator {
     const { id: _id, name: _n, visible: _v, transform: _t, parentId: _p, ...rest } = f;
     if (f.type === 'combine') {
       const kids = childrenOf(doc, f.id).map((k) => [this.keyFor(doc, k), k.transform, k.role, k.visible]);
-      return JSON.stringify(['combine', kids]);
+      return JSON.stringify(['combine', kids, f.repeat]);
     }
     if (f.type === 'mesh') return JSON.stringify(['mesh', f.positions.length, f.scale, f.modifiers, hashNumbers(f.positions)]);
     return JSON.stringify(rest);
@@ -81,36 +82,43 @@ export class Evaluator {
     } finally { dispose(m); }
   }
 
-  /** Build a Manifold for a feature in its authoring frame. Caller must delete it. */
+  /** Build a Manifold for a feature in its authoring frame (repeats applied). Caller must delete it. */
   manifoldFor(doc: FormaDocument, f: Feature): Manifold {
+    let m: Manifold;
     switch (f.type) {
-      case 'combine': return this.combineManifold(childrenOf(doc, f.id), doc, f.id);
-      case 'module': return this.moduleManifold(f);
-      default: return buildPrimitive(this.wasm, f);
+      case 'combine': m = this.combineManifold(childrenOf(doc, f.id), doc, f.id); break;
+      case 'module': m = this.moduleManifold(f); break;
+      default: m = buildPrimitive(this.wasm, f);
     }
+    return applyRepeat(this.wasm, m, f.repeat);
   }
 
   private combineManifold(children: Feature[], doc: FormaDocument, ownerId: string): Manifold {
     const { Manifold } = this.wasm;
-    const solids: Manifold[] = [], holes: Manifold[] = [];
+    const solids: Manifold[] = [], holes: Manifold[] = [], keeps: Manifold[] = [];
     try {
       for (const c of children) {
         if (!c.visible) continue;
         const local = this.manifoldFor(doc, c);
         const world = placed(local, c);
         dispose(local);
-        (c.role === 'hole' ? holes : solids).push(world);
+        (c.role === 'hole' ? holes : c.role === 'intersect' ? keeps : solids).push(world);
       }
       if (solids.length === 0) throw new BuildError('A combine needs at least one visible solid', ownerId);
       let acc = solids.length === 1 ? solids[0]!.translate([0, 0, 0]) : Manifold.union(solids);
+      for (const k of keeps) {
+        const inter = Manifold.intersection(acc, k);
+        dispose(acc);
+        acc = inter;
+      }
       if (holes.length) {
         const cut = Manifold.difference([acc, ...holes]);
         dispose(acc);
         acc = cut;
       }
-      if (acc.isEmpty()) throw new BuildError('The holes removed everything', ownerId);
+      if (acc.isEmpty()) throw new BuildError(keeps.length ? 'Nothing overlaps the intersect part' : 'The holes removed everything', ownerId);
       return acc;
-    } finally { dispose(...solids, ...holes); }
+    } finally { dispose(...solids, ...holes, ...keeps); }
   }
 
   private moduleManifold(f: Extract<Feature, { type: 'module' }>): Manifold {
@@ -130,7 +138,7 @@ export class Evaluator {
     const parts: Manifold[] = [];
     try {
       for (const f of topLevel(doc)) {
-        if (!f.visible || f.role !== 'solid') continue;
+        if (!f.visible || f.role === 'hole') continue;
         if (ids && !ids.includes(f.id)) continue;
         const local = this.manifoldFor(doc, f);
         parts.push(placed(local, f));

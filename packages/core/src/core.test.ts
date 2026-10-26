@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   initManifold, Evaluator, createDefaultRegistry, createModuleApi, createDocument, addFeature, makeFeature,
-  combine, ungroup, removeFeatures, duplicate, addToCombine, parseDocument, serializeDocument, History, toBinarySTL, to3MF,
+  combine, ungroup, removeFeatures, duplicate, addToCombine, splitFeature, parseDocument, serializeDocument, History, toBinarySTL, to3MF,
   traceRaster, loopsToProfiles, composeTransforms, sampleDocument, LAMP_FAMILIES, SOCKET_HOLE_RADIUS, familyInputs,
   encodeHeightMap, decodeHeightMap, sampleHeightMap, blurHeightMap, proceduralHeightMap, rasterToHeightMap, VASE_SHAPES,
   type TextRasterizer, type FormaDocument,
@@ -103,6 +103,70 @@ describe('sketch on a face', () => {
     const [c2] = ev.evaluate(doc);
     expect(c2!.error).toBeUndefined();
     expect(c2!.volume).toBeLessThan(c!.volume - 1);
+  });
+});
+
+describe('repeat, edges, intersect, split', () => {
+  const one = (doc: FormaDocument) => { const [r] = ev.evaluate(doc); expect(r!.error).toBeUndefined(); return r!; };
+  it('linear, grid, radial and mirror repeats multiply the volume', () => {
+    const base = Math.PI * 25 * 10;
+    const mk = (repeat: Record<string, unknown>) => { let doc = createDocument(); doc = addFeature(doc, makeFeature(doc, 'cylinder', { radius: 5, height: 10, segments: 64, repeat })); return one(doc); };
+    expect(near(mk({ mode: 'linear', count: 4, step: { x: 20, y: 0, z: 0 } }).volume, base * 4)).toBe(true);
+    expect(near(mk({ mode: 'grid', count: 3, count2: 2, step: { x: 20, y: 0, z: 0 }, step2: { x: 0, y: 20, z: 0 } }).volume, base * 6)).toBe(true);
+    const radial = mk({ mode: 'radial', count: 6, center: [-30, 0], sweep: 360 });
+    expect(near(radial.volume, base * 6)).toBe(true);
+    expect(radial.bbox.min.x).toBeLessThan(-50); // copies went all the way around the centre 30 mm away
+    expect(near(mk({ mode: 'mirror', axis: 'x', offset: 10 }).volume, base * 2)).toBe(true);
+    expect(near(mk({ mode: 'mirror', axis: 'x', offset: 10, keepOriginal: false }).volume, base)).toBe(true);
+    // overlapping copies union rather than double-count
+    expect(mk({ mode: 'linear', count: 2, step: { x: 2, y: 0, z: 0 } }).volume).toBeLessThan(base * 2);
+  });
+  it('rounded and chamfered edges remove material and stay watertight', () => {
+    const mk = (type: 'box' | 'cylinder', edges: Record<string, unknown>) => {
+      let doc = createDocument();
+      doc = addFeature(doc, type === 'box' ? makeFeature(doc, 'box', { width: 40, depth: 30, height: 20, edges }) : makeFeature(doc, 'cylinder', { radius: 15, height: 20, segments: 64, edges }));
+      return one(doc);
+    };
+    const plain = mk('box', {}).volume;
+    const sides = mk('box', { sides: { kind: 'round', size: 5 } }).volume;
+    expect(sides).toBeLessThan(plain);
+    // four rounded vertical corners remove (1 - π/4)·r²·h each
+    expect(near(sides, plain - 4 * (1 - Math.PI / 4) * 25 * 20, 0.03)).toBe(true);
+    const chamfer = mk('box', { sides: { kind: 'chamfer', size: 5 } }).volume;
+    expect(chamfer).toBeLessThan(sides); // a chamfer cuts more than a round of the same size
+    const top = mk('box', { top: { kind: 'round', size: 4 } });
+    expect(top.volume).toBeLessThan(plain);
+    expect(top.volume).toBeGreaterThan(plain * 0.9);
+    expect(top.bbox.max.z).toBeCloseTo(20, 1);
+    const both = mk('cylinder', { top: { kind: 'chamfer', size: 3 }, bottom: { kind: 'round', size: 3 } });
+    expect(both.volume).toBeLessThan(mk('cylinder', {}).volume);
+    expect(both.bbox.min.z).toBeCloseTo(0, 1);
+    // an extrusion with twist keeps rounded corners but skips top/bottom treatments
+    let doc = createDocument();
+    doc = addFeature(doc, makeFeature(doc, 'extrude', { profile: { outer: [[-10, -10], [10, -10], [10, 10], [-10, 10]], holes: [] }, height: 20, twist: 30, edges: { sides: { kind: 'round', size: 3 }, top: { kind: 'round', size: 3 } } }));
+    expect(one(doc).volume).toBeLessThan(400 * 20);
+  });
+  it('intersect keeps only the overlap', () => {
+    let doc = createDocument();
+    const a = makeFeature(doc, 'box', { width: 20, depth: 20, height: 20 });
+    const b = makeFeature(doc, 'box', { width: 20, depth: 20, height: 20, role: 'intersect', transform: { position: { x: 10, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } } });
+    doc = addFeature(addFeature(doc, a), b);
+    doc = combine(doc, [a.id, b.id]).doc;
+    expect(near(one(doc).volume, 10 * 20 * 20)).toBe(true);
+  });
+  it('split makes two parametric halves with a gap', () => {
+    let doc = createDocument();
+    const box = makeFeature(doc, 'box', { width: 40, depth: 30, height: 20 });
+    doc = addFeature(doc, box);
+    const r = splitFeature(doc, box.id, { axis: 'z', at: 8, gap: 1 });
+    const res = ev.evaluate(r.doc);
+    expect(res).toHaveLength(2);
+    expect(res.every((x) => !x.error)).toBe(true);
+    const [lo, hi] = res.map((x) => x.volume).sort((p, q) => p - q);
+    expect(near(lo!, 40 * 30 * 7.5)).toBe(true);
+    expect(near(hi!, 40 * 30 * 11.5)).toBe(true);
+    const rx = splitFeature(doc, box.id, { axis: 'x', at: 0 });
+    expect(ev.evaluate(rx.doc).map((x) => Math.round(x.volume))).toEqual([12000, 12000]);
   });
 });
 

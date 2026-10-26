@@ -99,7 +99,44 @@ export const ModifiersSchema = z.object({
 export type Modifiers = z.infer<typeof ModifiersSchema>;
 export const defaultModifiers = (): Modifiers => ModifiersSchema.parse({});
 
-export const RoleSchema = z.enum(['solid', 'hole']);
+/** Repeat a feature: copies are unioned into one solid before placement. */
+export const RepeatSchema = z.object({
+  mode: z.enum(['none', 'linear', 'grid', 'radial', 'mirror']).default('none'),
+  /** copies along the first direction (linear, grid) or around the axis (radial) */
+  count: z.number().int().min(1).max(200).default(3),
+  /** copies along the second direction (grid) */
+  count2: z.number().int().min(1).max(200).default(2),
+  /** step between copies, mm (linear, grid first direction) */
+  step: Vec3Schema.default({ x: 30, y: 0, z: 0 }),
+  /** step along the second direction (grid) */
+  step2: Vec3Schema.default({ x: 0, y: 30, z: 0 }),
+  /** radial: total sweep in degrees (360 = full circle, evenly spaced) */
+  sweep: z.number().default(360),
+  /** radial: centre of rotation in the feature's own frame, mm (the part sits `radius` away from it) */
+  center: Vec2Schema.default([0, 0]),
+  /** mirror: plane normal axis and its offset from the feature origin, mm */
+  axis: z.enum(['x', 'y', 'z']).default('x'),
+  offset: z.number().default(0),
+  /** keep the original too (mirror) */
+  keepOriginal: z.boolean().default(true),
+});
+export type Repeat = z.infer<typeof RepeatSchema>;
+export const defaultRepeat = (): Repeat => RepeatSchema.parse({});
+
+/** Edge treatment for profile-based solids (box, cylinder, extrude). */
+export const EdgeKindSchema = z.enum(['none', 'round', 'chamfer']);
+export const EdgeSchema = z.object({ kind: EdgeKindSchema.default('none'), size: z.number().min(0).default(2) });
+export const EdgesSchema = z.object({
+  /** vertical corners of the outline (bevel) */
+  sides: EdgeSchema.default({}),
+  top: EdgeSchema.default({}),
+  bottom: EdgeSchema.default({}),
+});
+export type Edges = z.infer<typeof EdgesSchema>;
+export const defaultEdges = (): Edges => EdgesSchema.parse({});
+
+/** solid = union, hole = subtract, intersect = keep only what overlaps the solids so far */
+export const RoleSchema = z.enum(['solid', 'hole', 'intersect']);
 export type Role = z.infer<typeof RoleSchema>;
 
 const base = {
@@ -111,10 +148,11 @@ const base = {
   /** id of the combine that owns this feature, if any */
   parentId: z.string().nullable().default(null),
   modifiers: ModifiersSchema.default(defaultModifiers()),
+  repeat: RepeatSchema.default({}),
 };
 
-export const BoxFeature = z.object({ ...base, type: z.literal('box'), width: z.number().positive(), depth: z.number().positive(), height: z.number().positive() });
-export const CylinderFeature = z.object({ ...base, type: z.literal('cylinder'), radius: z.number().positive(), height: z.number().positive(), segments: z.number().int().min(3).default(64) });
+export const BoxFeature = z.object({ ...base, type: z.literal('box'), width: z.number().positive(), depth: z.number().positive(), height: z.number().positive(), edges: EdgesSchema.default({}) });
+export const CylinderFeature = z.object({ ...base, type: z.literal('cylinder'), radius: z.number().positive(), height: z.number().positive(), segments: z.number().int().min(3).default(64), edges: EdgesSchema.default({}) });
 export const ConeFeature = z.object({ ...base, type: z.literal('cone'), radiusBottom: z.number().positive(), radiusTop: z.number().min(0), height: z.number().positive(), segments: z.number().int().min(3).default(64) });
 export const SphereFeature = z.object({ ...base, type: z.literal('sphere'), radius: z.number().positive(), segments: z.number().int().min(4).default(48) });
 export const TorusFeature = z.object({ ...base, type: z.literal('torus'), ringRadius: z.number().positive(), tubeRadius: z.number().positive(), segments: z.number().int().min(6).default(64) });
@@ -133,6 +171,8 @@ export const ExtrudeFeature = z.object({
   twist: z.number().default(0),
   /** extrude towards -Z (into the part the sketch sits on) instead of +Z */
   flip: z.boolean().default(false),
+  /** rounded or chamfered corners/edges; top/bottom treatments need scaleTop = 1 and twist = 0 */
+  edges: EdgesSchema.default({}),
 });
 export const RevolveFeature = z.object({
   ...base,

@@ -117,3 +117,49 @@ export function bounds(loops: readonly (readonly Vec2[])[]): { minX: number; min
   for (const l of loops) for (const [x, y] of l) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
   return { minX, minY, maxX, maxY };
 }
+
+
+/**
+ * Round (arc of radius `size`) or chamfer (legs of `size`) every corner of a
+ * closed polygon. Corners too tight for the size get the largest treatment
+ * that fits. Works for convex and concave corners alike.
+ */
+export function treatPolygonCorners(poly: Vec2[], kind: 'round' | 'chamfer', size: number): Vec2[] {
+  const n = poly.length;
+  if (n < 3 || size <= 0) return poly;
+  const out: Vec2[] = [];
+  for (let i = 0; i < n; i++) {
+    const p = poly[i]!, a = poly[(i - 1 + n) % n]!, b = poly[(i + 1) % n]!;
+    const inx = a[0] - p[0], iny = a[1] - p[1], outx = b[0] - p[0], outy = b[1] - p[1];
+    const li = Math.hypot(inx, iny), lo = Math.hypot(outx, outy);
+    if (li < 1e-9 || lo < 1e-9) { out.push(p); continue; }
+    const ux = inx / li, uy = iny / li, vx = outx / lo, vy = outy / lo;
+    const cosT = Math.max(-1, Math.min(1, ux * vx + uy * vy));
+    const theta = Math.acos(cosT); // interior angle at p
+    if (theta > Math.PI - 1e-4 || theta < 1e-4) { out.push(p); continue; } // straight or degenerate
+    const maxD = 0.5 * Math.min(li, lo) - 1e-6;
+    if (kind === 'chamfer') {
+      const d = Math.min(size, maxD);
+      if (d <= 1e-6) { out.push(p); continue; }
+      out.push([p[0] + ux * d, p[1] + uy * d], [p[0] + vx * d, p[1] + vy * d]);
+    } else {
+      // tangent distance for a radius r: d = r / tan(theta/2); shrink r if the edges are short
+      let r = size;
+      let d = r / Math.tan(theta / 2);
+      if (d > maxD) { d = maxD; r = d * Math.tan(theta / 2); }
+      if (d <= 1e-6 || r <= 1e-6) { out.push(p); continue; }
+      const t1: Vec2 = [p[0] + ux * d, p[1] + uy * d], t2: Vec2 = [p[0] + vx * d, p[1] + vy * d];
+      // centre lies along the bisector at distance r / sin(theta/2)
+      const bx = ux + vx, by = uy + vy, bl = Math.hypot(bx, by) || 1;
+      const cx = p[0] + (bx / bl) * (r / Math.sin(theta / 2)), cy = p[1] + (by / bl) * (r / Math.sin(theta / 2));
+      const a1 = Math.atan2(t1[1] - cy, t1[0] - cx), a2 = Math.atan2(t2[1] - cy, t2[0] - cx);
+      let sweep = a2 - a1;
+      // take the short way round (the arc hugs the corner)
+      while (sweep > Math.PI) sweep -= 2 * Math.PI;
+      while (sweep < -Math.PI) sweep += 2 * Math.PI;
+      const segs = Math.max(3, Math.ceil((Math.abs(sweep) * r) / 0.6));
+      for (let k = 0; k <= segs; k++) { const ang = a1 + (sweep * k) / segs; out.push([cx + Math.cos(ang) * r, cy + Math.sin(ang) * r]); }
+    }
+  }
+  return out;
+}

@@ -7,6 +7,7 @@ import type { Manifold, ManifoldToplevel, Mesh } from 'manifold-3d';
 import type { Feature, FeatureOf, Modifiers, Vec2 } from '../document/types.js';
 import { chaikin, ensureCCW, profileContours } from './profile.js';
 import { buildDisplacedRevolve, decodedLayers, displacementAt, hasModifiers, modifierEdgeLength } from './revolve.js';
+import { edgesOf, extrudeWithEdges, hasEdges, treatCorners } from './edges.js';
 import { sketchToProfiles } from '../sketch/sketch.js';
 import { dispose } from './manifold.js';
 
@@ -20,12 +21,24 @@ export function buildPrimitive(wasm: ManifoldToplevel, f: Exclude<Feature, Featu
   const { Manifold, CrossSection } = wasm;
   let m: Manifold;
   switch (f.type) {
-    case 'box':
-      m = Manifold.cube([f.width, f.depth, f.height], true).translate([0, 0, f.height / 2]);
+    case 'box': {
+      const e = edgesOf(f.edges);
+      if (hasEdges(e)) {
+        const w = f.width / 2, d = f.depth / 2;
+        m = extrudeWithEdges(wasm, [[[-w, -d], [w, -d], [w, d], [-w, d]]], f.height, e);
+      } else m = Manifold.cube([f.width, f.depth, f.height], true).translate([0, 0, f.height / 2]);
       break;
-    case 'cylinder':
-      m = Manifold.cylinder(f.height, f.radius, f.radius, f.segments);
+    }
+    case 'cylinder': {
+      const e = edgesOf(f.edges);
+      if (hasEdges(e)) {
+        const ring: Vec2[] = [];
+        for (let k = 0; k < f.segments; k++) { const a = (k / f.segments) * Math.PI * 2; ring.push([Math.cos(a) * f.radius, Math.sin(a) * f.radius]); }
+        // a circle has no corners: side treatments do nothing here
+        m = extrudeWithEdges(wasm, [ring], f.height, { ...e, sides: { kind: 'none', size: 0 } });
+      } else m = Manifold.cylinder(f.height, f.radius, f.radius, f.segments);
       break;
+    }
     case 'cone':
       m = Manifold.cylinder(f.height, f.radiusBottom, Math.max(0, f.radiusTop), f.segments);
       break;
@@ -49,10 +62,18 @@ export function buildPrimitive(wasm: ManifoldToplevel, f: Exclude<Feature, Featu
     case 'extrude': {
       const profiles = f.sketch ? sketchToProfiles(f.sketch).profiles : f.profile ? [f.profile] : [];
       if (profiles.length === 0) throw new BuildError(f.sketch ? 'Sketch has no closed outline yet' : 'Extrusion has no outline', f.id);
-      const cs = new CrossSection(profiles.flatMap(profileContours), 'Positive');
-      const divisions = f.twist !== 0 ? Math.max(1, Math.round(Math.abs(f.twist) / 5)) : 0;
-      m = cs.extrude(f.height, divisions, f.twist, [f.scaleTop, f.scaleTop]);
-      dispose(cs);
+      const contours = profiles.flatMap(profileContours);
+      const e = edgesOf(f.edges);
+      const straight = f.twist === 0 && f.scaleTop === 1;
+      if (hasEdges(e) && straight) {
+        m = extrudeWithEdges(wasm, contours, f.height, e);
+      } else {
+        // side corners always apply; top/bottom treatments need straight walls
+        const cs = new CrossSection(treatCorners(contours, e.sides.kind, e.sides.size), 'Positive');
+        const divisions = f.twist !== 0 ? Math.max(1, Math.round(Math.abs(f.twist) / 5)) : 0;
+        m = cs.extrude(f.height, divisions, f.twist, [f.scaleTop, f.scaleTop]);
+        dispose(cs);
+      }
       if (f.flip) { const down = m.translate([0, 0, -f.height]); dispose(m); m = down; }
       break;
     }

@@ -3,8 +3,8 @@
  * that returns feature specs. Forma evaluates modules live and can bake
  * them into ordinary features.
  */
-import type { Feature, FeatureOf, FeatureType, Role, Transform, Vec2, Profile, Modifiers } from '../document/types.js';
-import { identityTransform, defaultModifiers } from '../document/types.js';
+import type { Feature, FeatureOf, FeatureType, Role, Transform, Vec2, Profile, Modifiers, Repeat, Edges } from '../document/types.js';
+import { identityTransform, defaultModifiers, defaultRepeat, defaultEdges } from '../document/types.js';
 import type { ModuleApi } from './api.js';
 
 interface InputBase {
@@ -37,10 +37,12 @@ export type ModuleInputValues = Record<string, string | number | boolean>;
 
 /** What build() returns: a feature without bookkeeping fields. */
 export type FeatureSpec = {
-  [T in Exclude<FeatureType, 'combine' | 'module'>]: Omit<FeatureOf<T>, 'id' | 'parentId' | 'name' | 'role' | 'visible' | 'transform' | 'modifiers' | 'flip'> & {
+  [T in Exclude<FeatureType, 'combine' | 'module'>]: Omit<FeatureOf<T>, 'id' | 'parentId' | 'name' | 'role' | 'visible' | 'transform' | 'modifiers' | 'flip' | 'repeat' | 'edges'> & {
     name?: string;
     /** extrude only: build towards -Z */
     flip?: boolean;
+    repeat?: Partial<Repeat>;
+    edges?: Partial<Edges>;
     role?: Role;
     transform?: Partial<Transform>;
     position?: Partial<Transform['position']>;
@@ -112,7 +114,7 @@ export function resolveInputs(def: ModuleDefinition, stored: Record<string, unkn
 /** Turn specs into full features (ids are synthetic; used for evaluation or baking). */
 export function specsToFeatures(specs: FeatureSpec[], idPrefix = 'm'): Feature[] {
   return specs.map((s, i) => {
-    const { name, role, visible, transform, position, rotation, modifiers, flip, ...rest } = s as FeatureSpec & { visible?: boolean };
+    const { name, role, visible, transform, position, rotation, modifiers, flip, repeat, edges, ...rest } = s as FeatureSpec & { visible?: boolean };
     const t: Transform = { ...identityTransform(), ...(transform ?? {}) };
     if (position) t.position = { ...t.position, ...position };
     if (rotation) t.rotation = { ...t.rotation, ...rotation };
@@ -124,7 +126,9 @@ export function specsToFeatures(specs: FeatureSpec[], idPrefix = 'm'): Feature[]
       transform: t,
       parentId: null,
       modifiers: { ...defaultModifiers(), ...(modifiers ?? {}) },
+      repeat: { ...defaultRepeat(), ...(repeat ?? {}) },
       ...(rest.type === 'extrude' ? { flip: flip ?? false } : {}),
+      ...(rest.type === 'extrude' || rest.type === 'box' || rest.type === 'cylinder' ? { edges: { ...defaultEdges(), ...(edges ?? {}) } } : {}),
       ...rest,
     } as Feature;
     return f;

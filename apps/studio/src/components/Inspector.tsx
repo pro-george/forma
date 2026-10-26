@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { featureById, inputVisible, parseProfileInput, type Feature, type FeatureOf, type Modifiers, type Vec2 } from '@forma/core';
+import { featureById, inputVisible, parseProfileInput, defaultEdges, defaultRepeat, type Edges, type Feature, type FeatureOf, type Modifiers, type Repeat, type Vec2 } from '@forma/core';
 import { useStore } from '../state/store';
 import type { ModuleInfo } from '../state/worker-client';
 import { Field, NumberField, Slider, TextField, formatNum } from './fields';
@@ -64,8 +64,112 @@ function CommonHeader({ feature }: { feature: Feature }) {
         <div className="seg">
           <button className={feature.role === 'solid' ? 'on' : ''} onClick={() => patch(feature.id, { role: 'solid' })}>Solid</button>
           <button className={`hole ${feature.role === 'hole' ? 'on' : ''}`} onClick={() => patch(feature.id, { role: 'hole' })}>Hole</button>
+          <button className={feature.role === 'intersect' ? 'on' : ''} onClick={() => patch(feature.id, { role: 'intersect' })} title="Keep only where this overlaps the solids before it (inside a combine)">Keep</button>
         </div>
       </Field>
+    </>
+  );
+}
+
+const EDGE_KINDS = [{ value: 'none', label: 'None' }, { value: 'round', label: 'Round' }, { value: 'chamfer', label: 'Chamfer' }] as const;
+const EDGE_TYPES = new Set<Feature['type']>(['box', 'cylinder', 'extrude']);
+
+/** Fillet / chamfer / bevel for profile-based solids. */
+function EdgesPanel({ feature }: { feature: Feature }) {
+  const patch = useStore((s) => s.patchFeature);
+  if (!EDGE_TYPES.has(feature.type)) return null;
+  const edges: Edges = { ...defaultEdges(), ...((feature as { edges?: Partial<Edges> }).edges ?? {}) };
+  const set = (part: keyof Edges, v: Partial<Edges[keyof Edges]>, undoable = true) => patch(feature.id, { edges: { ...edges, [part]: { ...edges[part], ...v } } } as Partial<Feature>, { undoable });
+  const rows: { key: keyof Edges; label: string; hint: string }[] = feature.type === 'cylinder'
+    ? [{ key: 'top', label: 'Top edge', hint: 'rim' }, { key: 'bottom', label: 'Bottom edge', hint: 'base' }]
+    : [{ key: 'sides', label: 'Corners (bevel)', hint: 'vertical corners of the outline' }, { key: 'top', label: 'Top edge', hint: '' }, { key: 'bottom', label: 'Bottom edge', hint: '' }];
+  const twisted = feature.type === 'extrude' && (feature.twist !== 0 || feature.scaleTop !== 1);
+  return (
+    <>
+      <h3>Edges</h3>
+      {rows.map((r) => (
+        <div key={r.key} className="edge-row">
+          <label>{r.label}</label>
+          <select value={edges[r.key].kind} onChange={(e) => set(r.key, { kind: e.target.value as Edges['sides']['kind'] })}>{EDGE_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}</select>
+          <NumberField value={edges[r.key].size} min={0} step={0.5} unit="mm" onChange={(v) => set(r.key, { size: v }, false)} />
+        </div>
+      ))}
+      <div className="note">{twisted ? 'Top and bottom treatments need a straight extrusion (no twist, top scale 1); corners still apply.' : 'Round = fillet, Chamfer = flat cut. Top and bottom rounds are built from 0.3 mm slices, finer than a printed layer.'}</div>
+    </>
+  );
+}
+
+const REPEAT_MODES = [{ value: 'none', label: 'Off' }, { value: 'linear', label: 'Linear' }, { value: 'grid', label: 'Grid' }, { value: 'radial', label: 'Radial' }, { value: 'mirror', label: 'Mirror' }] as const;
+
+/** Repeater (linear / grid / radial / mirror) for any part, including combines. */
+function RepeatPanel({ feature }: { feature: Feature }) {
+  const patch = useStore((s) => s.patchFeature);
+  const r: Repeat = { ...defaultRepeat(), ...(feature.repeat ?? {}) };
+  const set = (v: Partial<Repeat>, undoable = true) => patch(feature.id, { repeat: { ...r, ...v } } as Partial<Feature>, { undoable });
+  const vec = (key: 'step' | 'step2') => (
+    <div className="triple">
+      {(['x', 'y', 'z'] as const).map((ax) => <NumberField key={ax} axis={ax} value={r[key][ax]} step={1} onChange={(v) => set({ [key]: { ...r[key], [ax]: v } }, false)} />)}
+    </div>
+  );
+  return (
+    <>
+      <h3>Repeat</h3>
+      <Field label="Mode"><select value={r.mode} onChange={(e) => set({ mode: e.target.value as Repeat['mode'] })}>{REPEAT_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></Field>
+      {(r.mode === 'linear' || r.mode === 'grid') && (
+        <>
+          <Field label="Count"><NumberField value={r.count} min={1} max={200} step={1} onChange={(v) => set({ count: Math.round(v) }, false)} /></Field>
+          <div className="field-block"><label>Step (mm)</label>{vec('step')}</div>
+          {r.mode === 'grid' && (
+            <>
+              <Field label="Count 2"><NumberField value={r.count2} min={1} max={200} step={1} onChange={(v) => set({ count2: Math.round(v) }, false)} /></Field>
+              <div className="field-block"><label>Step 2 (mm)</label>{vec('step2')}</div>
+            </>
+          )}
+        </>
+      )}
+      {r.mode === 'radial' && (
+        <>
+          <Field label="Count"><NumberField value={r.count} min={1} max={200} step={1} onChange={(v) => set({ count: Math.round(v) }, false)} /></Field>
+          <Field label="Sweep"><NumberField value={r.sweep} min={-360} max={360} step={5} unit="°" onChange={(v) => set({ sweep: v }, false)} /></Field>
+          <Field label="Centre X"><NumberField value={r.center[0]} step={1} unit="mm" onChange={(v) => set({ center: [v, r.center[1]] }, false)} /></Field>
+          <Field label="Centre Y"><NumberField value={r.center[1]} step={1} unit="mm" onChange={(v) => set({ center: [r.center[0], v] }, false)} /></Field>
+          <div className="note">Copies turn around a point in the part's own frame. Put the centre 30 mm to the left to spread the part on a 30 mm circle.</div>
+        </>
+      )}
+      {r.mode === 'mirror' && (
+        <>
+          <Field label="Across">
+            <div className="seg">{(['x', 'y', 'z'] as const).map((ax) => <button key={ax} className={r.axis === ax ? 'on' : ''} onClick={() => set({ axis: ax })}>{ax.toUpperCase()}</button>)}</div>
+          </Field>
+          <Field label="Plane offset"><NumberField value={r.offset} step={1} unit="mm" onChange={(v) => set({ offset: v }, false)} /></Field>
+          <Field label="Keep original"><label className="check"><input type="checkbox" checked={r.keepOriginal} onChange={(e) => set({ keepOriginal: e.target.checked })} /></label></Field>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Cut a top-level part in two with a plane (print-in-parts, "loop cut"). */
+function SplitPanel({ feature }: { feature: Feature }) {
+  const split = useStore((s) => s.splitFeature);
+  const result = useStore((s) => s.results.get(feature.id));
+  const [axis, setAxis] = useState<'x' | 'y' | 'z'>('z');
+  const [at, setAt] = useState<number | null>(null);
+  const [gap, setGap] = useState(0);
+  if (feature.parentId !== null) return null;
+  const p = feature.transform.position;
+  const mid = result ? (result.bbox.min[axis] + result.bbox.max[axis]) / 2 + p[axis] : p[axis];
+  const value = at ?? Math.round(mid * 10) / 10;
+  return (
+    <>
+      <h3>Split</h3>
+      <Field label="Plane">
+        <div className="seg">{(['x', 'y', 'z'] as const).map((ax) => <button key={ax} className={axis === ax ? 'on' : ''} onClick={() => { setAxis(ax); setAt(null); }}>{ax.toUpperCase()}</button>)}</div>
+      </Field>
+      <Field label="Position"><NumberField value={value} step={1} unit="mm" onChange={setAt} /></Field>
+      <Field label="Gap"><NumberField value={gap} min={0} step={0.1} unit="mm" onChange={setGap} /></Field>
+      <div className="actions"><button onClick={() => split(feature.id, { axis, at: value, gap })}>Split into two parts</button></div>
+      <div className="note">Both halves stay parametric: each is the original part with a cutting block, so you can still edit the part inside.</div>
     </>
   );
 }
@@ -145,11 +249,14 @@ function FeaturePanel({ feature }: { feature: Feature }) {
         </>
       )}
       {feature.type === 'combine' && (
-        <div className="note">{feature.childIds.length} children, {feature.childIds.filter((id) => featureById(doc, id)?.role === 'hole').length} of them holes. Solids are unioned, holes subtracted. Edit any child in the tree to change the result.</div>
+        <div className="note">{feature.childIds.length} children, {feature.childIds.filter((id) => featureById(doc, id)?.role === 'hole').length} holes, {feature.childIds.filter((id) => featureById(doc, id)?.role === 'intersect').length} keep. Solids are unioned, Keep parts intersected, holes subtracted. Edit any child in the tree to change the result.</div>
       )}
       {feature.type === 'mesh' && <div className="note">{(feature.positions.length / 9).toLocaleString()} triangles, imported as a watertight mesh; booleans and modifiers work on it like any other part.</div>}
+      <EdgesPanel feature={feature} />
       <ModifiersPanel feature={feature} />
+      <RepeatPanel feature={feature} />
       <Placement feature={feature} />
+      <SplitPanel feature={feature} />
       <Actions feature={feature} />
     </>
   );

@@ -45,7 +45,7 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
   const geometry = useMemo(() => (result ? toGeometry(result.mesh) : null), [result]);
   useEffect(() => () => geometry?.dispose(), [geometry]);
   const t = feature.transform;
-  const isHole = feature.role === 'hole';
+  const isHole = feature.role !== 'solid';
   const hasError = !!result?.error;
   return (
     <group position={[t.position.x, t.position.y, t.position.z]} rotation={[deg(t.rotation.x), deg(t.rotation.y), deg(t.rotation.z)]}>

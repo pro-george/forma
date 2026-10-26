@@ -119,6 +119,40 @@ export function combine(doc: FormaDocument, ids: string[], name?: string): { doc
   return { doc: { ...doc, features: [...features, c] }, combineId: c.id };
 }
 
+/**
+ * Split a top-level feature with a plane perpendicular to `axis` at world
+ * position `at` (mm), leaving `gap` mm between the halves. Produces two
+ * combines (feature + a huge box hole each) so both halves stay parametric.
+ */
+export function splitFeature(doc: FormaDocument, id: string, opts: { axis: 'x' | 'y' | 'z'; at: number; gap?: number }): { doc: FormaDocument; ids: [string, string] } {
+  const f = featureById(doc, id);
+  if (!f || f.parentId !== null) throw new Error('Split needs a top-level part');
+  const gap = Math.max(0, opts.gap ?? 0);
+  const BIG = 10000;
+  let out = doc;
+  const halves: string[] = [];
+  for (const side of [-1, 1] as const) {
+    const copy = duplicate(out, [f.id], { x: 0, y: 0, z: 0 });
+    out = copy.doc;
+    const copyId = copy.newIds[0]!;
+    // half `side` keeps what lies on its side of the plane (plus half the gap); the hole covers the other side
+    const pos = { x: 0, y: 0, z: 0 };
+    const size = { width: 2 * BIG, depth: 2 * BIG, height: 2 * BIG };
+    const edge = opts.at + side * gap / 2;
+    const holeAbove = side === -1;
+    if (opts.axis === 'z') { pos.z = holeAbove ? edge : edge - 2 * BIG; }
+    else if (opts.axis === 'x') { pos.x = holeAbove ? edge + BIG : edge - BIG; pos.z = -BIG; }
+    else { pos.y = holeAbove ? edge + BIG : edge - BIG; pos.z = -BIG; }
+    const hole = makeFeature(out, 'box', { ...size, role: 'hole', name: `Cut ${holeAbove ? 'above' : 'below'} ${opts.axis.toUpperCase()}`, transform: { position: pos, rotation: { x: 0, y: 0, z: 0 } } });
+    out = addFeature(out, hole);
+    const c = combine(out, [copyId, hole.id], `${f.name} ${side === 1 ? 'A' : 'B'}`);
+    out = c.doc;
+    halves.push(c.combineId);
+  }
+  out = removeFeatures(out, [f.id]);
+  return { doc: out, ids: [halves[0]!, halves[1]!] };
+}
+
 /** Add a top-level feature to an existing combine (at the end, so holes cut what came before). */
 export function addToCombine(doc: FormaDocument, combineId: string, featureId: string): FormaDocument {
   const c = featureById(doc, combineId);

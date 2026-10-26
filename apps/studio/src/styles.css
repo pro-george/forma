@@ -184,6 +184,9 @@ h4.group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; 
 .numfield .unit { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--muted); pointer-events: none; }
 .numfield .axis { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font: 11px var(--mono); color: var(--muted); pointer-events: none; }
 .numfield.with-axis input { padding-left: 22px; padding-right: 6px; }
+.edge-row { display: grid; grid-template-columns: 1fr 86px 82px; gap: 6px; align-items: center; padding: 3px 0; }
+.edge-row > label { font-size: 12px; color: var(--muted); }
+.edge-row select { width: 100%; background: rgba(255, 255, 255, .7); border: 1px solid var(--line); border-radius: var(--radius-ctl); padding: 6px 6px; font-size: 12px; }
 .triple { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 2px 0 6px; }
 .seg { display: inline-flex; background: var(--panel-2); border-radius: var(--pill); padding: 3px; gap: 2px; }
 .seg button { flex: 1; border: none; background: transparent; padding: 4px 10px; border-radius: var(--pill); }

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  History, addFeature, combine as combineDoc, createDocument, duplicate as duplicateDoc, featureById, makeFeature,
+  History, addFeature, combine as combineDoc, splitFeature as splitDoc, createDocument, duplicate as duplicateDoc, featureById, makeFeature,
   parseDocument, removeFeatures, sampleDocument, serializeDocument, ungroup as ungroupDoc, updateFeature, composeTransforms,
   type EvaluatedFeature, type Feature, type FeatureType, type FormaDocument, type Transform,
 } from '@forma/core';
@@ -49,6 +49,7 @@ interface Actions {
   deleteSelected(): void;
   bakeModule(id: string): Promise<void>;
   rotateSelected(deg: number): void;
+  splitFeature(id: string, opts: { axis: 'x' | 'y' | 'z'; at: number; gap: number }): void;
   // selection & view
   select(ids: string[], mode?: 'replace' | 'toggle' | 'add'): void;
   clearSelection(): void;
@@ -193,6 +194,14 @@ export const useStore = create<State & Actions>((set, get) => {
       apply(doc);
     },
     toggleVisible: (id) => apply(updateFeature(get().doc, id, (f) => ({ ...f, visible: !f.visible }))),
+    splitFeature: (id, opts) => {
+      try {
+        const r = splitDoc(get().doc, id, opts);
+        apply(r.doc);
+        set({ selection: r.ids });
+        get().toast('Split into two parts');
+      } catch (e) { get().toast((e as Error).message, 'error'); }
+    },
     combineSelected: () => {
       const { doc, selection } = get();
       const top = selection.filter((id) => featureById(doc, id)?.parentId === null);

@@ -22,6 +22,10 @@ pnpm build
 
 * **Sketch on a face** (⇧K, or *Sketch on face* in the Create panel): click any flat face of a part, draw on it, then **Join** (extrude outward) or **Cut** (extrude into the part). The extrusion is added to the part's combine so the boolean stays live and editable.
 * Extrusions have a **Direction** (up/down from their sketch plane) next to height, top scale and twist.
+* **Edges** on boxes, cylinders and extrusions: round (fillet) or chamfer the outline corners (bevel), the top edge and the bottom edge, each with its own size. Built as a smooth loft from inset outlines (slices as a fallback), so no second kernel is needed.
+* **Repeat** on any part, combines included: linear, grid, radial (around a centre in the part's frame) and mirror.
+* **Roles** inside a combine: Solid (union), Hole (subtract), Keep (intersect).
+* **Split** a top-level part with an X/Y/Z plane and an optional gap; both halves stay parametric.
 * The UI is a set of floating glass panels (Create, Parts, Properties) that collapse to pill tabs; the layout is remembered per browser.
 
 ## Conventions
