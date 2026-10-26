@@ -30,7 +30,7 @@ interface SketchState {
   /** true while the user is asked to click a face to sketch on */
   pickingFace: boolean;
   /** the part the current face sketch was started on (its combine gets the join/cut) */
-  host: { partId: string; combineId: string } | null;
+  host: { partId: string; combineId: string; point: [number, number, number]; normal: [number, number, number] } | null;
   start(featureId: string): void;
   createAndStart(): void;
   armFacePick(): void;
@@ -147,7 +147,10 @@ export const useSketch = create<SketchState>((set, get) => {
       let doc = addFeature(st.doc, f);
       // the sketch must live in the same combine as the part so its extrusion joins or cuts it
       let combineId: string;
-      if (part.parentId) {
+      if (part.type === 'combine') {
+        combineId = part.id;
+        doc = addToCombine(doc, combineId, f.id);
+      } else if (part.parentId) {
         combineId = part.parentId;
         doc = addToCombine(doc, combineId, f.id);
       } else {
@@ -156,14 +159,22 @@ export const useSketch = create<SketchState>((set, get) => {
       }
       const docBefore = st.doc;
       st.setDoc(doc);
-      set({ pickingFace: false, host: { partId, combineId } });
+      set({ pickingFace: false, host: { partId, combineId, point, normal } });
       get().start(f.id);
       set((state) => (state.active ? { active: { ...state.active, docAtEntry: docBefore } } : {}));
       useViewStore.getState().alignTo(point, normal);
     },
     setMode: (mode) => {
       const a = get().active; if (!a) return;
-      useStore.getState().patchFeature(a.featureId, { role: mode === 'cut' ? 'hole' : 'solid', flip: mode === 'cut' } as Partial<FeatureOf<'extrude'>>, { undoable: true });
+      const host = get().host;
+      // cuts start a hair outside the face, joins a hair inside, so the boolean never fights a coplanar skin
+      const eps = 0.02;
+      const patch: Partial<FeatureOf<'extrude'>> = { role: mode === 'cut' ? 'hole' : 'solid', flip: mode === 'cut' };
+      if (host) {
+        const t = planeTransform(host.point, host.normal), n = host.normal, by = mode === 'cut' ? eps : -eps;
+        patch.transform = { ...t, position: { x: t.position.x + n[0] * by, y: t.position.y + n[1] * by, z: t.position.z + n[2] * by } };
+      }
+      useStore.getState().patchFeature(a.featureId, patch, { undoable: true });
     },
     createAndStart: () => {
       const st = useStore.getState();

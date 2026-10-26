@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Grid, GizmoHelper, GizmoViewport, TransformControls, Edges, Line } from '@react-three/drei';
+import { OrbitControls, Grid, GizmoHelper, GizmoViewport, TransformControls, Edges, Line, Html } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { topLevel, type EvaluatedFeature, type Feature } from '@forma/core';
@@ -8,6 +8,7 @@ import { useStore } from '../state/store';
 import { useViewStore } from '../state/view';
 import { SketchLayer } from './SketchLayer';
 import { useSketch } from '../state/sketch';
+import { usePushPull } from '../state/pushpull';
 export { useViewStore };
 
 const cssVar = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888';
@@ -51,7 +52,14 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
     <group position={[t.position.x, t.position.y, t.position.z]} rotation={[deg(t.rotation.x), deg(t.rotation.y), deg(t.rotation.z)]}>
       {geometry && (geometry.attributes.position?.count ?? 0) > 0 && (
         <mesh geometry={geometry} castShadow receiveShadow userData={{ id: feature.id }}
+          onPointerDown={(e) => {
+            if (!usePushPull.getState().armed || e.button !== 0 || e.faceIndex === undefined || e.faceIndex === null) return;
+            e.stopPropagation();
+            const ray = { origin: [e.ray.origin.x, e.ray.origin.y, e.ray.origin.z] as [number, number, number], dir: [e.ray.direction.x, e.ray.direction.y, e.ray.direction.z] as [number, number, number] };
+            if (usePushPull.getState().begin(feature.id, e.faceIndex, [e.point.x, e.point.y, e.point.z], ray)) (e.target as Element & { setPointerCapture?: (id: number) => void }).setPointerCapture?.(e.pointerId);
+          }}
           onClick={(e) => {
+            if (usePushPull.getState().armed) { e.stopPropagation(); return; }
             if (!picking) { onSelect(e); return; }
             if (!e.face) return;
             e.stopPropagation();
@@ -186,6 +194,42 @@ function ViewController({ controls }: { controls: React.RefObject<OrbitControlsI
   return null;
 }
 
+/** Drives a push/pull drag from window pointer events and draws the arrow + value. */
+function PushPullHandler() {
+  const { camera, gl } = useThree();
+  const drag = usePushPull((s) => s.drag);
+  const colors = useThemeColors();
+  useEffect(() => {
+    if (!drag) return;
+    const ray = new THREE.Raycaster();
+    const onMove = (ev: PointerEvent) => {
+      const r = gl.domElement.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+      usePushPull.getState().move([ray.ray.origin.x, ray.ray.origin.y, ray.ray.origin.z], [ray.ray.direction.x, ray.ray.direction.y, ray.ray.direction.z]);
+    };
+    const onUp = () => usePushPull.getState().end();
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+    window.addEventListener('pointercancel', onUp, { once: true });
+    return () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp); };
+  }, [drag?.featureId, camera, gl]);
+  if (!drag) return null;
+  const o = new THREE.Vector3(...drag.origin), n = new THREE.Vector3(...drag.normal);
+  const tip = o.clone().addScaledVector(n, drag.distance);
+  const far = o.clone().addScaledVector(n, 400), near = o.clone().addScaledVector(n, -400);
+  return (
+    <group>
+      <Line points={[near, far]} color={colors.accent} lineWidth={1} dashed dashSize={2} gapSize={2} transparent opacity={0.5} />
+      <Line points={[o, tip]} color={colors.accent} lineWidth={3} />
+      <mesh position={tip}><sphereGeometry args={[1.2, 12, 12]} /><meshBasicMaterial color={colors.accent} depthTest={false} /></mesh>
+      <Html position={tip} style={{ pointerEvents: 'none', transform: 'translate(14px, -14px)' }}>
+        <div className="sketch-label">{drag.distance >= 0 ? '+' : '−'}{Math.abs(drag.distance).toFixed(1)} mm · {drag.distance >= 0 ? 'pull' : 'push'}</div>
+      </Html>
+    </group>
+  );
+}
+
 function Scene() {
   const doc = useStore((s) => s.doc);
   const results = useStore((s) => s.results);
@@ -196,6 +240,8 @@ function Scene() {
   const printLook = useStore((s) => s.printLook);
   const sketching = useSketch((s) => s.active?.featureId ?? null);
   const pickingFace = useSketch((s) => s.pickingFace);
+  const pushDragging = usePushPull((s) => !!s.drag);
+  const pushArmed = usePushPull((s) => s.armed);
   const gizmoMode = useViewStore((s) => s.gizmoMode);
   const colors = useThemeColors();
   const controls = useRef<OrbitControlsImpl | null>(null);
@@ -214,9 +260,10 @@ function Scene() {
         <Part key={f.id} feature={f} result={results.get(f.id)} selected={selection.includes(f.id)} colors={colors} wireframe={wireframe} printLook={printLook} ghost={sketching === f.id} picking={pickingFace}
           onSelect={(e) => { if (sketching) return; e.stopPropagation(); select([f.id], e.shiftKey || e.metaKey || e.ctrlKey ? 'toggle' : 'replace'); }} />
       ))}
-      {primary && !sketching && <SelectionGizmo key={primary.id + gizmoMode} primary={primary} mode={gizmoMode} />}
+      {primary && !sketching && !pushArmed && <SelectionGizmo key={primary.id + gizmoMode} primary={primary} mode={gizmoMode} />}
       <SketchLayer colors={colors} />
-      <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.12} minDistance={10} maxDistance={3000} maxPolarAngle={sketching ? Math.PI : Math.PI / 2 + 0.25}
+      <PushPullHandler />
+      <OrbitControls ref={controls} makeDefault enabled={!pushDragging} enableDamping dampingFactor={0.12} minDistance={10} maxDistance={3000} maxPolarAngle={sketching ? Math.PI : Math.PI / 2 + 0.25}
         mouseButtons={sketching ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }} />
       <GizmoHelper alignment="bottom-right" margin={[70, 110]}>
         <GizmoViewport axisColors={['#e0574f', '#5fb37a', '#6ea0ff']} labelColor="white" />

@@ -6,6 +6,7 @@ import { ToolRail } from './ToolRail';
 import { Tree } from './Tree';
 import { Inspector } from './Inspector';
 import { Icon } from './icons';
+import { usePushPull } from '../state/pushpull';
 
 const TABS: { id: PanelId; label: string }[] = [
   { id: 'create', label: 'Create' },
@@ -25,6 +26,7 @@ export function MobileShell() {
   const sketching = useSketch((s) => !!s.active);
   const partCount = useStore((s) => s.doc.features.filter((f) => f.parentId === null).length);
   const s = useStore();
+  const pushArmed = usePushPull((st) => st.armed);
   useEffect(() => { if (selection.length && !sketching) useUI.setState({ sheet: 'props' }); }, [selection, sketching]);
   useEffect(() => { if (sketching) useUI.setState({ sheet: null }); }, [sketching]);
   return (
@@ -34,7 +36,7 @@ export function MobileShell() {
         <input aria-label="Project name" value={s.doc.name} onChange={(e) => s.setDoc({ ...s.doc, name: e.target.value }, { undoable: false })} />
         <button className="ghost" title="Undo" disabled={!s.canUndo()} onClick={s.undo}><Icon.undo /></button>
         <button className="ghost" title="Redo" disabled={!s.canRedo()} onClick={s.redo}><Icon.redo /></button>
-        <button className={s.printLook ? 'on' : ''} onClick={s.togglePrintLook} title="Print look">PLA</button>
+        <button className={pushArmed ? 'on' : ''} onClick={() => (pushArmed ? usePushPull.getState().disarm() : usePushPull.getState().arm())} title="Push / pull a face">Pull</button>
         <button className="primary" onClick={() => s.exportModel('stl')} title="Export STL"><Icon.download /></button>
       </header>
       {sheet && !sketching && (

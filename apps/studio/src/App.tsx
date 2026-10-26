@@ -12,6 +12,7 @@ import { StatusBar } from './components/StatusBar';
 import { Panel } from './components/Panel';
 import { MobileShell } from './components/MobileShell';
 import { useIsMobile } from './state/media';
+import { usePushPull } from './state/pushpull';
 
 function useShortcuts() {
   useEffect(() => {
@@ -36,6 +37,7 @@ function useShortcuts() {
         return;
       }
       if (sketch.pickingFace && e.key === 'Escape') { sketch.disarmFacePick(); return; }
+      if (usePushPull.getState().armed && e.key === 'Escape') { usePushPull.getState().disarm(); return; }
       if (meta && k === 'z') { e.preventDefault(); e.shiftKey ? s.redo() : s.undo(); return; }
       if (meta && k === 'y') { e.preventDefault(); s.redo(); return; }
       if (meta && k === 'g') { e.preventDefault(); e.shiftKey ? s.ungroupSelected() : s.combineSelected(); return; }
@@ -56,6 +58,7 @@ function useShortcuts() {
         case 's': s.addPrimitive('sphere'); break;
         case 'v': s.addPrimitive('revolve'); break;
         case 'k': e.shiftKey ? sketch.armFacePick() : sketch.createAndStart(); break;
+        case 'p': { const pp = usePushPull.getState(); pp.armed ? pp.disarm() : pp.arm(); break; }
         case 'h': s.toggleRole(); break;
         case 'r': s.rotateSelected(e.shiftKey ? -90 : 90); break;
         case 'w': v.setGizmoMode('translate'); break;

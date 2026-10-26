@@ -3,6 +3,7 @@ import {
   initManifold, Evaluator, createDefaultRegistry, createModuleApi, createDocument, addFeature, makeFeature,
   combine, ungroup, removeFeatures, duplicate, addToCombine, splitFeature, parseDocument, serializeDocument, History, toBinarySTL, to3MF,
   traceRaster, loopsToProfiles, composeTransforms, sampleDocument, LAMP_FAMILIES, SOCKET_HOLE_RADIUS, familyInputs,
+  planarFace, loopArea,
   encodeHeightMap, decodeHeightMap, sampleHeightMap, blurHeightMap, proceduralHeightMap, rasterToHeightMap, VASE_SHAPES,
   type TextRasterizer, type FormaDocument,
 } from './index.js';
@@ -167,6 +168,39 @@ describe('repeat, edges, intersect, split', () => {
     expect(near(hi!, 40 * 30 * 11.5)).toBe(true);
     const rx = splitFeature(doc, box.id, { axis: 'x', at: 0 });
     expect(ev.evaluate(rx.doc).map((x) => Math.round(x.volume))).toEqual([12000, 12000]);
+  });
+});
+
+describe('planar faces', () => {
+  it('recovers the top face of a box and the ring of a tube, holes included', () => {
+    let doc = createDocument();
+    doc = addFeature(doc, makeFeature(doc, 'box', { width: 40, depth: 30, height: 20 }));
+    const [box] = ev.evaluate(doc);
+    // find a triangle on the top (z = 20)
+    const m = box!.mesh;
+    const topTri = [...Array(m.indices.length / 3).keys()].find((t) => [0, 1, 2].every((k) => Math.abs(m.positions[m.indices[t * 3 + k]! * 3 + 2]! - 20) < 1e-6))!;
+    const face = planarFace(m, topTri)!;
+    expect(face.normal[2]).toBeCloseTo(1, 5);
+    expect(face.loops).toHaveLength(1);
+    expect(face.loops[0]).toHaveLength(4);
+    expect(Math.abs(loopArea(face.loops[0]!, face.normal))).toBeCloseTo(1200, 3);
+    expect(loopArea(face.loops[0]!, face.normal)).toBeGreaterThan(0); // CCW seen from above
+    // tube: top ring has an outer loop and a hole loop
+    let d2 = createDocument();
+    d2 = addFeature(d2, makeFeature(d2, 'tube', { radius: 10, innerRadius: 6, height: 15, segments: 32 }));
+    const [tube] = ev.evaluate(d2);
+    const tm = tube!.mesh;
+    const ringTri = [...Array(tm.indices.length / 3).keys()].find((t) => [0, 1, 2].every((k) => Math.abs(tm.positions[tm.indices[t * 3 + k]! * 3 + 2]! - 15) < 1e-6))!;
+    const ring = planarFace(tm, ringTri)!;
+    expect(ring.loops).toHaveLength(2);
+    expect(loopArea(ring.loops[0]!, ring.normal)).toBeGreaterThan(0);
+    expect(loopArea(ring.loops[1]!, ring.normal)).toBeLessThan(0); // hole runs the other way
+    expect(Math.abs(loopArea(ring.loops[0]!, ring.normal))).toBeGreaterThan(Math.abs(loopArea(ring.loops[1]!, ring.normal)));
+    // a side face of the box is vertical
+    const sideTri = [...Array(m.indices.length / 3).keys()].find((t) => [0, 1, 2].every((k) => Math.abs(m.positions[m.indices[t * 3 + k]! * 3]! - 20) < 1e-6))!;
+    const side = planarFace(m, sideTri)!;
+    expect(side.normal[0]).toBeCloseTo(1, 5);
+    expect(Math.abs(loopArea(side.loops[0]!, side.normal))).toBeCloseTo(600, 3);
   });
 });
 

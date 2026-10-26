@@ -1,6 +1,7 @@
 import { useStore } from '../state/store';
 import { useViewStore } from '../state/view';
 import { useSketch } from '../state/sketch';
+import { usePushPull } from '../state/pushpull';
 import { Icon } from './icons';
 
 export function ToolRail() {
@@ -8,6 +9,7 @@ export function ToolRail() {
   const view = useViewStore();
   const sketching = useSketch((st) => !!st.active);
   const pickingFace = useSketch((st) => st.pickingFace);
+  const pushArmed = usePushPull((st) => st.armed);
   const primitives = [
     ['box', 'Box', 'B'], ['cylinder', 'Cylinder', 'C'], ['cone', 'Cone', ''], ['sphere', 'Sphere', 'S'], ['torus', 'Torus', ''], ['tube', 'Tube', ''], ['revolve', 'Revolve', 'V'],
   ] as const;
@@ -28,6 +30,7 @@ export function ToolRail() {
       ))}
 
       <h3>Edit</h3>
+      <button className={pushArmed ? 'on' : ''} onClick={() => (pushArmed ? usePushPull.getState().disarm() : usePushPull.getState().arm())} title="Press on a flat face and drag: out adds material, in cuts"><Icon.extrude />Push / Pull<kbd>P</kbd></button>
       <button onClick={s.combineSelected}><Icon.combine />Combine<kbd>⌘G</kbd></button>
       <button onClick={s.ungroupSelected}><Icon.ungroup />Ungroup</button>
       <div className="row">
