@@ -182,7 +182,7 @@ describe('modules', () => {
       expect(r!.error).toBeUndefined();
       return { volume: r!.volume, maxX: r!.bbox.max.x };
     };
-    const plain = vol({ ribs: 0, pattern: 'none' });
+    const plain = vol({ ribStyle: 'none', pattern: 'none' });
     const ribbed = vol({ ribs: 40, ribDepth: 1, pattern: 'none' });
     const relief = vol({ ribs: 40, ribDepth: 1, pattern: 'flower', depth: 2 });
     expect(ribbed.maxX).toBeGreaterThan(plain.maxX + 0.5);
@@ -190,11 +190,46 @@ describe('modules', () => {
     expect(relief.volume).toBeGreaterThan(ribbed.volume);
     // an uploaded map takes precedence over the sample pattern
     const custom = encodeHeightMap(proceduralHeightMap('checker', 32));
-    const uploaded = vol({ ribs: 0, pattern: 'none', image: custom, depth: 3, soften: 0 });
+    const uploaded = vol({ ribStyle: 'none', pattern: 'upload', image: custom, depth: 3, soften: 0 });
     expect(uploaded.maxX).toBeGreaterThan(plain.maxX + 2);
     // negative depth carves inward instead
-    const carved = vol({ ribs: 0, pattern: 'flower', depth: -2 });
+    const carved = vol({ ribStyle: 'none', pattern: 'flower', depth: -2 });
     expect(carved.volume).toBeLessThan(plain.volume);
+  });
+  it('relief vase v2: rib styles, front/back pictures, text and custom profile all build; check() warns', () => {
+    const run = (inputs: Record<string, unknown>) => {
+      let doc = createDocument();
+      doc = addFeature(doc, makeFeature(doc, 'module', { moduleId: 'relief-vase', inputs: { height: 60, diameter: 40, detail: 'preview', pattern: 'none', ...inputs } }));
+      const [r] = ev.evaluate(doc);
+      expect(r!.error, JSON.stringify(inputs)).toBeUndefined();
+      return r!;
+    };
+    const plain = run({ ribStyle: 'none' });
+    for (const style of ['straight', 'beads', 'woven', 'fuzzy']) {
+      const r = run({ ribStyle: style, ribs: 40, ribDepth: 1 });
+      expect(r.bbox.max.x, style).toBeGreaterThan(plain.bbox.max.x + 0.3);
+    }
+    // beads add vertical structure: more triangles than straight ribs at the same settings
+    expect(run({ ribStyle: 'beads', ribs: 40, beadSize: 2 }).mesh.indices.length).toBeGreaterThan(run({ ribStyle: 'straight', ribs: 40 }).mesh.indices.length);
+    // a front picture only raises the front: +x side grows, -x side does not
+    const pic = encodeHeightMap(proceduralHeightMap('checker', 32));
+    const front = run({ ribStyle: 'none', front: pic, frontWidth: 40, pictureDepth: 3, soften: 0 });
+    expect(front.bbox.max.x).toBeGreaterThan(plain.bbox.max.x + 2);
+    expect(front.bbox.min.x).toBeCloseTo(plain.bbox.min.x, 0);
+    const back = run({ ribStyle: 'none', back: pic, backWidth: 40, pictureDepth: 3, soften: 0 });
+    expect(back.bbox.min.x).toBeLessThan(plain.bbox.min.x - 2);
+    expect(back.bbox.max.x).toBeCloseTo(plain.bbox.max.x, 0);
+    // text goes through the rasterizer (fake in Node) and raises the wall where it sits
+    const text = run({ ribStyle: 'none', text: 'ARTEA', textSize: 10, textDepth: 2, textAngle: 90, soften: 0 });
+    expect(text.bbox.max.y).toBeGreaterThan(plain.bbox.max.y + 1);
+    expect(text.volume).toBeGreaterThan(plain.volume);
+    // custom profile: a narrow waist shows up in the volume
+    const custom = run({ ribStyle: 'none', shape: 'custom', profile: JSON.stringify([[1, 0], [0.5, 0.5], [1, 1]]) });
+    expect(custom.volume).toBeLessThan(plain.volume * 0.9);
+    expect(run({ ribStyle: 'none', shape: 'custom', profile: 'not json' }).error).toBeUndefined();
+    // printability warnings
+    expect(run({ ribs: 400, ribStyle: 'straight' }).warnings?.join(' ')).toMatch(/nozzle/);
+    expect(run({ ribs: 40, ribStyle: 'straight' }).warnings).toBeUndefined();
   });
   it('unknown module reports an error instead of throwing', () => {
     let doc = createDocument();

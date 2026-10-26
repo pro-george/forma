@@ -47,6 +47,7 @@ export function TopBar() {
       <div className="group">
         <button className={s.showGrid ? 'on' : ''} onClick={s.toggleGrid}>Grid</button>
         <button className={s.wireframe ? 'on' : ''} onClick={s.toggleWireframe}>Wire</button>
+        <button className={s.printLook ? 'on' : ''} onClick={s.togglePrintLook} title="Matte PLA shading with a hard light: see relief the way the print will show it">Print look</button>
       </div>
       <Menu primary label={<><Icon.download /> Export</>}>{(close) => (
         <>

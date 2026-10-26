@@ -18,6 +18,8 @@ interface State {
   selection: string[];
   showGrid: boolean;
   wireframe: boolean;
+  /** matte PLA-like shading with a hard key light, to judge relief the way a print will look */
+  printLook: boolean;
   toasts: Toast[];
   fileName: string | null;
 }
@@ -50,7 +52,7 @@ interface Actions {
   // selection & view
   select(ids: string[], mode?: 'replace' | 'toggle' | 'add'): void;
   clearSelection(): void;
-  toggleGrid(): void; toggleWireframe(): void;
+  toggleGrid(): void; toggleWireframe(): void; togglePrintLook(): void;
   // export
   exportModel(format: 'stl' | '3mf', onlySelection?: boolean): Promise<void>;
   toast(text: string, kind?: Toast['kind']): void;
@@ -120,6 +122,7 @@ export const useStore = create<State & Actions>((set, get) => {
     selection: [],
     showGrid: true,
     wireframe: false,
+    printLook: false,
     toasts: [],
     fileName: null,
 
@@ -254,12 +257,15 @@ export const useStore = create<State & Actions>((set, get) => {
     clearSelection: () => set({ selection: [] }),
     toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
     toggleWireframe: () => set((s) => ({ wireframe: !s.wireframe })),
+    togglePrintLook: () => set((s) => ({ printLook: !s.printLook })),
 
     exportModel: async (format, onlySelection) => {
-      const { doc, selection } = get();
+      const { doc: live, selection } = get();
       const ids = onlySelection && selection.length ? selection : undefined;
+      // modules with a preview/print "detail" switch always export at print quality
+      const doc = { ...live, features: live.features.map((f) => f.type === 'module' && 'detail' in f.inputs ? { ...f, inputs: { ...f.inputs, detail: 'print' } } : f) };
       try {
-        get().toast(format === 'stl' ? 'Unioning parts for STL…' : 'Packing 3MF…');
+        get().toast(format === 'stl' ? 'Building print-quality mesh…' : 'Packing 3MF…');
         const bytes = await workerClient.exportModel(doc, format, ids);
         const base = doc.name.replace(/[^\w-]+/g, '_') || 'model';
         download(bytes, `${base}.${format}`, format === 'stl' ? 'model/stl' : 'model/3mf');

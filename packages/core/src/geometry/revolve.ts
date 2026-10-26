@@ -23,7 +23,23 @@ const MAX_ROWS = 720;
 
 export const reliefOf = (m: Modifiers): Relief => ({ ...defaultRelief(), ...(m.relief ?? {}) });
 export const hasRelief = (r: Relief) => r.depth !== 0 && r.map !== '';
-export const hasModifiers = (m: Modifiers) => m.twist !== 0 || m.taper !== 0 || m.rippleAmplitude !== 0 || m.grooveAmplitude !== 0 || hasRelief(reliefOf(m));
+/** Every relief layer of a part, normalised, including the primary `relief`. */
+export const reliefLayers = (m: Modifiers): Relief[] => [reliefOf(m), ...(m.reliefs ?? []).map((r) => ({ ...defaultRelief(), ...r }))].filter(hasRelief);
+export const hasModifiers = (m: Modifiers) => m.twist !== 0 || m.taper !== 0 || m.rippleAmplitude !== 0 || m.grooveAmplitude !== 0 || (m.fuzz ?? 0) !== 0 || reliefLayers(m).length > 0;
+
+/** Deterministic hash noise in 0..1 on an integer lattice, smoothly interpolated (value noise). */
+function hash2(ix: number, iy: number): number {
+  let h = Math.imul(ix | 0, 374761393) ^ Math.imul(iy | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+export function valueNoise(x: number, y: number): number {
+  const x0 = Math.floor(x), y0 = Math.floor(y);
+  const tx = x - x0, ty = y - y0;
+  const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+  const a = hash2(x0, y0), b = hash2(x0 + 1, y0), c = hash2(x0, y0 + 1), d = hash2(x0 + 1, y0 + 1);
+  return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy;
+}
 
 /** Decoded (and softened) height maps, keyed by content so slider drags don't re-decode. */
 const mapCache = new Map<string, HeightMap | null>();
@@ -39,33 +55,70 @@ export function reliefMap(r: Relief): HeightMap | null {
   return out;
 }
 
-/** Radial displacement in mm at angle `a` (rad) and height fraction `t`, from ripple, grooves and relief. */
-export function displacementAt(mods: Modifiers, relief: Relief, map: HeightMap | null, a: number, t: number): number {
+export interface ReliefLayer { relief: Relief; map: HeightMap }
+export const decodedLayers = (mods: Modifiers): ReliefLayer[] => reliefLayers(mods).flatMap((relief) => { const map = reliefMap(relief); return map ? [{ relief, map }] : []; });
+
+/**
+ * Radial displacement in mm at angle `a` (rad), height fraction `t` and
+ * height `z` (mm), from ripple, grooves (optionally beaded), fuzz and every
+ * relief layer. `h` is the part height, for the groove bead period and fuzz.
+ */
+export function displacementAt(mods: Modifiers, layers: ReliefLayer[], a: number, t: number, h: number, radius: number): number {
   let d = 0;
   if (mods.rippleAmplitude) d += mods.rippleAmplitude * Math.sin(t * mods.rippleWaves * Math.PI * 2);
-  if (mods.grooveAmplitude) d += mods.grooveAmplitude * 0.5 * (1 + Math.cos(a * mods.grooveCount));
-  if (map) {
+  if (mods.grooveAmplitude) {
+    let ridge = 0.5 * (1 + Math.cos(a * mods.grooveCount));
+    const wl = mods.grooveWaveLength ?? 0;
+    if (wl > 0) {
+      // beads: modulate the ridge along z; stagger shifts odd ribs by half a period
+      const rib = Math.round((a * mods.grooveCount) / (2 * Math.PI));
+      const shift = mods.grooveStagger && rib % 2 !== 0 ? Math.PI : 0;
+      ridge *= 0.35 + 0.65 * 0.5 * (1 + Math.cos((t * h * 2 * Math.PI) / wl + shift));
+    }
+    d += mods.grooveAmplitude * ridge;
+  }
+  if (mods.fuzz) {
+    const cell = Math.max(0.2, mods.fuzzScale ?? 1.5);
+    const cells = Math.max(4, Math.round((2 * Math.PI * radius) / cell));
+    const u = ((a / (2 * Math.PI)) + 1) % 1 * cells; // wraps seamlessly around
+    d += mods.fuzz * (valueNoise(u, (t * h) / cell) - 0.5);
+  }
+  for (const { relief, map } of layers) {
     const band = Math.max(1e-6, relief.to - relief.from);
     const tv = (t - relief.from) / band;
-    if (tv >= 0 && tv <= 1) {
-      const u = ((a - relief.phase * deg2rad) / (2 * Math.PI) + 0.5) * relief.repeat;
-      let s = sampleHeightMap(map, u, tv * relief.rows, relief.rows > 1);
+    if (tv < 0 || tv > 1) continue;
+    const u = ((a - relief.phase * deg2rad) / (2 * Math.PI) + 0.5) * relief.repeat;
+    // a single (non-repeating) picture covers only its own tile; outside it there is nothing
+    if (!relief.tile) {
+      const uu = ((u % 1) + 1) % 1;
+      if (uu < 0.5 - relief.width / 2 || uu > 0.5 + relief.width / 2) continue;
+      let s = sampleHeightMap(map, (uu - 0.5) / relief.width + 0.5, tv);
       if (relief.invert) s = 1 - s;
       const ease = Math.min(1, Math.min(tv, 1 - tv) / RELIEF_FADE);
       d += relief.depth * s * ease;
+      continue;
     }
+    let s = sampleHeightMap(map, u, tv * relief.rows, relief.rows > 1);
+    if (relief.invert) s = 1 - s;
+    const ease = Math.min(1, Math.min(tv, 1 - tv) / RELIEF_FADE);
+    d += relief.depth * s * ease;
   }
   return d;
 }
 
 /** Vertex spacing that resolves every modifier without wasting triangles. */
-export function modifierEdgeLength(mods: Modifiers, relief: Relief, map: HeightMap | null, radius: number, h: number): number {
+export function modifierEdgeLength(mods: Modifiers, layers: ReliefLayer[], radius: number, h: number): number {
   let edge = Math.max(0.6, Math.min(h, radius * 2) / 40);
   const circumference = 2 * Math.PI * radius;
-  if (mods.grooveAmplitude) edge = Math.min(edge, circumference / (mods.grooveCount * 5));
-  if (map) {
+  if (mods.grooveAmplitude) {
+    edge = Math.min(edge, circumference / (mods.grooveCount * 5));
+    if ((mods.grooveWaveLength ?? 0) > 0) edge = Math.min(edge, mods.grooveWaveLength / 4);
+  }
+  if (mods.fuzz) edge = Math.min(edge, Math.max(0.2, mods.fuzzScale ?? 1.5) / 2);
+  for (const { relief, map } of layers) {
     const band = Math.max(0.05, relief.to - relief.from);
-    const pxAround = circumference / (relief.repeat * map.width);
+    const tileW = relief.tile ? 1 / relief.repeat : relief.width;
+    const pxAround = (circumference * tileW) / map.width;
     const pxUp = (h * band) / (relief.rows * map.height);
     edge = Math.min(edge, Math.max(pxAround, pxUp) * 1.2);
   }
@@ -95,14 +148,13 @@ function radiusFn(side: [number, number][]): (t: number) => number {
  */
 export function buildDisplacedRevolve(wasm: ManifoldToplevel, f: FeatureOf<'revolve'>): Manifold {
   const mods = f.modifiers;
-  const relief = reliefOf(mods);
-  const map = reliefMap(relief);
+  const layers = decodedLayers(mods);
   const h = f.height;
   const side = chaikin(f.profile, f.smoothing).map(([r, t]): [number, number] => [Math.max(0.01, r), Math.min(1, Math.max(0, t))]);
   const R = radiusFn(side);
   const maxR = side.reduce((m, [r]) => Math.max(m, r), 0);
 
-  const edge = modifierEdgeLength(mods, relief, map, maxR, h);
+  const edge = modifierEdgeLength(mods, layers, maxR, h);
   const N = Math.max(8, Math.round(f.segments));
   const M = Math.min(MAX_ROWS, Math.max(2, Math.ceil(h / edge)));
   const vessel = f.wall > 0;
@@ -125,7 +177,7 @@ export function buildDisplacedRevolve(wasm: ManifoldToplevel, f: FeatureOf<'revo
     const base = R(t) - (inner ? f.wall : 0);
     for (let j = 0; j < N; j++) {
       const a = (j / N) * Math.PI * 2;
-      const r = Math.max(0.01, base * (1 + taper * t) + displacementAt(mods, relief, map, a, t));
+      const r = Math.max(0.01, base * (1 + taper * t) + displacementAt(mods, layers, a, t, h, maxR));
       const aa = a + twist * t;
       put(Math.cos(aa) * r, Math.sin(aa) * r, z);
     }

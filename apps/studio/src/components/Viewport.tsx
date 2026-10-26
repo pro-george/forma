@@ -35,8 +35,11 @@ function toGeometry(m: EvaluatedFeature['mesh']): THREE.BufferGeometry {
 
 const deg = THREE.MathUtils.degToRad;
 
-function Part({ feature, result, selected, colors, wireframe, ghost, onSelect }: {
-  feature: Feature; result: EvaluatedFeature | undefined; selected: boolean; colors: ReturnType<typeof useThemeColors>; wireframe: boolean; ghost?: boolean;
+/** Above this many indices the selection edge overlay is skipped: it costs seconds and hides the surface under lines. */
+const EDGE_OVERLAY_MAX_INDICES = 150_000;
+
+function Part({ feature, result, selected, colors, wireframe, printLook, ghost, onSelect }: {
+  feature: Feature; result: EvaluatedFeature | undefined; selected: boolean; colors: ReturnType<typeof useThemeColors>; wireframe: boolean; printLook: boolean; ghost?: boolean;
   onSelect: (e: ThreeEvent<MouseEvent>) => void;
 }) {
   const geometry = useMemo(() => (result ? toGeometry(result.mesh) : null), [result]);
@@ -49,14 +52,14 @@ function Part({ feature, result, selected, colors, wireframe, ghost, onSelect }:
       {geometry && (geometry.attributes.position?.count ?? 0) > 0 && (
         <mesh geometry={geometry} onClick={onSelect} castShadow receiveShadow userData={{ id: feature.id }}>
           <meshStandardMaterial
-            color={isHole ? colors.hole : colors.solid}
+            color={isHole ? colors.hole : printLook ? '#e8e4dc' : colors.solid}
             emissive={selected ? colors.accent : '#000000'}
-            emissiveIntensity={selected ? 0.12 : 0}
-            roughness={0.55} metalness={0.12}
+            emissiveIntensity={selected && !printLook ? 0.12 : 0}
+            roughness={printLook ? 0.92 : 0.55} metalness={printLook ? 0 : 0.12}
             transparent={isHole || ghost} opacity={isHole ? 0.42 : ghost ? 0.3 : 1} depthWrite={!isHole && !ghost}
             wireframe={wireframe}
           />
-          {selected && !ghost && <Edges threshold={28} color={colors.accent} lineWidth={1} />}
+          {selected && !ghost && !printLook && (result?.mesh.indices.length ?? 0) < EDGE_OVERLAY_MAX_INDICES && <Edges threshold={28} color={colors.accent} lineWidth={1} />}
         </mesh>
       )}
       {hasError && (
@@ -170,6 +173,7 @@ function Scene() {
   const select = useStore((s) => s.select);
   const showGrid = useStore((s) => s.showGrid);
   const wireframe = useStore((s) => s.wireframe);
+  const printLook = useStore((s) => s.printLook);
   const sketching = useSketch((s) => s.active?.featureId ?? null);
   const gizmoMode = useViewStore((s) => s.gizmoMode);
   const colors = useThemeColors();
@@ -180,12 +184,13 @@ function Scene() {
   return (
     <>
       <color attach="background" args={[colors.vp]} />
-      <hemisphereLight args={['#ffffff', '#3b4553', 0.55]} />
-      <directionalLight position={[120, -90, 200]} intensity={1.1} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-200} shadow-camera-right={200} shadow-camera-top={200} shadow-camera-bottom={-200} shadow-camera-far={800} shadow-bias={-0.0005} />
+      <hemisphereLight args={['#ffffff', '#3b4553', printLook ? 0.25 : 0.55]} />
+      {printLook && <directionalLight position={[220, 60, 140]} intensity={1.6} />}
+      <directionalLight position={[120, -90, 200]} intensity={printLook ? 0.6 : 1.1} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-200} shadow-camera-right={200} shadow-camera-top={200} shadow-camera-bottom={-200} shadow-camera-far={800} shadow-bias={-0.0005} />
       <directionalLight position={[-150, 120, 80]} intensity={0.35} />
       {showGrid && <Grid args={[400, 400]} cellSize={1} cellThickness={0.6} cellColor={colors.gridMinor} sectionSize={10} sectionThickness={1} sectionColor={colors.gridMajor} rotation={[Math.PI / 2, 0, 0]} fadeDistance={700} fadeStrength={1} infiniteGrid />}
       {parts.map((f) => (
-        <Part key={f.id} feature={f} result={results.get(f.id)} selected={selection.includes(f.id)} colors={colors} wireframe={wireframe} ghost={sketching === f.id}
+        <Part key={f.id} feature={f} result={results.get(f.id)} selected={selection.includes(f.id)} colors={colors} wireframe={wireframe} printLook={printLook} ghost={sketching === f.id}
           onSelect={(e) => { if (sketching) return; e.stopPropagation(); select([f.id], e.shiftKey || e.metaKey || e.ctrlKey ? 'toggle' : 'replace'); }} />
       ))}
       {primary && !sketching && <SelectionGizmo key={primary.id + gizmoMode} primary={primary} mode={gizmoMode} />}

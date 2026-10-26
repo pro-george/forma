@@ -4,7 +4,7 @@ export { nametagModule } from './builtin/nametag.js';
 export { flexiModule } from './builtin/flexi.js';
 export { storageBoxModule } from './builtin/box.js';
 export { lampshadeModule, LAMP_FAMILIES, SOCKET_HOLE_RADIUS, familyInputs, type LampFamily } from './builtin/lamp.js';
-export { reliefVaseModule, VASE_SHAPES, VASE_PATTERNS } from './builtin/vase.js';
+export { reliefVaseModule, VASE_SHAPES, VASE_PATTERNS, RIB_STYLES, VASE_FONTS, VASE_PRINT_NOTES, parseProfileInput } from './builtin/vase.js';
 import { ModuleRegistry } from './registry.js';
 import { nametagModule } from './builtin/nametag.js';
 import { flexiModule } from './builtin/flexi.js';

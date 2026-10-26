@@ -15,7 +15,7 @@ import plexSans700 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-700
 import plexMono400 from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2?url';
 import plexMono500 from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2?url';
 
-export type ModuleInfo = Pick<ModuleDefinition, 'id' | 'name' | 'description' | 'category' | 'inputs' | 'version'> & { source: string };
+export type ModuleInfo = Pick<ModuleDefinition, 'id' | 'name' | 'description' | 'category' | 'inputs' | 'version' | 'printNotes'> & { source: string };
 
 export interface EvalResult {
   features: EvaluatedFeature[];
@@ -48,7 +48,7 @@ const api = {
   },
 
   listModules(): ModuleInfo[] {
-    return registry.list().map((m) => ({ id: m.id, name: m.name, description: m.description, category: m.category, inputs: m.inputs, version: m.version, source: m.build.toString() }));
+    return registry.list().map((m) => ({ id: m.id, name: m.name, description: m.description, category: m.category, inputs: m.inputs, version: m.version, printNotes: m.printNotes, source: m.build.toString() }));
   },
 
   evaluate(doc: FormaDocument): EvalResult {

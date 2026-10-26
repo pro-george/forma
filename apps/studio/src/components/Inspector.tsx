@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { featureById, type Feature, type FeatureOf, type Modifiers } from '@forma/core';
+import { featureById, inputVisible, parseProfileInput, type Feature, type FeatureOf, type Modifiers, type Vec2 } from '@forma/core';
 import { useStore } from '../state/store';
 import type { ModuleInfo } from '../state/worker-client';
 import { Field, NumberField, Slider, TextField, formatNum } from './fields';
-import { ProfileEditor } from './ProfileEditor';
+import { ProfileCanvas, ProfileEditor } from './ProfileEditor';
 import { ImageField } from './ImageField';
 import { useSketch } from '../state/sketch';
 
@@ -155,6 +155,7 @@ function ModulePanel({ feature }: { feature: FeatureOf<'module'> }) {
   const bake = useStore((s) => s.bakeModule);
   const [showSource, setShowSource] = useState(false);
   const info: ModuleInfo | undefined = modules.find((m) => m.id === feature.moduleId);
+  const result = useStore((st) => st.results.get(feature.id));
   const setInput = (key: string, value: unknown, undoable = false) => patch(feature.id, { inputs: { ...feature.inputs, [key]: value } }, { undoable });
   if (!info) return <><h3>Module</h3><div className="note err">Unknown module "{feature.moduleId}". It may come from a plugin that is not loaded.</div><Actions feature={feature} /></>;
   return (
@@ -163,24 +164,51 @@ function ModulePanel({ feature }: { feature: FeatureOf<'module'> }) {
       <div className="note" style={{ marginTop: 0 }}>{info.description}</div>
       <CommonHeader feature={feature} />
       <h3>Inputs</h3>
-      {info.inputs.map((inp) => {
-        const v = feature.inputs[inp.key] ?? inp.default;
-        const id = `mi-${inp.key}`;
-        switch (inp.type) {
-          case 'text': return <Field key={inp.key} label={inp.label} htmlFor={id}><TextField id={id} value={String(v)} placeholder={inp.placeholder} onChange={(t) => setInput(inp.key, t)} /></Field>;
-          case 'number': return <Field key={inp.key} label={inp.label} htmlFor={id}><NumberField id={id} value={Number(v)} min={inp.min} max={inp.max} step={inp.step} unit={inp.unit} onChange={(n) => setInput(inp.key, n)} /></Field>;
-          case 'select': return <Field key={inp.key} label={inp.label} htmlFor={id}><select id={id} value={String(v)} onChange={(e) => setInput(inp.key, e.target.value, true)}>{inp.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></Field>;
-          case 'toggle': return <Field key={inp.key} label={inp.label} htmlFor={id}><label className="check"><input id={id} type="checkbox" checked={Boolean(v)} onChange={(e) => setInput(inp.key, e.target.checked, true)} /></label></Field>;
-          case 'color': return <Field key={inp.key} label={inp.label} htmlFor={id}><input id={id} type="color" value={String(v)} onChange={(e) => setInput(inp.key, e.target.value, true)} /></Field>;
-          case 'image': return (
-            <div key={inp.key} className="field-block">
-              <label htmlFor={id}>{inp.label}</label>
-              <ImageField id={id} value={String(v)} onChange={(s) => setInput(inp.key, s, true)} />
-              {inp.help && <div className="help">{inp.help}</div>}
-            </div>
-          );
-        }
-      })}
+      {(() => {
+        const values: Record<string, unknown> = {};
+        for (const inp of info.inputs) values[inp.key] = feature.inputs[inp.key] ?? inp.default;
+        let lastGroup: string | undefined;
+        return info.inputs.filter((inp) => inputVisible(inp, values)).map((inp) => {
+          const v = values[inp.key];
+          const id = `mi-${inp.key}`;
+          const header = inp.group && inp.group !== lastGroup ? <h4 className="group" key={`g-${inp.group}`}>{inp.group}</h4> : null;
+          lastGroup = inp.group ?? lastGroup;
+          let field: React.ReactNode;
+          switch (inp.type) {
+            case 'text': field = <Field key={inp.key} label={inp.label} htmlFor={id}><TextField id={id} value={String(v)} placeholder={inp.placeholder} onChange={(t) => setInput(inp.key, t)} /></Field>; break;
+            case 'number': field = <Field key={inp.key} label={inp.label} htmlFor={id}><NumberField id={id} value={Number(v)} min={inp.min} max={inp.max} step={inp.step} unit={inp.unit} onChange={(n) => setInput(inp.key, n)} /></Field>; break;
+            case 'select': field = <Field key={inp.key} label={inp.label} htmlFor={id}><select id={id} value={String(v)} onChange={(e) => setInput(inp.key, e.target.value, true)}>{inp.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></Field>; break;
+            case 'toggle': field = <Field key={inp.key} label={inp.label} htmlFor={id}><label className="check"><input id={id} type="checkbox" checked={Boolean(v)} onChange={(e) => setInput(inp.key, e.target.checked, true)} /></label></Field>; break;
+            case 'color': field = <Field key={inp.key} label={inp.label} htmlFor={id}><input id={id} type="color" value={String(v)} onChange={(e) => setInput(inp.key, e.target.value, true)} /></Field>; break;
+            case 'image': field = (
+              <div key={inp.key} className="field-block">
+                <label htmlFor={id}>{inp.label}</label>
+                <ImageField id={id} value={String(v)} onChange={(str) => setInput(inp.key, str, true)} />
+                {inp.help && <div className="help">{inp.help}</div>}
+              </div>
+            ); break;
+            case 'profile': {
+              const fallback = parseProfileInput(inp.default, [[1, 0], [1, 1]]);
+              const prof = parseProfileInput(v, fallback);
+              const diameter = Number(values.diameter ?? 0);
+              field = (
+                <div key={inp.key} className="field-block">
+                  <label>{inp.label}</label>
+                  <ProfileCanvas profile={prof} smoothing={3} heightLabel={`h ${values.height ?? ''} mm`} unit="×" radiusScale={diameter / 2}
+                    onChange={(p: Vec2[], undoable) => setInput(inp.key, JSON.stringify(p), undoable)} />
+                  {inp.help && <div className="help">{inp.help}</div>}
+                </div>
+              );
+              break;
+            }
+          }
+          return header ? <div key={`w-${inp.key}`}>{header}{field}</div> : field;
+        });
+      })()}
+      {result?.warnings && result.warnings.length > 0 && (
+        <div className="note warn"><strong>Print check</strong><ul>{result.warnings.map((w, k) => <li key={k}>{w}</li>)}</ul></div>
+      )}
+      {info.printNotes && <div className="note"><strong>Printing</strong><br />{info.printNotes}</div>}
       <Placement feature={feature} />
       <div className="actions">
         <button onClick={() => bake(feature.id)}>Bake to parts</button>

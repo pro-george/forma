@@ -4,6 +4,7 @@
 import type { Profile, Vec2 } from '../document/types.js';
 import { circle, regularPolygon, roundedRect, translatePoints, bounds } from '../geometry/profile.js';
 import { rasterToProfiles, type Raster } from '../raster/trace.js';
+import { encodeHeightMap, rasterToHeightMap } from '../raster/heightmap.js';
 
 export interface TextFont {
   /** CSS font-family, e.g. '"IBM Plex Sans", sans-serif' */
@@ -27,6 +28,14 @@ export interface TextResult {
   height: number;
 }
 
+export interface TextMap {
+  /** encoded height map of the rendered text (see raster/heightmap.ts) */
+  map: string;
+  /** size in mm at the requested capital height */
+  width: number;
+  height: number;
+}
+
 export interface ModuleApi {
   roundedRect: typeof roundedRect;
   circle: typeof circle;
@@ -37,12 +46,15 @@ export interface ModuleApi {
   text(text: string, font: TextFont, capHeightMm: number): TextResult;
   /** Convert any coverage raster (e.g. an uploaded logo) to profiles. */
   traceRaster(raster: Raster, mmPerPixel: number): TextResult;
+  /** Render text to a height map for relief, sized by capital height in mm. Throws if no rasterizer is installed. */
+  textMap(text: string, font: TextFont, capHeightMm: number): TextMap;
   /** true when text() is available in this environment */
   readonly hasText: boolean;
 }
 
 export function createModuleApi(rasterizer: TextRasterizer | null): ModuleApi {
   const cache = new Map<string, TextResult>();
+  const mapCache = new Map<string, TextMap>();
   return {
     roundedRect, circle, regularPolygon, translate: translatePoints, bounds,
     get hasText() { return rasterizer !== null; },
@@ -58,6 +70,19 @@ export function createModuleApi(rasterizer: TextRasterizer | null): ModuleApi {
       const out: TextResult = { profiles: res.profiles, width: res.width, height: res.height };
       cache.set(key, out);
       if (cache.size > 200) cache.delete(cache.keys().next().value as string);
+      return out;
+    },
+    textMap(text, font, capHeightMm) {
+      if (!rasterizer) throw new Error('Text rendering is not available in this environment');
+      const key = JSON.stringify(['map', text, font, capHeightMm]);
+      const hit = mapCache.get(key);
+      if (hit) return hit;
+      const fontPx = 160;
+      const r = rasterizer(text, font, fontPx);
+      const mmPerPx = capHeightMm / Math.max(1, r.capHeightPx);
+      const out: TextMap = { map: encodeHeightMap(rasterToHeightMap(r, 512)), width: r.width * mmPerPx, height: r.height * mmPerPx };
+      mapCache.set(key, out);
+      if (mapCache.size > 100) mapCache.delete(mapCache.keys().next().value as string);
       return out;
     },
     traceRaster(raster, mmPerPixel) {

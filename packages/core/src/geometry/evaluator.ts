@@ -41,12 +41,20 @@ export class Evaluator {
       const t0 = performance.now();
       try {
         const entry = this.entryFor(doc, f);
-        out.push({ id: f.id, mesh: entry.mesh, volume: f.role === 'hole' ? 0 : entry.volume, bbox: entry.bbox, role: f.role, ms: performance.now() - t0 });
+        const warnings = this.warningsFor(f);
+        out.push({ id: f.id, mesh: entry.mesh, volume: f.role === 'hole' ? 0 : entry.volume, bbox: entry.bbox, role: f.role, ms: performance.now() - t0, ...(warnings.length ? { warnings } : {}) });
       } catch (e) {
         out.push({ id: f.id, mesh: emptyMesh(), volume: 0, bbox: { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 } }, role: f.role, ms: performance.now() - t0, error: (e as Error).message });
       }
     }
     return out;
+  }
+
+  private warningsFor(f: Feature): string[] {
+    if (f.type !== 'module') return [];
+    const def = this.opts.registry.get(f.moduleId);
+    if (!def?.check) return [];
+    try { return def.check(resolveInputs(def, f.inputs)); } catch { return []; }
   }
 
   /** Geometry cache key: everything that changes the authored shape (not name/visibility/top-level placement). */

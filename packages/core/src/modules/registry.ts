@@ -7,14 +7,31 @@ import type { Feature, FeatureOf, FeatureType, Role, Transform, Vec2, Profile, M
 import { identityTransform, defaultModifiers } from '../document/types.js';
 import type { ModuleApi } from './api.js';
 
+interface InputBase {
+  key: string;
+  label: string;
+  help?: string;
+  /** inputs with the same group are shown under one sub-heading, in order of first appearance */
+  group?: string;
+  /** hide this input unless another input has one of the given values, e.g. { shape: ['custom'] } */
+  showWhen?: Record<string, (string | number | boolean)[]>;
+}
 export type ModuleInput =
-  | { key: string; type: 'text'; label: string; default: string; placeholder?: string; help?: string }
-  | { key: string; type: 'number'; label: string; default: number; min: number; max: number; step: number; unit?: string; help?: string }
-  | { key: string; type: 'select'; label: string; default: string; options: { value: string; label: string }[]; help?: string }
-  | { key: string; type: 'toggle'; label: string; default: boolean; help?: string }
-  | { key: string; type: 'color'; label: string; default: string; help?: string }
+  | (InputBase & { type: 'text'; default: string; placeholder?: string })
+  | (InputBase & { type: 'number'; default: number; min: number; max: number; step: number; unit?: string })
+  | (InputBase & { type: 'select'; default: string; options: { value: string; label: string }[] })
+  | (InputBase & { type: 'toggle'; default: boolean })
+  | (InputBase & { type: 'color'; default: string })
   /** an uploaded picture, stored as an encoded height map (see raster/heightmap.ts); '' = none */
-  | { key: string; type: 'image'; label: string; default: string; help?: string };
+  | (InputBase & { type: 'image'; default: string })
+  /** a side profile as JSON [[radius mm, height 0..1], …]; edited with the profile editor */
+  | (InputBase & { type: 'profile'; default: string });
+
+/** Whether an input is currently shown, given the other input values. */
+export function inputVisible(inp: ModuleInput, values: Record<string, unknown>): boolean {
+  if (!inp.showWhen) return true;
+  return Object.entries(inp.showWhen).every(([k, allowed]) => allowed.includes(values[k] as string | number | boolean));
+}
 
 export type ModuleInputValues = Record<string, string | number | boolean>;
 
@@ -43,6 +60,10 @@ export interface ModuleDefinition {
    * Must be deterministic: same inputs → same output (results are cached).
    */
   build: (inputs: ModuleInputValues, api: ModuleApi) => FeatureSpec[];
+  /** Optional printability check; returned strings are shown as warnings next to the inputs. */
+  check?: (inputs: ModuleInputValues) => string[];
+  /** Short printing instructions (slicer settings etc.) shown with the module. */
+  printNotes?: string;
 }
 
 export class ModuleRegistry {

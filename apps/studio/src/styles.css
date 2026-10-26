@@ -115,6 +115,10 @@ kbd { font: 11px var(--mono); color: var(--muted); }
 .field { display: grid; grid-template-columns: 1fr 112px; align-items: center; gap: 8px; padding: 3px 0; }
 .field > label { font-size: 12px; color: var(--muted); }
 .field-block { padding: 6px 0; }
+h4.group { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 12px 0 2px; }
+.note.warn { border-left: 3px solid #d9822b; }
+.note.warn ul { margin: 4px 0 0 14px; padding: 0; }
+.note.warn li { margin: 2px 0; }
 .field-block > label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
 .field-block .help { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
 .imagefield { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: center; }

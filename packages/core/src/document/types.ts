@@ -62,6 +62,10 @@ export const ReliefSchema = z.object({
   invert: z.boolean().default(false),
   /** rotate the pattern around the part, degrees */
   phase: z.number().default(0),
+  /** true: the map is tiled `repeat` × `rows` over the band; false: one copy, `width` of the circumference wide, centred at `phase` */
+  tile: z.boolean().default(true),
+  /** single-picture width as a fraction of the circumference (tile = false) */
+  width: z.number().min(0.02).max(1).default(0.4),
 });
 export type Relief = z.infer<typeof ReliefSchema>;
 export const defaultRelief = (): Relief => ReliefSchema.parse({});
@@ -69,6 +73,8 @@ export const defaultRelief = (): Relief => ReliefSchema.parse({});
 /** Non-destructive surface modifiers, applied after the base shape is built. */
 export const ModifiersSchema = z.object({
   relief: ReliefSchema.default({}),
+  /** extra relief layers (front picture, back picture, text…), summed with `relief` */
+  reliefs: z.array(ReliefSchema).default([]),
   /** total rotation around Z over the part height, degrees */
   twist: z.number().default(0),
   /** radial scale change from bottom (0 %) to top, percent; -50 halves the top */
@@ -79,6 +85,14 @@ export const ModifiersSchema = z.object({
   /** grooves around the perimeter, mm amplitude */
   grooveAmplitude: z.number().default(0),
   grooveCount: z.number().default(12),
+  /** vertical period in mm that turns each groove ridge into a stack of beads; 0 = straight ribs */
+  grooveWaveLength: z.number().min(0).default(0),
+  /** shift the beads by half a period on every other rib (woven look) */
+  grooveStagger: z.boolean().default(false),
+  /** random surface noise, mm amplitude ("fuzzy skin" look) */
+  fuzz: z.number().min(0).default(0),
+  /** size of the noise cells, mm */
+  fuzzScale: z.number().min(0.2).default(1.5),
   /** mesh refinement before warping: 1 = default edge length, 2 = twice as coarse (faster previews) */
   coarseness: z.number().min(0.25).max(4).default(1),
 });
@@ -192,4 +206,6 @@ export interface EvaluatedFeature {
   /** wall-clock ms spent evaluating (for the status bar) */
   ms: number;
   error?: string;
+  /** printability or usage warnings (from a module's check()) */
+  warnings?: string[];
 }
