@@ -14,10 +14,15 @@ function load(): Record<PanelId, boolean> {
 
 export const useUI = create<{
   collapsed: Record<PanelId, boolean>;
+  /** phone layout: the one bottom sheet that is open */
+  sheet: PanelId | null;
   toggle(id: PanelId): void;
   setCollapsed(id: PanelId, v: boolean): void;
+  openSheet(id: PanelId | null): void;
 }>((set, get) => ({
   collapsed: load(),
+  sheet: null,
+  openSheet: (sheet) => set((s) => ({ sheet: s.sheet === sheet ? null : sheet })),
   toggle: (id) => get().setCollapsed(id, !get().collapsed[id]),
   setCollapsed: (id, v) => {
     const collapsed = { ...get().collapsed, [id]: v };

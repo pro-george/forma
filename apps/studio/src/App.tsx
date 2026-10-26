@@ -10,6 +10,8 @@ import { Tree } from './components/Tree';
 import { Inspector } from './components/Inspector';
 import { StatusBar } from './components/StatusBar';
 import { Panel } from './components/Panel';
+import { MobileShell } from './components/MobileShell';
+import { useIsMobile } from './state/media';
 
 function useShortcuts() {
   useEffect(() => {
@@ -77,6 +79,20 @@ export default function App() {
   const ready = useStore((s) => s.ready);
   const selection = useStore((s) => s.selection);
   const partCount = useStore((s) => s.doc.features.filter((f) => f.parentId === null).length);
+  const mobile = useIsMobile();
+  if (mobile) {
+    return (
+      <div className="app mobile">
+        <section className="viewport">
+          <Viewport />
+          {!ready && <div className="loading"><div><div className="spin" />Loading geometry kernel…</div></div>}
+        </section>
+        <MobileShell />
+        <SketchHUD />
+        <Toasts />
+      </div>
+    );
+  }
   return (
     <div className="app">
       <section className="viewport">
