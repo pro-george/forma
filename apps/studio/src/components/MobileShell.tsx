@@ -7,6 +7,8 @@ import { Tree } from './Tree';
 import { Inspector } from './Inspector';
 import { Icon } from './icons';
 import { usePushPull } from '../state/pushpull';
+import { useMenu } from '../state/menu';
+import { useViewStore } from '../state/view';
 
 const TABS: { id: PanelId; label: string }[] = [
   { id: 'create', label: 'Create' },
@@ -22,12 +24,10 @@ const TABS: { id: PanelId; label: string }[] = [
 export function MobileShell() {
   const sheet = useUI((s) => s.sheet);
   const open = useUI((s) => s.openSheet);
-  const selection = useStore((s) => s.selection);
   const sketching = useSketch((s) => !!s.active);
   const partCount = useStore((s) => s.doc.features.filter((f) => f.parentId === null).length);
   const s = useStore();
   const pushArmed = usePushPull((st) => st.armed);
-  useEffect(() => { if (selection.length && !sketching) useUI.setState({ sheet: 'props' }); }, [selection, sketching]);
   useEffect(() => { if (sketching) useUI.setState({ sheet: null }); }, [sketching]);
   return (
     <>
@@ -48,6 +48,12 @@ export function MobileShell() {
             {sheet === 'props' && <Inspector />}
           </div>
         </section>
+      )}
+      {!sketching && !sheet && (
+        <button className="m-fab" aria-label="Add here" onClick={() => {
+          const g = useViewStore.getState().ground;
+          useMenu.getState().show(window.innerWidth / 2, window.innerHeight / 2 - 40, { point: g ? [g[0], g[1], 0] : [0, 0, 0], normal: [0, 0, 1] });
+        }}>+</button>
       )}
       {!sketching && (
         <nav className="m-tabs glass-strong">

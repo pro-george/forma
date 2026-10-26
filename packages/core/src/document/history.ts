@@ -55,4 +55,16 @@ export class History {
   }
 
   reset(doc: FormaDocument): void { this.current = doc; this.past = []; this.future = []; }
+
+  /** Timeline view: past states (oldest first), the current one, and future states (nearest first). */
+  entries(): { past: readonly FormaDocument[]; current: FormaDocument; future: readonly FormaDocument[] } {
+    return { past: this.past, current: this.current, future: [...this.future].reverse() };
+  }
+
+  /** Move `delta` steps along the timeline (negative = back). Returns the new current state. */
+  jump(delta: number): FormaDocument {
+    while (delta < 0 && this.canUndo) { this.undo(); delta++; }
+    while (delta > 0 && this.canRedo) { this.redo(); delta--; }
+    return this.current;
+  }
 }

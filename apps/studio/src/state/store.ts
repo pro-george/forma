@@ -4,6 +4,8 @@ import {
   parseDocument, removeFeatures, sampleDocument, serializeDocument, ungroup as ungroupDoc, updateFeature, composeTransforms,
   type EvaluatedFeature, type Feature, type FeatureType, type FormaDocument, type Transform,
 } from '@forma/core';
+import { useViewStore } from './view';
+import { planeTransform } from './plane';
 import { workerClient, type ModuleInfo } from './worker-client';
 
 export interface Toast { id: number; text: string; kind?: 'info' | 'error'; }
@@ -30,13 +32,19 @@ interface Actions {
   beginGesture(): void;
   endGesture(): void;
   undo(): void; redo(): void;
+  /** timeline for the history strip */
+  timeline(): { past: readonly FormaDocument[]; current: FormaDocument; future: readonly FormaDocument[] };
+  jumpHistory(delta: number): void;
+  /** bumps on every history change so the strip re-renders */
+  historyTick: number;
   canUndo(): boolean; canRedo(): boolean;
   newDocument(): void;
   loadSample(): void;
   openFile(file: File): Promise<void>;
   saveFile(): void;
   // features
-  addPrimitive(type: Exclude<FeatureType, 'combine' | 'module' | 'mesh' | 'extrude'>): void;
+  /** `at` places the part with its base centred on that point and standing on that normal; otherwise it lands at the last pointed ground spot. */
+  addPrimitive(type: Exclude<FeatureType, 'combine' | 'module' | 'mesh' | 'extrude'>, at?: { point: [number, number, number]; normal: [number, number, number] }): void;
   addModule(id: string): void;
   patchFeature(id: string, patch: Partial<Feature> | ((f: Feature) => Feature), opts?: { undoable?: boolean }): void;
   setTransform(id: string, t: Partial<Transform>, opts?: { undoable?: boolean }): void;
@@ -91,7 +99,7 @@ function download(bytes: Uint8Array | string, name: string, type: string) {
 export const useStore = create<State & Actions>((set, get) => {
   const apply = (next: FormaDocument, undoable = true) => {
     const doc = undoable && !gestureBefore ? history.commit(next) : history.replace(next);
-    set({ doc, evaluating: true });
+    set({ doc, evaluating: true, historyTick: get().historyTick + 1 });
     workerClient.evaluate(doc);
     persist(doc);
   };
@@ -108,6 +116,19 @@ export const useStore = create<State & Actions>((set, get) => {
     workerClient.evaluate(get().doc);
   });
 
+  const snap5 = (v: number) => Math.round(v / 5) * 5;
+  /** Where the pointer last touched the ground, snapped to 5 mm. */
+  const placeAtPointer = (): Transform | null => {
+    const g = useViewStore.getState().ground;
+    if (!g) return null;
+    return { position: { x: snap5(g[0]), y: snap5(g[1]), z: 0 }, rotation: { x: 0, y: 0, z: 0 } };
+  };
+  /** Standing on a plane through `point` with the given up normal (a face, or the ground). */
+  const placeOn = (point: [number, number, number], normal: [number, number, number]): Transform => {
+    const t = planeTransform(point, normal);
+    if (Math.abs(normal[2] - 1) < 1e-6) t.position = { x: snap5(point[0]), y: snap5(point[1]), z: Math.round(point[2] * 10) / 10 };
+    return t;
+  };
   const placeNew = (): Transform => {
     const n = get().doc.features.filter((f) => f.parentId === null).length;
     return { position: { x: ((n % 4) - 1.5) * 30, y: (Math.floor(n / 4) % 4 - 1.5) * 30, z: 0 }, rotation: { x: 0, y: 0, z: 0 } };
@@ -121,6 +142,7 @@ export const useStore = create<State & Actions>((set, get) => {
     ready: false,
     modules: [],
     selection: [],
+    historyTick: 0,
     showGrid: true,
     wireframe: false,
     printLook: false,
@@ -130,11 +152,13 @@ export const useStore = create<State & Actions>((set, get) => {
     setDoc: (next, opts) => apply(next, opts?.undoable ?? true),
     beginGesture: () => { if (!gestureBefore) gestureBefore = history.value; },
     endGesture: () => {
-      if (gestureBefore && gestureBefore !== history.value) history.checkpoint(gestureBefore);
+      if (gestureBefore && gestureBefore !== history.value) { history.checkpoint(gestureBefore); set({ historyTick: get().historyTick + 1 }); }
       gestureBefore = null;
     },
-    undo: () => { const d = history.undo(); set({ doc: d, selection: get().selection.filter((id) => featureById(d, id)) }); workerClient.evaluate(d); persist(d); },
-    redo: () => { const d = history.redo(); set({ doc: d, selection: get().selection.filter((id) => featureById(d, id)) }); workerClient.evaluate(d); persist(d); },
+    timeline: () => history.entries(),
+    jumpHistory: (delta) => { const d = history.jump(delta); set({ doc: d, selection: get().selection.filter((id) => featureById(d, id)), historyTick: get().historyTick + 1 }); workerClient.evaluate(d); persist(d); },
+    undo: () => { const d = history.undo(); set({ doc: d, selection: get().selection.filter((id) => featureById(d, id)), historyTick: get().historyTick + 1 }); workerClient.evaluate(d); persist(d); },
+    redo: () => { const d = history.redo(); set({ doc: d, selection: get().selection.filter((id) => featureById(d, id)), historyTick: get().historyTick + 1 }); workerClient.evaluate(d); persist(d); },
     canUndo: () => history.canUndo,
     canRedo: () => history.canRedo,
     newDocument: () => { set({ selection: [], fileName: null }); apply(createDocument()); },
@@ -154,9 +178,9 @@ export const useStore = create<State & Actions>((set, get) => {
       set({ fileName: name });
     },
 
-    addPrimitive: (type) => {
+    addPrimitive: (type, at) => {
       const doc = get().doc;
-      const t = placeNew();
+      const t = at ? placeOn(at.point, at.normal) : placeAtPointer() ?? placeNew();
       let f: Feature;
       switch (type) {
         case 'box': f = makeFeature(doc, 'box', { width: 40, depth: 30, height: 20, transform: t }); break;

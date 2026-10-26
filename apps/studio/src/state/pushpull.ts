@@ -35,13 +35,17 @@ interface PushPullState {
   /** Pointer ray in world space (camera origin + direction). */
   move(rayOrigin: [number, number, number], rayDir: [number, number, number]): void;
   end(): void;
+  /** true for the click event that follows a real drag */
+  justDragged(): boolean;
 }
 
 const MIN = 0.2;
 /** cuts start this far outside the face and joins this far inside it, so booleans never fight a coplanar skin */
 const EPS = 0.02;
 
+let lastDragEnd = 0;
 export const usePushPull = create<PushPullState>((set, get) => ({
+  justDragged: () => performance.now() - lastDragEnd < 300,
   armed: false,
   drag: null,
   arm: () => { set({ armed: true }); useStore.getState().toast('Push / pull: press on a flat face and drag'); },
@@ -90,7 +94,7 @@ export const usePushPull = create<PushPullState>((set, get) => ({
     const drag: PushPullDrag = { featureId: f.id, combineId, origin, normal, distance: 0, t0: null, profile: { outer, holes }, docBefore };
     // anchor the drag where the user pressed, not at the face centre
     drag.t0 = ray ? lineParam(drag, ray.origin, ray.dir) : (point[0] - origin[0]) * normal[0] + (point[1] - origin[1]) * normal[1] + (point[2] - origin[2]) * normal[2];
-    set({ drag, armed: true });
+    set({ drag });
     return true;
   },
   move: (rayOrigin, rayDir) => {
@@ -123,7 +127,9 @@ export const usePushPull = create<PushPullState>((set, get) => ({
       return;
     }
     st.endGesture();
-    st.toast(`${d.distance > 0 ? 'Pulled' : 'Pushed'} ${Math.abs(d.distance).toFixed(1)} mm — the height stays editable`);
+    lastDragEnd = performance.now();
+    // keep the whole part selected so its faces stay draggable
+    st.select([d.combineId]);
     set({ drag: null });
   },
 }));

@@ -13,6 +13,8 @@ import { Panel } from './components/Panel';
 import { MobileShell } from './components/MobileShell';
 import { useIsMobile } from './state/media';
 import { usePushPull } from './state/pushpull';
+import { RadialMenu } from './components/RadialMenu';
+import { HistoryStrip } from './components/HistoryStrip';
 
 function useShortcuts() {
   useEffect(() => {
@@ -30,6 +32,11 @@ function useShortcuts() {
         if (/^[0-9.]$/.test(e.key)) { sketch.typeChar(e.key); return; }
         if (e.key === 'Backspace' || e.key === 'Delete') { sketch.backspace(); return; }
         if (e.key === 'Enter') { sketch.enter(); return; }
+        if (sketch.active.tool === 'select' && sketch.active.selected && e.key.startsWith('Arrow')) {
+          const n = e.shiftKey ? 10 : 1;
+          const d = { ArrowLeft: [-n, 0], ArrowRight: [n, 0], ArrowUp: [0, n], ArrowDown: [0, -n] }[e.key] as [number, number] | undefined;
+          if (d) { e.preventDefault(); sketch.nudgeSelected(d[0], d[1]); return; }
+        }
         if (e.key === 'Escape') { sketch.escape(); return; }
         const tool = ({ v: 'select', l: 'line', r: 'rect', c: 'circle', a: 'arc' } as const)[k as 'v' | 'l' | 'r' | 'c' | 'a'];
         if (tool) { sketch.setTool(tool); return; }
@@ -92,6 +99,7 @@ export default function App() {
         </section>
         <MobileShell />
         <SketchHUD />
+        <RadialMenu />
         <Toasts />
       </div>
     );
@@ -112,6 +120,8 @@ export default function App() {
         <Panel id="props" title={selection.length ? 'Properties' : 'Scene'} side="right"><Inspector /></Panel>
       </div>
       <StatusBar />
+      <HistoryStrip />
+      <RadialMenu />
       <Toasts />
     </div>
   );

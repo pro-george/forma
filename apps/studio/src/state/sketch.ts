@@ -9,6 +9,8 @@ import { addFeature, addToCombine, combine as combineDoc, featureById, makeFeatu
 import * as THREE from 'three';
 import { useStore } from './store';
 import { useViewStore } from './view';
+import { planeTransform } from './plane';
+export { planeTransform };
 
 export type SketchTool = 'select' | 'line' | 'rect' | 'circle' | 'arc';
 
@@ -33,6 +35,8 @@ interface SketchState {
   host: { partId: string; combineId: string; point: [number, number, number]; normal: [number, number, number] } | null;
   start(featureId: string): void;
   createAndStart(): void;
+  /** Start a ground sketch centred on a world point. */
+  createAndStartAt(point: [number, number, number]): void;
   armFacePick(): void;
   disarmFacePick(): void;
   /** Start a sketch on a planar face of `partId`: `point` and `normal` are in world space. */
@@ -49,6 +53,10 @@ interface SketchState {
   escape(): void;
   select(id: string | null): void;
   deleteSelected(): void;
+  /** Set the length of the selected line (moves its end point) or the radius of the selected circle/arc. */
+  setSelectedSize(v: number): void;
+  /** Move the selected entity by (dx, dy) mm; connected endpoints follow. */
+  nudgeSelected(dx: number, dy: number): void;
   beginVertexDrag(local: Vec2): boolean;
   dragVertexTo(local: Vec2, mods: { shift: boolean; alt: boolean }): void;
   endVertexDrag(): void;
@@ -161,7 +169,7 @@ export const useSketch = create<SketchState>((set, get) => {
       st.setDoc(doc);
       set({ pickingFace: false, host: { partId, combineId, point, normal } });
       get().start(f.id);
-      set((state) => (state.active ? { active: { ...state.active, docAtEntry: docBefore } } : {}));
+      set((state) => (state.active ? { active: { ...state.active, docAtEntry: docBefore, tool: 'rect' } } : {}));
       useViewStore.getState().alignTo(point, normal);
     },
     setMode: (mode) => {
@@ -175,6 +183,12 @@ export const useSketch = create<SketchState>((set, get) => {
         patch.transform = { ...t, position: { x: t.position.x + n[0] * by, y: t.position.y + n[1] * by, z: t.position.z + n[2] * by } };
       }
       useStore.getState().patchFeature(a.featureId, patch, { undoable: true });
+    },
+    createAndStartAt: (point) => {
+      const st = useStore.getState();
+      const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [] }, height: 10, transform: { position: { x: Math.round(point[0]), y: Math.round(point[1]), z: Math.round(point[2] * 10) / 10 }, rotation: { x: 0, y: 0, z: 0 } } });
+      st.setDoc(addFeature(st.doc, f));
+      get().start(f.id);
     },
     createAndStart: () => {
       const st = useStore.getState();
@@ -190,6 +204,7 @@ export const useSketch = create<SketchState>((set, get) => {
       const anchor = a.draft.length ? a.draft[a.draft.length - 1]! : null;
       const snap = computeSnap(local, sketch, anchor, mods, a.tool === 'line' && a.draft.length >= 3 ? [a.draft[0]!] : []);
       const hover = snapPoints(sketch).find((p) => Math.hypot(p[0] - local[0], p[1] - local[1]) < POINT_SNAP) ?? null;
+      if (snap?.kind === 'point' && a.snap?.kind !== 'point') { try { navigator.vibrate?.(8); } catch { /* unsupported */ } }
       upd({ cursor: local, snap, hoverVertex: a.tool === 'select' ? hover : null });
     },
     click: (local, mods) => {
@@ -254,6 +269,40 @@ export const useSketch = create<SketchState>((set, get) => {
       get().finish();
     },
     select: (id) => upd({ selected: id }),
+    setSelectedSize: (v) => {
+      const a = get().active; if (!a || !a.selected || !(v > 0)) return;
+      const entities = currentSketch(a.featureId).entities.map((e) => {
+        if (e.id !== a.selected) return e;
+        if (e.type === 'line') {
+          const L = Math.hypot(e.b[0] - e.a[0], e.b[1] - e.a[1]) || 1;
+          return { ...e, b: [round2(e.a[0] + ((e.b[0] - e.a[0]) / L) * v), round2(e.a[1] + ((e.b[1] - e.a[1]) / L) * v)] as Vec2 };
+        }
+        if (e.type === 'circle' || e.type === 'arc') return { ...e, radius: round2(v) };
+        return e;
+      });
+      writeSketch(a.featureId, entities, true);
+    },
+    nudgeSelected: (dx, dy) => {
+      const a = get().active; if (!a || !a.selected) return;
+      const sketch = currentSketch(a.featureId);
+      const target = sketch.entities.find((e) => e.id === a.selected);
+      if (!target) return;
+      // move the entity and every endpoint that touches it, so the outline stays closed
+      const touched = new Set<string>();
+      const ep = endpoints(target);
+      const pts: Vec2[] = ep ? [ep[0], ep[1]] : target.type === 'circle' ? [target.center] : [];
+      const same = (p: Vec2, q: Vec2) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 1e-6;
+      const mv = (p: Vec2): Vec2 => [round2(p[0] + dx), round2(p[1] + dy)];
+      const entities = sketch.entities.map((e) => {
+        if (e.id === target.id) { touched.add(e.id); return shift(e, dx, dy); }
+        if (e.type === 'line') {
+          const na = pts.some((p) => same(p, e.a)) ? mv(e.a) : e.a, nb = pts.some((p) => same(p, e.b)) ? mv(e.b) : e.b;
+          return na !== e.a || nb !== e.b ? { ...e, a: na, b: nb } : e;
+        }
+        return e;
+      });
+      writeSketch(a.featureId, entities, true);
+    },
     deleteSelected: () => {
       const a = get().active; if (!a || !a.selected) return;
       writeSketch(a.featureId, currentSketch(a.featureId).entities.filter((e) => e.id !== a.selected), true);
@@ -316,17 +365,10 @@ export const useSketch = create<SketchState>((set, get) => {
   };
 });
 
-/** A feature transform whose local XY plane sits at `point` with local +Z along `normal` (world space). */
-export function planeTransform(point: [number, number, number], normal: [number, number, number]): Transform {
-  const n = new THREE.Vector3(...normal).normalize();
-  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
-  // keep the sketch's X axis as close to world X (or world Y for vertical faces) as the normal allows
-  const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
-  const r2d = 180 / Math.PI;
-  const round = (v: number) => Math.round(v * r2d * 1000) / 1000;
-  return { position: { x: round1(point[0]), y: round1(point[1]), z: round1(point[2]) }, rotation: { x: round(e.x), y: round(e.y), z: round(e.z) } };
+function shift(e: SketchEntity, dx: number, dy: number): SketchEntity {
+  if (e.type === 'line') return { ...e, a: [round2(e.a[0] + dx), round2(e.a[1] + dy)], b: [round2(e.b[0] + dx), round2(e.b[1] + dy)] };
+  return { ...e, center: [round2(e.center[0] + dx), round2(e.center[1] + dy)] };
 }
-const round1 = (v: number) => Math.round(v * 1000) / 1000;
 
 /** Summary line for the HUD. */
 export function sketchStatus(featureId: string): { closed: number; holes: number; open: number } {

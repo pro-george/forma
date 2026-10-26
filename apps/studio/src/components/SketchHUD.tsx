@@ -23,7 +23,7 @@ export function SketchHUD() {
   const api = useSketch.getState();
   const mode = f.role === 'hole' ? 'cut' : 'join';
   const hint = {
-    select: active.selected ? 'Backspace removes the selected segment · drag a point to move it' : 'Click a segment to select it · drag a corner to move it',
+    select: active.selected ? 'Type its length or radius above · arrows nudge it 1 mm (⇧ 10) · Backspace removes it' : 'Click a segment to select it · drag a corner to move it',
     line: active.draft.length ? 'Click the next point · type a length and press Enter · click the first point to close' : 'Click to start a line or polyline',
     rect: active.draft.length ? 'Click the opposite corner' : 'Click the first corner',
     circle: active.draft.length ? 'Click for the radius, or type it and press Enter' : 'Click the centre',
@@ -43,6 +43,17 @@ export function SketchHUD() {
           </span>
         )}
         <label className="hud-field">{mode === 'cut' ? 'Depth' : 'Height'}<NumberField value={f.height} min={0.1} step={1} unit="mm" onChange={(v) => patch(f.id, { height: v }, { undoable: false })} /></label>
+        {active.tool === 'select' && active.selected && (() => {
+          const e = f.sketch?.entities.find((x) => x.id === active.selected);
+          if (!e) return null;
+          const v = e.type === 'line' ? Math.hypot(e.b[0] - e.a[0], e.b[1] - e.a[1]) : e.radius;
+          return (
+            <>
+              <span className="sep" />
+              <label className="hud-field">{e.type === 'line' ? 'Length' : 'Radius'}<NumberField value={Math.round(v * 100) / 100} min={0.1} step={1} unit="mm" onChange={(n) => api.setSelectedSize(n)} /></label>
+            </>
+          );
+        })()}
         <span className="sep" />
         <span className={`hud-status ${st.open ? 'warn' : st.closed ? 'ok' : ''}`}>
           {st.closed ? `${st.closed} outline${st.closed > 1 ? 's' : ''}${st.holes ? `, ${st.holes} hole${st.holes > 1 ? 's' : ''}` : ''}` : 'no closed outline yet'}
