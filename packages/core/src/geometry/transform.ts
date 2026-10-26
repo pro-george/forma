@@ -32,6 +32,14 @@ const mul = (a: M3, b: M3): M3 => {
 const apply = (m: M3, v: Vec3): Vec3 => ({ x: m[0] * v.x + m[1] * v.y + m[2] * v.z, y: m[3] * v.x + m[4] * v.y + m[5] * v.z, z: m[6] * v.x + m[7] * v.y + m[8] * v.z });
 const round = (v: number) => Math.round(v * 1000) / 1000;
 
+/** Euler rotation (degrees) whose matrix has the given unit columns: local X → u, local Y → v, local Z → w. */
+export function eulerFromBasis(u: Vec3, v: Vec3, w: Vec3): Vec3 {
+  return matrixToEuler([u.x, v.x, w.x, u.y, v.y, w.y, u.z, v.z, w.z]);
+}
+
+/** Rotate a vector by an Euler rotation (degrees). */
+export function rotateVec(r: Vec3, p: Vec3): Vec3 { return apply(eulerToMatrix(r), p); }
+
 /** parent ∘ child: the child's transform expressed in the parent's frame, returned in world frame. */
 export function composeTransforms(parent: Transform, child: Transform): Transform {
   const Rp = eulerToMatrix(parent.rotation), Rc = eulerToMatrix(child.rotation);

@@ -8,7 +8,7 @@ export { Evaluator, emptyMesh, smoothNormals, type EvaluatorOptions } from './ge
 export { BuildError, revolveProfile } from './geometry/build.js';
 export { buildDisplacedRevolve, displacementAt, hasModifiers } from './geometry/revolve.js';
 export { applyRepeat, extrudeWithEdges, treatCorners, edgesOf, hasEdges, insetPolygon } from './geometry/edges.js';
-export { planarFace, loopArea, type PlanarFace, type Vec3Tuple } from './geometry/faces.js';
+export { planarFace, loopArea, meshEdges, edgeToolSection, type PlanarFace, type MeshEdge, type Vec3Tuple } from './geometry/faces.js';
 export * from './raster/trace.js';
 export * from './raster/heightmap.js';
 export * from './sketch/sketch.js';

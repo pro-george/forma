@@ -3,7 +3,7 @@ import {
   initManifold, Evaluator, createDefaultRegistry, createModuleApi, createDocument, addFeature, makeFeature,
   combine, ungroup, removeFeatures, duplicate, addToCombine, splitFeature, parseDocument, serializeDocument, History, toBinarySTL, to3MF,
   traceRaster, loopsToProfiles, composeTransforms, sampleDocument, LAMP_FAMILIES, SOCKET_HOLE_RADIUS, familyInputs,
-  planarFace, loopArea,
+  planarFace, loopArea, meshEdges, edgeToolSection, eulerFromBasis,
   encodeHeightMap, decodeHeightMap, sampleHeightMap, blurHeightMap, proceduralHeightMap, rasterToHeightMap, VASE_SHAPES,
   type TextRasterizer, type FormaDocument,
 } from './index.js';
@@ -201,6 +201,70 @@ describe('planar faces', () => {
     const side = planarFace(m, sideTri)!;
     expect(side.normal[0]).toBeCloseTo(1, 5);
     expect(Math.abs(loopArea(side.loops[0]!, side.normal))).toBeCloseTo(600, 3);
+  });
+});
+
+describe('rotation convention', () => {
+  it('eulerFromBasis places a part so local axes land on the basis, in the kernel', () => {
+    // local x → +y, local y → +z, local z → +x
+    const rot = eulerFromBasis({ x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 1 }, { x: 1, y: 0, z: 0 });
+    let doc = createDocument();
+    doc = addFeature(doc, makeFeature(doc, 'box', { width: 5, depth: 2, height: 9, transform: { position: { x: 0, y: 0, z: 0 }, rotation: rot } }));
+    const m = ev.worldManifold(doc);
+    const b = m.boundingBox(); m.delete();
+    // box authored centred in x/y (±2.5, ±1) base on z=0..9 → after: x 0..9, y ±2.5, z ±1
+    expect(b.min.map((v) => +v.toFixed(2))).toEqual([0, -2.5, -1]);
+    expect(b.max.map((v) => +v.toFixed(2))).toEqual([9, 2.5, 1]);
+  });
+});
+
+describe('mesh edges and edge tools', () => {
+  it('a box has 12 straight convex edges; a cut box has concave ones too', () => {
+    let doc = createDocument();
+    doc = addFeature(doc, makeFeature(doc, 'box', { width: 40, depth: 30, height: 20 }));
+    const { faces, edges } = meshEdges(ev.evaluate(doc)[0]!.mesh);
+    expect(faces).toHaveLength(6);
+    expect(edges).toHaveLength(12);
+    expect(edges.every((e) => e.convex)).toBe(true);
+    const lens = edges.map((e) => Math.round(e.length)).sort((a, b) => a - b);
+    expect(lens).toEqual([20, 20, 20, 20, 30, 30, 30, 30, 40, 40, 40, 40]);
+    // an L: box minus a corner block → 4 concave edges around the notch
+    let d2 = createDocument();
+    const b = makeFeature(d2, 'box', { width: 40, depth: 30, height: 20 });
+    const cut = makeFeature(d2, 'box', { width: 20, depth: 40, height: 10, role: 'hole', transform: { position: { x: 10, y: 0, z: 10 }, rotation: { x: 0, y: 0, z: 0 } } });
+    d2 = combine(addFeature(addFeature(d2, b), cut), [b.id, cut.id]).doc;
+    const L = meshEdges(ev.evaluate(d2)[0]!.mesh);
+    expect(L.edges.filter((e) => !e.convex).length).toBeGreaterThanOrEqual(1);
+    expect(L.edges.filter((e) => e.convex).length).toBeGreaterThan(12);
+  });
+  it('chamfer and fillet tool bodies remove the expected volume on a box edge', () => {
+    let doc = createDocument();
+    const box = makeFeature(doc, 'box', { width: 40, depth: 30, height: 20 });
+    doc = addFeature(doc, box);
+    const mesh = ev.evaluate(doc)[0]!.mesh;
+    const { edges } = meshEdges(mesh);
+    // the top-front edge: z = 20, y = -15, along x
+    const edge = edges.find((e) => Math.abs(e.a[2] - 20) < 1e-6 && Math.abs(e.b[2] - 20) < 1e-6 && Math.abs(e.a[1] + 15) < 1e-6 && Math.abs(e.b[1] + 15) < 1e-6)!;
+    expect(edge).toBeTruthy();
+    const build = (kind: 'chamfer' | 'round', size: number) => {
+      const sec = edgeToolSection(edge, kind, size, 0.02)!;
+      expect(sec.role).toBe('hole');
+      // place the section as an extrude along the edge: plane normal = edge dir; local X = u, local Y = v
+      const { u, v } = sec.frame;
+      const dir = edge.dir;
+      const rot = eulerFromBasis({ x: u[0], y: u[1], z: u[2] }, { x: v[0], y: v[1], z: v[2] }, { x: dir[0], y: dir[1], z: dir[2] });
+      const tool = makeFeature(doc, 'extrude', { role: 'hole', profile: { outer: sec.points, holes: [] }, height: edge.length + 0.04,
+        transform: { position: { x: edge.a[0] - dir[0] * 0.02, y: edge.a[1] - dir[1] * 0.02, z: edge.a[2] - dir[2] * 0.02 }, rotation: rot } });
+      const d = combine(addFeature(doc, tool), [box.id, tool.id]).doc;
+      const r = ev.evaluate(d)[0]!;
+      expect(r.error).toBeUndefined();
+      return r.volume;
+    };
+    const plain = 40 * 30 * 20;
+    const chamfer = build('chamfer', 5);
+    expect(near(chamfer, plain - 0.5 * 5 * 5 * 40, 0.02)).toBe(true);
+    const round = build('round', 5);
+    expect(near(round, plain - (1 - Math.PI / 4) * 25 * 40, 0.03)).toBe(true);
   });
 });
 

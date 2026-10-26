@@ -24,7 +24,7 @@ export function DimensionTags({ feature, result }: { feature: Feature; result: E
     const top = last.flip ? -last.height : last.height;
     const tag: Tag = { key: last.id, label: last.role === 'hole' ? 'Depth' : 'H', value: last.height, at: [0, 0, top], min: 0.1, apply: (v) => patch(last.id, { height: v } as Partial<Feature>) };
     return (
-      <group position={[t.position.x, t.position.y, t.position.z]} rotation={[t.rotation.x * d2r, t.rotation.y * d2r, t.rotation.z * d2r]}>
+      <group position={[t.position.x, t.position.y, t.position.z]} rotation={[t.rotation.x * d2r, t.rotation.y * d2r, t.rotation.z * d2r, 'ZYX']}>
         <TagChip tag={tag} />
       </group>
     );

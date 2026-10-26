@@ -12,6 +12,7 @@ import { usePushPull } from '../state/pushpull';
 import { useHover, faceAt } from '../state/hover';
 import { useMenu, longPress, type MenuHit } from '../state/menu';
 import { DimensionTags } from './DimensionTags';
+import { useEdges, edgesFor, edgeJustClicked } from '../state/edges';
 export { useViewStore };
 
 const cssVar = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888';
@@ -70,7 +71,7 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
   const lpHit = useRef<{ x: number; y: number; hit: MenuHit } | null>(null);
   const lp = useMemo(() => longPress(() => { const h = lpHit.current; if (h) { usePushPull.getState().end(); useMenu.getState().show(h.x, h.y, h.hit); } }), []);
   return (
-    <group position={[t.position.x, t.position.y, t.position.z]} rotation={[deg(t.rotation.x), deg(t.rotation.y), deg(t.rotation.z)]}>
+    <group position={[t.position.x, t.position.y, t.position.z]} rotation={[deg(t.rotation.x), deg(t.rotation.y), deg(t.rotation.z), 'ZYX']}>
       {geometry && (geometry.attributes.position?.count ?? 0) > 0 && (
         <mesh geometry={geometry} castShadow receiveShadow userData={{ id: feature.id }}
           onPointerMove={(e) => {
@@ -103,7 +104,7 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
           }}
           onClick={(e) => {
             if (usePushPull.getState().justDragged()) { e.stopPropagation(); return; }
-            if (!picking) { onSelect(e); return; }
+            if (!picking) { useEdges.getState().clear(); onSelect(e); return; }
             if (!e.face) return;
             e.stopPropagation();
             // face normal → world space, point → world space
@@ -128,6 +129,7 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
         </mesh>
       )}
       {selected && !ghost && result && !result.error && <DimensionTags feature={feature} result={result} />}
+      {selected && !ghost && result && !result.error && <EdgeLayer partId={feature.id} mesh={result.mesh} accent={colors.accent} />}
       {hasError && (
         <mesh onClick={onSelect}>
           <boxGeometry args={[10, 10, 10]} />
@@ -138,6 +140,33 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
   );
 }
 
+/** Pickable straight edges of the selected part: hover to highlight, click to select (⇧ adds), then round or chamfer. */
+function EdgeLayer({ partId, mesh, accent }: { partId: string; mesh: EvaluatedFeature['mesh']; accent: string }) {
+  const edges = useMemo(() => edgesFor(mesh), [mesh]);
+  const hover = useEdges((e) => (e.hover?.partId === partId ? e.hover.index : -1));
+  const selected = useEdges((e) => (e.selected?.partId === partId ? e.selected.indices : EMPTY));
+  if (edges.length === 0) return null;
+  return (
+    <group>
+      {edges.map((e, i) => {
+        const on = selected.includes(i), hot = hover === i;
+        const pts: [number, number, number][] = [e.a, e.b];
+        return (
+          <group key={i}>
+            {(on || hot) && <Line points={pts} color={accent} lineWidth={on ? 4 : 2.5} transparent opacity={on ? 1 : 0.8} depthTest={false} />}
+            <Line points={pts} color={accent} lineWidth={14} transparent opacity={0}
+              onPointerOver={(ev: ThreeEvent<PointerEvent>) => { if (useSketch.getState().active || usePushPull.getState().drag) return; ev.stopPropagation(); useEdges.getState().setHover({ partId, index: i }); }}
+              onPointerOut={() => { if (useEdges.getState().hover?.index === i) useEdges.getState().setHover(null); }}
+              onPointerDown={(ev: ThreeEvent<PointerEvent>) => { ev.stopPropagation(); }}
+              onClick={(ev: ThreeEvent<MouseEvent>) => { ev.stopPropagation(); useEdges.getState().toggle(partId, i, ev.shiftKey || ev.metaKey || ev.ctrlKey); }} />
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+const EMPTY: number[] = [];
+
 /** Gizmo attached to a proxy object at the primary selection; moves all selected top-level parts. */
 function SelectionGizmo({ primary, mode }: { primary: Feature; mode: 'translate' | 'rotate' }) {
   const proxy = useRef<THREE.Group>(null!);
@@ -146,7 +175,8 @@ function SelectionGizmo({ primary, mode }: { primary: Feature; mode: 'translate'
   const t = primary.transform;
   useEffect(() => {
     proxy.current.position.set(t.position.x, t.position.y, t.position.z);
-    proxy.current.rotation.set(deg(t.rotation.x), deg(t.rotation.y), deg(t.rotation.z));
+    // document rotations are Euler ZYX degrees: X, then Y, then Z about world axes (what Manifold.rotate does)
+    proxy.current.rotation.set(deg(t.rotation.x), deg(t.rotation.y), deg(t.rotation.z), 'ZYX');
   }, [t.position.x, t.position.y, t.position.z, t.rotation.x, t.rotation.y, t.rotation.z]);
 
   const onChange = () => {
@@ -209,7 +239,7 @@ function ViewController({ controls }: { controls: React.RefObject<OrbitControlsI
       if (!f || !r || r.error) continue;
       const m = new THREE.Matrix4().compose(
         new THREE.Vector3(f.transform.position.x, f.transform.position.y, f.transform.position.z),
-        new THREE.Quaternion().setFromEuler(new THREE.Euler(deg(f.transform.rotation.x), deg(f.transform.rotation.y), deg(f.transform.rotation.z))),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(deg(f.transform.rotation.x), deg(f.transform.rotation.y), deg(f.transform.rotation.z), 'ZYX')),
         new THREE.Vector3(1, 1, 1),
       );
       const b = new THREE.Box3(new THREE.Vector3(r.bbox.min.x, r.bbox.min.y, r.bbox.min.z), new THREE.Vector3(r.bbox.max.x, r.bbox.max.y, r.bbox.max.z)).applyMatrix4(m);
@@ -368,7 +398,7 @@ export function Viewport() {
       dpr={[1, 2]}
       camera={{ position: [170, -170, 130], up: [0, 0, 1], fov: 38, near: 0.5, far: 6000 }}
       onCreated={({ camera }) => { camera.up.set(0, 0, 1); camera.lookAt(0, 0, 0); }}
-      onPointerMissed={(e) => { if (!useSketch.getState().active && e.button === 0) clearSelection(); }}
+      onPointerMissed={(e) => { if (!useSketch.getState().active && e.button === 0 && !edgeJustClicked() && !usePushPull.getState().justDragged()) { useEdges.getState().clear(); clearSelection(); } }}
       gl={{ antialias: true, preserveDrawingBuffer: true }}
     >
       <Scene />

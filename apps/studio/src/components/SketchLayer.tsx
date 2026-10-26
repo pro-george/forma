@@ -14,14 +14,14 @@ const d2r = Math.PI / 180;
 function frame(t: Transform) {
   const m = new THREE.Matrix4().compose(
     new THREE.Vector3(t.position.x, t.position.y, t.position.z),
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(t.rotation.x * d2r, t.rotation.y * d2r, t.rotation.z * d2r, 'XYZ')),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(t.rotation.x * d2r, t.rotation.y * d2r, t.rotation.z * d2r, 'ZYX')),
     new THREE.Vector3(1, 1, 1),
   );
   const inv = m.clone().invert();
   const v = new THREE.Vector3();
   const toLocal = (wx: number, wy: number, wz = 0): Vec2 => { v.set(wx, wy, wz).applyMatrix4(inv); return [v.x, v.y]; };
   const toWorld = (p: Vec2, z = 0): [number, number, number] => { const w = new THREE.Vector3(p[0], p[1], z).applyMatrix4(m); return [w.x, w.y, w.z]; };
-  const euler: [number, number, number] = [t.rotation.x * d2r, t.rotation.y * d2r, t.rotation.z * d2r];
+  const euler: [number, number, number, 'ZYX'] = [t.rotation.x * d2r, t.rotation.y * d2r, t.rotation.z * d2r, 'ZYX'];
   return { toLocal, toWorld, euler };
 }
 

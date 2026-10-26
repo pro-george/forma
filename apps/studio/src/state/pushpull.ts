@@ -61,7 +61,7 @@ export const usePushPull = create<PushPullState>((set, get) => ({
     const t = part.transform;
     const mat = new THREE.Matrix4().compose(
       new THREE.Vector3(t.position.x, t.position.y, t.position.z),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(t.rotation.x), THREE.MathUtils.degToRad(t.rotation.y), THREE.MathUtils.degToRad(t.rotation.z), 'XYZ')),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(t.rotation.x), THREE.MathUtils.degToRad(t.rotation.y), THREE.MathUtils.degToRad(t.rotation.z), 'ZYX')),
       new THREE.Vector3(1, 1, 1),
     );
     const nm = new THREE.Matrix3().getNormalMatrix(mat);
@@ -73,7 +73,7 @@ export const usePushPull = create<PushPullState>((set, get) => ({
     const planeT = planeTransform(origin, normal);
     const planeMat = new THREE.Matrix4().compose(
       new THREE.Vector3(planeT.position.x, planeT.position.y, planeT.position.z),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(planeT.rotation.x), THREE.MathUtils.degToRad(planeT.rotation.y), THREE.MathUtils.degToRad(planeT.rotation.z), 'XYZ')),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(planeT.rotation.x), THREE.MathUtils.degToRad(planeT.rotation.y), THREE.MathUtils.degToRad(planeT.rotation.z), 'ZYX')),
       new THREE.Vector3(1, 1, 1),
     ).invert();
     const to2d = (loop: [number, number, number][]): Vec2[] => loop.map(([x, y, z]) => { const v = new THREE.Vector3(x, y, z).applyMatrix4(mat).applyMatrix4(planeMat); return [round(v.x), round(v.y)]; });

@@ -5,7 +5,7 @@ import type { Transform } from '@forma/core';
 export function planeTransform(point: [number, number, number], normal: [number, number, number]): Transform {
   const n = new THREE.Vector3(...normal).normalize();
   const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
-  const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+  const e = new THREE.Euler().setFromQuaternion(q, 'ZYX');
   const r2d = 180 / Math.PI;
   const round = (v: number) => Math.round(v * r2d * 1000) / 1000;
   const round1 = (v: number) => Math.round(v * 1000) / 1000;

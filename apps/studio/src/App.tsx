@@ -13,8 +13,10 @@ import { Panel } from './components/Panel';
 import { MobileShell } from './components/MobileShell';
 import { useIsMobile } from './state/media';
 import { usePushPull } from './state/pushpull';
+import { useEdges } from './state/edges';
 import { RadialMenu } from './components/RadialMenu';
 import { HistoryStrip } from './components/HistoryStrip';
+import { EdgeToolbar } from './components/EdgeToolbar';
 
 function useShortcuts() {
   useEffect(() => {
@@ -52,7 +54,7 @@ function useShortcuts() {
       if (meta && k === 's') { e.preventDefault(); s.saveFile(); return; }
       if (meta && k === 'a') { e.preventDefault(); s.select(s.doc.features.filter((f) => f.parentId === null && f.visible).map((f) => f.id)); return; }
       if (meta) return;
-      if (e.key === 'Escape') { s.clearSelection(); return; }
+      if (e.key === 'Escape') { if (useEdges.getState().selected) { useEdges.getState().clear(); return; } s.clearSelection(); return; }
       if (e.key === 'Delete' || e.key === 'Backspace') { s.deleteSelected(); return; }
       const nudge = e.shiftKey ? 10 : 1;
       if (e.key === 'ArrowLeft') { s.moveSelectionBy(-nudge, 0, 0); return; }
@@ -99,6 +101,7 @@ export default function App() {
         </section>
         <MobileShell />
         <SketchHUD />
+        <EdgeToolbar />
         <RadialMenu />
         <Toasts />
       </div>
@@ -112,6 +115,7 @@ export default function App() {
       </section>
       <TopBar />
       <SketchHUD />
+      <EdgeToolbar />
       <div className="dock left">
         <Panel id="create" title="Create" side="left"><ToolRail /></Panel>
       </div>

@@ -6,7 +6,7 @@
  *  - Z is up, the build plate is the XY plane at Z = 0
  *  - every feature is authored with its base on Z = 0 and its footprint
  *    centred on the origin; the transform then places it in the scene
- *  - rotations are Euler XYZ in degrees
+ *  - rotations are Euler degrees applied X, then Y, then Z about world axes (three.js order 'ZYX')
  *
  * The document is plain JSON validated by zod, so it can be saved as a
  * `.forma` file, diffed, and evaluated in a worker without any class instances.
@@ -22,7 +22,7 @@ export type Vec3 = z.infer<typeof Vec3Schema>;
 
 export const TransformSchema = z.object({
   position: Vec3Schema,
-  /** Euler XYZ, degrees */
+  /** Euler degrees, applied X then Y then Z about world axes (three.js order 'ZYX', Manifold.rotate) */
   rotation: Vec3Schema,
 });
 export type Transform = z.infer<typeof TransformSchema>;
