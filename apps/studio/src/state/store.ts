@@ -6,7 +6,7 @@ import {
 } from '@forma/core';
 import { useViewStore } from './view';
 import { planeTransform } from './plane';
-import { workerClient, type ModuleInfo } from './worker-client';
+import { workerClient, type ModuleInfo, type ExportFormat } from './worker-client';
 
 export interface Toast { id: number; text: string; kind?: 'info' | 'error'; }
 
@@ -63,7 +63,7 @@ interface Actions {
   clearSelection(): void;
   toggleGrid(): void; toggleWireframe(): void; togglePrintLook(): void;
   // export
-  exportModel(format: 'stl' | '3mf' | 'obj', onlySelection?: boolean): Promise<void>;
+  exportModel(format: ExportFormat, onlySelection?: boolean): Promise<void>;
   toast(text: string, kind?: Toast['kind']): void;
   dismissToast(id: number): void;
 }
@@ -301,8 +301,10 @@ export const useStore = create<State & Actions>((set, get) => {
         get().toast(format === 'stl' ? 'Building print-quality mesh…' : format === 'obj' ? 'Writing OBJ…' : 'Packing 3MF…');
         const bytes = await workerClient.exportModel(doc, format, ids);
         const base = doc.name.replace(/[^\w-]+/g, '_') || 'model';
-        download(bytes, `${base}.${format}`, format === 'stl' ? 'model/stl' : format === 'obj' ? 'model/obj' : 'model/3mf');
-        get().toast(`Exported ${base}.${format} (${(bytes.length / 1024).toFixed(0)} KB)`);
+        const ext = format === 'bambu' ? '3mf' : format;
+        download(bytes, `${base}.${ext}`, format === 'stl' ? 'model/stl' : format === 'obj' ? 'model/obj' : 'model/3mf');
+        const slots = new Set(doc.features.filter((f) => f.parentId === null && f.visible && f.role === 'solid' && (!ids || ids.includes(f.id))).map((f) => f.filament));
+        get().toast(`Exported ${base}.${ext} (${(bytes.length / 1024).toFixed(0)} KB)${format === 'bambu' && slots.size > 1 ? ` · ${slots.size} filament slots` : ''}`);
       } catch (e) { get().toast(`Export failed: ${(e as Error).message}`, 'error'); }
     },
     toast: (text, kind = 'info') => {

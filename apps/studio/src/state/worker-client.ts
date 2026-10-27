@@ -1,6 +1,7 @@
 import * as Comlink from 'comlink';
 import type { FormaDocument } from '@forma/core';
-import type { EvaluatorWorkerApi, EvalResult, ModuleInfo } from '../worker/evaluator.worker';
+import type { EvaluatorWorkerApi, EvalResult, ModuleInfo, ExportFormat } from '../worker/evaluator.worker';
+export type { ExportFormat };
 
 /**
  * Talks to the geometry worker. Evaluations are coalesced: while one is in
@@ -86,7 +87,7 @@ class WorkerClient {
   }
 
   bake(doc: FormaDocument, id: string) { return this.remote.bake(doc, id); }
-  exportModel(doc: FormaDocument, format: 'stl' | '3mf' | 'obj', ids?: string[]) { return this.remote.exportModel(doc, format, ids); }
+  exportModel(doc: FormaDocument, format: ExportFormat, ids?: string[]) { return this.remote.exportModel(doc, format, ids); }
 }
 
 export const workerClient = new WorkerClient();

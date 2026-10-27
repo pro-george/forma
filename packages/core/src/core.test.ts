@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import { unzipSync, strFromU8 } from 'fflate';
 import {
   initManifold, Evaluator, createDefaultRegistry, createModuleApi, createDocument, addFeature, makeFeature,
   combine, ungroup, removeFeatures, duplicate, addToCombine, splitFeature, parseDocument, serializeDocument, History, toBinarySTL, to3MF, toOBJ,
@@ -481,6 +482,37 @@ describe('export', () => {
     const mf = to3MF([{ name: 'cube', mesh: r!.mesh }]);
     expect(mf.length).toBeGreaterThan(300);
     expect(mf[0]).toBe(0x50); // 'P' of PK zip signature
+  });
+  it('3MF carries filament slots the way Bambu Studio and PrusaSlicer read them', () => {
+    let doc = createDocument();
+    doc = addFeature(doc, makeFeature(doc, 'box', { width: 10, depth: 10, height: 2 }));
+    doc = addFeature(doc, makeFeature(doc, 'cylinder', { radius: 2, height: 6, filament: 3 }));
+    const [a, b] = ev.evaluate(doc);
+    const files = unzipSync(to3MF([{ name: 'plate', mesh: a!.mesh, filament: 1 }, { name: 'peg', mesh: b!.mesh, filament: 3 }], 'Test', { filaments: doc.filaments, colors: true }));
+    const text = (n: string) => strFromU8(files[n]!);
+    const model = text('3D/3dmodel.model');
+    // two filaments → one assembly object with two component parts in the build
+    expect(model).toContain('<components>');
+    expect(model.match(/<item /g)!.length).toBe(1);
+    expect(model).toContain('<metadata name="Application">Forma</metadata>');
+    expect(model).toContain('<m:colorgroup');
+    // Bambu: per-part extruder in model_settings.config, matching component ids
+    const bambu = text('Metadata/model_settings.config');
+    expect(bambu).toContain('<part id="1" subtype="normal_part">');
+    expect(bambu).toContain('<part id="2" subtype="normal_part">');
+    expect(bambu.match(/key="extruder" value="3"/g)!.length).toBe(1);
+    expect(bambu.match(/key="extruder" value="1"/g)!.length).toBe(2); // object default + plate part
+    // Prusa: volumes as contiguous triangle ranges
+    const prusa = text('Metadata/Slic3r_PE_model.config');
+    const plateTris = a!.mesh.indices.length / 3;
+    expect(prusa).toContain(`<volume firstid="0" lastid="${plateTris - 1}">`);
+    expect(prusa).toContain(`<volume firstid="${plateTris}" lastid="${plateTris + b!.mesh.indices.length / 3 - 1}">`);
+    expect(prusa).toContain('key="extruder" value="3"');
+    // single filament → independent objects, no colour groups unless asked
+    const single = strFromU8(unzipSync(to3MF([{ name: 'a', mesh: a!.mesh }, { name: 'b', mesh: b!.mesh }]))['3D/3dmodel.model']!);
+    expect(single).not.toContain('<components>');
+    expect(single.match(/<item /g)!.length).toBe(2);
+    expect(single).not.toContain('colorgroup');
   });
 });
 

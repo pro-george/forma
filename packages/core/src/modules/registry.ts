@@ -37,8 +37,10 @@ export type ModuleInputValues = Record<string, string | number | boolean>;
 
 /** What build() returns: a feature without bookkeeping fields. */
 export type FeatureSpec = {
-  [T in Exclude<FeatureType, 'combine' | 'module'>]: Omit<FeatureOf<T>, 'id' | 'parentId' | 'name' | 'role' | 'visible' | 'transform' | 'modifiers' | 'flip' | 'repeat' | 'edges'> & {
+  [T in Exclude<FeatureType, 'combine' | 'module'>]: Omit<FeatureOf<T>, 'id' | 'parentId' | 'name' | 'role' | 'visible' | 'transform' | 'modifiers' | 'flip' | 'repeat' | 'edges' | 'filament'> & {
     name?: string;
+    /** filament / AMS slot (1-based) for multi-colour modules */
+    filament?: number;
     /** extrude only: build towards -Z */
     flip?: boolean;
     repeat?: Partial<Repeat>;
@@ -114,7 +116,7 @@ export function resolveInputs(def: ModuleDefinition, stored: Record<string, unkn
 /** Turn specs into full features (ids are synthetic; used for evaluation or baking). */
 export function specsToFeatures(specs: FeatureSpec[], idPrefix = 'm'): Feature[] {
   return specs.map((s, i) => {
-    const { name, role, visible, transform, position, rotation, modifiers, flip, repeat, edges, ...rest } = s as FeatureSpec & { visible?: boolean };
+    const { name, role, visible, transform, position, rotation, modifiers, flip, repeat, edges, filament, ...rest } = s as FeatureSpec & { visible?: boolean };
     const t: Transform = { ...identityTransform(), ...(transform ?? {}) };
     if (position) t.position = { ...t.position, ...position };
     if (rotation) t.rotation = { ...t.rotation, ...rotation };
@@ -127,6 +129,7 @@ export function specsToFeatures(specs: FeatureSpec[], idPrefix = 'm'): Feature[]
       parentId: null,
       modifiers: { ...defaultModifiers(), ...(modifiers ?? {}) },
       repeat: { ...defaultRepeat(), ...(repeat ?? {}) },
+      filament: filament ?? 1,
       ...(rest.type === 'extrude' ? { flip: flip ?? false } : {}),
       ...(rest.type === 'extrude' || rest.type === 'box' || rest.type === 'cylinder' ? { edges: { ...defaultEdges(), ...(edges ?? {}) } } : {}),
       ...rest,

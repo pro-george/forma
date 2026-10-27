@@ -68,8 +68,13 @@ const api = {
     return evaluator.bakeModule(doc, moduleFeatureId);
   },
 
-  /** Export as one unioned watertight shell (STL) or one object per part (3MF). */
-  exportModel(doc: FormaDocument, format: 'stl' | '3mf' | 'obj', ids?: string[]): Uint8Array {
+  /**
+   * Export as one unioned watertight shell (STL), one object per part (OBJ),
+   * or a 3MF with per-part filament slots: `bambu` keeps multi-colour parts
+   * together as one object for Bambu Studio / Orca, `3mf` also embeds colours
+   * for PrusaSlicer / Cura.
+   */
+  exportModel(doc: FormaDocument, format: ExportFormat, ids?: string[]): Uint8Array {
     if (!evaluator) throw new Error('worker not initialised');
     if (format === 'stl') {
       const m = evaluator.worldManifold(doc, ids);
@@ -84,7 +89,7 @@ const api = {
         return Comlink.transfer(bytes, [bytes.buffer as ArrayBuffer]);
       } finally { m.delete(); }
     }
-    const objects: { name: string; mesh: TriangleMesh }[] = [];
+    const objects: { name: string; mesh: TriangleMesh; filament: number }[] = [];
     for (const f of topLevel(doc)) {
       if (!f.visible || f.role !== 'solid') continue;
       if (ids && !ids.includes(f.id)) continue;
@@ -94,13 +99,16 @@ const api = {
         const np = mesh.numProp, n = mesh.vertProperties.length / np;
         const positions = new Float32Array(n * 3);
         for (let i = 0; i < n; i++) { positions[i * 3] = mesh.vertProperties[i * np]!; positions[i * 3 + 1] = mesh.vertProperties[i * np + 1]!; positions[i * 3 + 2] = mesh.vertProperties[i * np + 2]!; }
-        objects.push({ name: featureById(doc, f.id)?.name ?? f.id, mesh: { positions, normals: new Float32Array(0), indices: new Uint32Array(mesh.triVerts) } });
+        objects.push({ name: featureById(doc, f.id)?.name ?? f.id, filament: f.filament, mesh: { positions, normals: new Float32Array(0), indices: new Uint32Array(mesh.triVerts) } });
       } finally { m.delete(); }
     }
-    const bytes = format === 'obj' ? toOBJ(objects, doc.name) : to3MF(objects, doc.name);
+    const bytes = format === 'obj' ? toOBJ(objects, doc.name)
+      : format === 'bambu' ? to3MF(objects, doc.name, { filaments: doc.filaments })
+      : to3MF(objects, doc.name, { filaments: doc.filaments, colors: true });
     return Comlink.transfer(bytes, [bytes.buffer as ArrayBuffer]);
   },
 };
 
+export type ExportFormat = 'stl' | 'bambu' | '3mf' | 'obj';
 export type EvaluatorWorkerApi = typeof api;
 Comlink.expose(api);

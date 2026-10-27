@@ -6,7 +6,7 @@
  * combine, children are placed with their transforms before the booleans.
  */
 import type { Manifold, ManifoldToplevel } from 'manifold-3d';
-import type { EvaluatedFeature, Feature, FormaDocument, TriangleMesh, Vec3 } from '../document/types.js';
+import { DEFAULT_FILAMENTS, type EvaluatedFeature, type Feature, type FormaDocument, type TriangleMesh, type Vec3 } from '../document/types.js';
 import { childrenOf, featureById, topLevel } from '../document/document.js';
 import { ModuleRegistry, resolveInputs, specsToFeatures } from '../modules/registry.js';
 import type { ModuleApi } from '../modules/api.js';
@@ -65,7 +65,7 @@ export class Evaluator {
 
   /** Geometry cache key: everything that changes the authored shape (not name/visibility/top-level placement). */
   keyFor(doc: FormaDocument, f: Feature): string {
-    const { id: _id, name: _n, visible: _v, transform: _t, parentId: _p, ...rest } = f;
+    const { id: _id, name: _n, visible: _v, transform: _t, parentId: _p, filament: _f, ...rest } = f;
     if (f.type === 'combine') {
       const kids = childrenOf(doc, f.id).map((k) => [this.keyFor(doc, k), k.transform, k.role, k.visible]);
       return JSON.stringify(['combine', kids, f.repeat]);
@@ -139,7 +139,7 @@ export class Evaluator {
     try { specs = def.build(inputs, this.opts.api); } catch (e) { throw new BuildError(`Module error: ${(e as Error).message}`, f.id); }
     const feats = specsToFeatures(specs, f.id);
     if (feats.length === 0) throw new BuildError('Module produced no parts', f.id);
-    const tmpDoc: FormaDocument = { version: 1, name: '', units: 'mm', features: feats };
+    const tmpDoc: FormaDocument = { version: 1, name: '', units: 'mm', features: feats, filaments: DEFAULT_FILAMENTS };
     return this.combineManifold(feats, tmpDoc, f.id);
   }
 

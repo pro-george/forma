@@ -149,7 +149,25 @@ const base = {
   parentId: z.string().nullable().default(null),
   modifiers: ModifiersSchema.default(defaultModifiers()),
   repeat: RepeatSchema.default({}),
+  /** filament / AMS slot this part prints with (1-based, as slicers number them) */
+  filament: z.number().int().min(1).max(16).default(1),
 };
+
+/** One filament slot of the printer (an AMS tray). Index + 1 is the slot number. */
+export const FilamentSchema = z.object({
+  /** display colour, #rrggbb */
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  /** material shown in the UI and written to the 3MF, e.g. PLA, PETG */
+  type: z.string().default('PLA'),
+  name: z.string().default(''),
+});
+export type Filament = z.infer<typeof FilamentSchema>;
+export const DEFAULT_FILAMENTS: Filament[] = [
+  { color: '#e8e4dc', type: 'PLA', name: '' },
+  { color: '#c0392b', type: 'PLA', name: '' },
+  { color: '#2c3e50', type: 'PLA', name: '' },
+  { color: '#f1c40f', type: 'PLA', name: '' },
+];
 
 export const BoxFeature = z.object({ ...base, type: z.literal('box'), width: z.number().positive(), depth: z.number().positive(), height: z.number().positive(), edges: EdgesSchema.default({}) });
 export const CylinderFeature = z.object({ ...base, type: z.literal('cylinder'), radius: z.number().positive(), height: z.number().positive(), segments: z.number().int().min(3).default(64), edges: EdgesSchema.default({}) });
@@ -226,6 +244,8 @@ export const DocumentSchema = z.object({
   name: z.string().default('Untitled'),
   units: z.literal('mm').default('mm'),
   features: z.array(FeatureSchema),
+  /** printer filament slots; parts reference them by 1-based `filament` */
+  filaments: z.array(FilamentSchema).min(1).max(16).default(DEFAULT_FILAMENTS),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });

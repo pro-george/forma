@@ -4,7 +4,7 @@
  * This keeps undo/redo trivial (snapshots) and makes the worker boundary safe.
  */
 import {
-  DocumentSchema, FeatureSchema, DOCUMENT_VERSION, defaultModifiers, identityTransform,
+  DocumentSchema, FeatureSchema, DOCUMENT_VERSION, DEFAULT_FILAMENTS, defaultModifiers, identityTransform,
   type Feature, type FeatureOf, type FeatureInputOf, type FeatureType, type FormaDocument, type Transform,
 } from './types.js';
 
@@ -17,7 +17,7 @@ export function newId(prefix = 'f'): string {
 
 export function createDocument(name = 'Untitled'): FormaDocument {
   const now = new Date().toISOString();
-  return { version: DOCUMENT_VERSION, name, units: 'mm', features: [], createdAt: now, updatedAt: now };
+  return { version: DOCUMENT_VERSION, name, units: 'mm', features: [], filaments: DEFAULT_FILAMENTS.map((f) => ({ ...f })), createdAt: now, updatedAt: now };
 }
 
 /** Parse + validate JSON (from a .forma file or storage). Throws ZodError on bad input. */
