@@ -31,7 +31,7 @@ class WorkerClient {
   /** Device profile: phones and low-memory machines get coarser previews and a smaller cache. */
   private static profile() {
     const nav = navigator as Navigator & { deviceMemory?: number };
-    const small = matchMedia('(max-width: 720px)').matches || (nav.deviceMemory !== undefined && nav.deviceMemory <= 4);
+    const small = matchMedia('(max-width: 720px)').matches || matchMedia('(pointer: coarse)').matches || (nav.deviceMemory !== undefined && nav.deviceMemory <= 4);
     return small ? { coarseness: 1.6, cacheBytes: 48 * 1024 * 1024 } : { coarseness: 1, cacheBytes: 160 * 1024 * 1024 };
   }
 
