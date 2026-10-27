@@ -19,7 +19,12 @@ import { blurHeightMap, decodeHeightMap, sampleHeightMap, type HeightMap } from 
 const deg2rad = Math.PI / 180;
 /** fraction of the covered band over which the relief eases in and out, so bands never start with a ledge */
 const RELIEF_FADE = 0.02;
-const MAX_ROWS = 720;
+const MAX_ROWS = 480;
+
+/** Multiplies every part's vertex spacing: raised on phones and low-memory devices by the worker. */
+let coarsenessScale = 1;
+export function setCoarsenessScale(v: number): void { coarsenessScale = Math.max(0.5, Math.min(4, v)); }
+export function getCoarsenessScale(): number { return coarsenessScale; }
 
 export const reliefOf = (m: Modifiers): Relief => ({ ...defaultRelief(), ...(m.relief ?? {}) });
 export const hasRelief = (r: Relief) => r.depth !== 0 && r.map !== '';
@@ -122,7 +127,7 @@ export function modifierEdgeLength(mods: Modifiers, layers: ReliefLayer[], radiu
     const pxUp = (h * band) / (relief.rows * map.height);
     edge = Math.min(edge, Math.max(pxAround, pxUp) * 1.2);
   }
-  return Math.max(0.45, edge) * (mods.coarseness ?? 1);
+  return Math.max(0.45, edge) * (mods.coarseness ?? 1) * coarsenessScale;
 }
 
 /** Piecewise-linear radius lookup over a [radius, heightFraction] side profile. */

@@ -6,7 +6,7 @@ export * from './geometry/profile.js';
 export * from './geometry/transform.js';
 export { Evaluator, emptyMesh, smoothNormals, type EvaluatorOptions } from './geometry/evaluator.js';
 export { BuildError, revolveProfile } from './geometry/build.js';
-export { buildDisplacedRevolve, displacementAt, hasModifiers } from './geometry/revolve.js';
+export { buildDisplacedRevolve, displacementAt, hasModifiers, setCoarsenessScale, getCoarsenessScale } from './geometry/revolve.js';
 export { applyRepeat, extrudeWithEdges, treatCorners, edgesOf, hasEdges, insetPolygon } from './geometry/edges.js';
 export { planarFace, loopArea, meshEdges, edgeToolSection, type PlanarFace, type MeshEdge, type Vec3Tuple } from './geometry/faces.js';
 export * from './raster/trace.js';

@@ -8,8 +8,8 @@ import type { EvaluatorWorkerApi, EvalResult, ModuleInfo } from '../worker/evalu
  * never queues up stale work.
  */
 class WorkerClient {
-  private remote: Comlink.Remote<EvaluatorWorkerApi>;
-  private ready: Promise<{ modules: ModuleInfo[] }>;
+  private remote!: Comlink.Remote<EvaluatorWorkerApi>;
+  private ready!: Promise<{ modules: ModuleInfo[] }>;
   private inflight: Promise<void> | null = null;
   private pending: FormaDocument | null = null;
   private listeners = new Set<(r: EvalResult, doc: FormaDocument) => void>();
@@ -20,11 +20,39 @@ class WorkerClient {
     return () => this.errorListeners.delete(fn);
   }
 
+  private worker!: Worker;
+  private restarts = 0;
+
   constructor() {
-    const worker = new Worker(new URL('../worker/evaluator.worker.ts', import.meta.url), { type: 'module', name: 'forma-geometry' });
-    this.remote = Comlink.wrap<EvaluatorWorkerApi>(worker);
-    this.ready = this.remote.init();
+    this.spawn();
   }
+
+  /** Device profile: phones and low-memory machines get coarser previews and a smaller cache. */
+  private static profile() {
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    const small = matchMedia('(max-width: 720px)').matches || (nav.deviceMemory !== undefined && nav.deviceMemory <= 4);
+    return small ? { coarseness: 1.6, cacheBytes: 48 * 1024 * 1024 } : { coarseness: 1, cacheBytes: 160 * 1024 * 1024 };
+  }
+
+  private spawn() {
+    this.worker = new Worker(new URL('../worker/evaluator.worker.ts', import.meta.url), { type: 'module', name: 'forma-geometry' });
+    this.remote = Comlink.wrap<EvaluatorWorkerApi>(this.worker);
+    this.ready = this.remote.init(WorkerClient.profile());
+    // a worker that dies (out of memory, WASM abort) is replaced and the latest document re-evaluated
+    this.worker.onerror = (e) => { console.error('geometry worker error', e); this.restart(); };
+  }
+
+  private restart() {
+    if (this.restarts++ > 3) return;
+    try { this.worker.terminate(); } catch { /* already gone */ }
+    const doc = this.pending ?? this.lastDoc;
+    this.inflight = null;
+    this.spawn();
+    this.ready.then(() => { for (const l of this.errorListeners) l(new Error('The geometry engine restarted (it ran out of memory). Try Preview detail for big parts.'), doc ?? ({} as FormaDocument)); });
+    if (doc) this.evaluate(doc);
+  }
+
+  private lastDoc: FormaDocument | null = null;
 
   whenReady() { return this.ready; }
 
@@ -45,6 +73,7 @@ class WorkerClient {
     while (this.pending) {
       const doc = this.pending;
       this.pending = null;
+      this.lastDoc = doc;
       try {
         const res = await this.remote.evaluate(doc);
         for (const l of this.listeners) l(res, doc);

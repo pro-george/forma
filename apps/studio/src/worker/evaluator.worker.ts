@@ -5,7 +5,7 @@
  */
 import * as Comlink from 'comlink';
 import {
-  initManifold, Evaluator, createDefaultRegistry, createModuleApi, canvasTextRasterizer,
+  initManifold, Evaluator, createDefaultRegistry, createModuleApi, canvasTextRasterizer, setCoarsenessScale,
   toBinarySTL, to3MF, toOBJ, topLevel, featureById,
   type FormaDocument, type EvaluatedFeature, type ModuleDefinition, type Feature, type TriangleMesh,
 } from '@forma/core';
@@ -38,12 +38,13 @@ async function loadFonts() {
 }
 
 const api = {
-  async init(): Promise<{ modules: ModuleInfo[] }> {
+  async init(profile: { coarseness?: number; cacheBytes?: number } = {}): Promise<{ modules: ModuleInfo[] }> {
+    if (profile.coarseness) setCoarsenessScale(profile.coarseness);
     const [wasm] = await Promise.all([initManifold({ wasmUrl }), loadFonts()]);
     const rasterizer = typeof OffscreenCanvas !== 'undefined'
       ? canvasTextRasterizer((w, h) => new OffscreenCanvas(w, h) as unknown as { getContext(id: '2d'): OffscreenCanvasRenderingContext2D | null; width: number; height: number })
       : null;
-    evaluator = new Evaluator(wasm, { registry, api: createModuleApi(rasterizer) });
+    evaluator = new Evaluator(wasm, { registry, api: createModuleApi(rasterizer), ...(profile.cacheBytes ? { cacheBytes: profile.cacheBytes } : {}) });
     return { modules: api.listModules() };
   },
 

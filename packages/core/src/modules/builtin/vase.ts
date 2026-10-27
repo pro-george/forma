@@ -187,7 +187,7 @@ export const reliefVaseModule: ModuleDefinition = {
     }
 
     // enough segments around for ribs to stay round; relief refinement happens in the mesh builder
-    const segments = Math.min(preview ? 256 : 720, Math.max(preview ? 96 : 192, ribs * (preview ? 3 : 4)));
+    const segments = Math.min(preview ? 256 : 540, Math.max(preview ? 96 : 192, ribs * (preview ? 3 : 4)));
     const [primary, ...rest] = layers;
     const vase: FeatureSpec = {
       type: 'revolve', name: 'Vase', profile, height: h, wall, floor: num(i.floor), smoothing: 3, segments, open: false,

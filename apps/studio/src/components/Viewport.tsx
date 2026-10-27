@@ -394,6 +394,7 @@ export function Viewport() {
   const clearSelection = useStore((s) => s.clearSelection);
   return (
     <Canvas
+      frameloop="demand"
       shadows
       dpr={[1, 2]}
       camera={{ position: [170, -170, 130], up: [0, 0, 1], fov: 38, near: 0.5, far: 6000 }}
