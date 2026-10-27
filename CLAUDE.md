@@ -8,3 +8,4 @@
 - Worker boundary: meshes are copied before transfer because the evaluator cache keeps the originals.
 - Tests: `pnpm test` runs real Manifold booleans in Node. Add a test for every new feature type or module.
 - Commit style: imperative subject, body explains why.
+- 3MF export (`export/threemf.ts`) targets Bambu Studio / Orca first: per-part `extruder` in `Metadata/model_settings.config` (mirrors bambulab/BambuStudio `bbs_3mf.cpp`), PrusaSlicer via `Slic3r_PE_model.config`. `Application` metadata must not start with "BambuStudio-" (that flips the importer into project mode, which expects full presets). Parts carry a 1-based `filament` slot; the document holds the `filaments` palette.

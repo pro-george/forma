@@ -56,6 +56,7 @@ function useShortcuts() {
       if (meta) return;
       if (e.key === 'Escape') { if (useEdges.getState().selected) { useEdges.getState().clear(); return; } s.clearSelection(); return; }
       if (e.key === 'Delete' || e.key === 'Backspace') { s.deleteSelected(); return; }
+      if ((e.key === 'Enter' || e.key === 'F2') && s.selection.length === 1) { e.preventDefault(); const el = document.getElementById('f-name') as HTMLInputElement | null; el?.focus(); el?.select(); return; }
       const nudge = e.shiftKey ? 10 : 1;
       if (e.key === 'ArrowLeft') { s.moveSelectionBy(-nudge, 0, 0); return; }
       if (e.key === 'ArrowRight') { s.moveSelectionBy(nudge, 0, 0); return; }
