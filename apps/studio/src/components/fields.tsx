@@ -39,6 +39,33 @@ export function NumberField({ value, onChange, min, max, step = 1, unit, axis, i
   );
 }
 
+const SEC_KEY = 'forma.sections.v1';
+let sectionState: Record<string, boolean> = {};
+try { sectionState = JSON.parse(localStorage.getItem(SEC_KEY) ?? '{}'); } catch { /* ignore */ }
+
+/**
+ * Collapsible group of fields. Rarely-used groups start closed so the panel
+ * stays short; the header shows a summary of what is set inside, so a closed
+ * section never hides an active setting. Open/closed is remembered.
+ */
+export function Section({ id, title, summary, defaultOpen = false, children }: { id: string; title: string; summary?: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState<boolean>(sectionState[id] ?? defaultOpen);
+  const toggle = () => {
+    const v = !open; setOpen(v); sectionState = { ...sectionState, [id]: v };
+    try { localStorage.setItem(SEC_KEY, JSON.stringify(sectionState)); } catch { /* ignore */ }
+  };
+  return (
+    <div className={`section${open ? ' open' : ''}`}>
+      <button className="sec-head" onClick={toggle} aria-expanded={open}>
+        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        <span>{title}</span>
+        {!open && summary && <small>{summary}</small>}
+      </button>
+      {open && <div className="sec-body">{children}</div>}
+    </div>
+  );
+}
+
 export function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div className="field">

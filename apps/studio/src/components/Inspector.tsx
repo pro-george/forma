@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { featureById, inputVisible, parseProfileInput, defaultEdges, defaultRepeat, type Edges, type Feature, type FeatureOf, type Modifiers, type Repeat, type Vec2 } from '@forma/core';
 import { useStore } from '../state/store';
 import type { ModuleInfo } from '../state/worker-client';
-import { Field, NumberField, Slider, TextField, formatNum } from './fields';
+import { Field, NumberField, Section, Slider, TextField, formatNum } from './fields';
 import { ProfileCanvas, ProfileEditor } from './ProfileEditor';
 import { ImageField } from './ImageField';
 import { useSketch } from '../state/sketch';
@@ -35,6 +35,29 @@ const MOD_DEFS: { key: NumModKey; label: string; min: number; max: number; step:
   { key: 'grooveCount', label: 'Count', min: 2, max: 64, step: 1, unit: '' },
 ];
 const MOD_TYPES = new Set<Feature['type']>(['box', 'cylinder', 'cone', 'sphere', 'revolve', 'mesh', 'extrude', 'tube']);
+
+function edgeSummary(f: Feature): string {
+  const e = (f as { edges?: Partial<Edges> }).edges;
+  if (!e) return 'none';
+  const on = (Object.keys(e) as (keyof Edges)[]).filter((k) => e[k] && e[k]!.kind !== 'none').map((k) => `${k} ${e[k]!.kind} ${e[k]!.size} mm`);
+  return on.length ? on.join(', ') : 'none';
+}
+function modSummary(f: Feature): string {
+  const m = f.modifiers;
+  const on: string[] = [];
+  if (m.twist) on.push(`twist ${m.twist}°`);
+  if (m.taper) on.push(`taper ${m.taper}%`);
+  if (m.rippleAmplitude) on.push('ripple');
+  if (m.grooveAmplitude) on.push(`${m.grooveCount} grooves`);
+  if (m.relief?.depth || m.reliefs?.length) on.push('relief');
+  if (m.fuzz) on.push('fuzz');
+  return on.length ? on.join(', ') : 'none';
+}
+function repeatSummary(f: Feature): string {
+  const r = f.repeat;
+  if (!r || r.mode === 'none') return 'off';
+  return r.mode === 'grid' ? `grid ${r.count} × ${r.count2}` : r.mode === 'mirror' ? 'mirror' : `${r.mode} × ${r.count}`;
+}
 
 const LABEL: Record<Feature['type'], string> = { box: 'Box', cylinder: 'Cylinder', cone: 'Cone', sphere: 'Sphere', torus: 'Torus', tube: 'Tube', extrude: 'Extrusion', revolve: 'Revolve', mesh: 'Mesh', combine: 'Combine', module: 'Module' };
 
@@ -98,7 +121,6 @@ function EdgesPanel({ feature }: { feature: Feature }) {
   const twisted = feature.type === 'extrude' && (feature.twist !== 0 || feature.scaleTop !== 1);
   return (
     <>
-      <h3>Edges</h3>
       {rows.map((r) => (
         <div key={r.key} className="edge-row">
           <label>{r.label}</label>
@@ -125,7 +147,6 @@ function RepeatPanel({ feature }: { feature: Feature }) {
   );
   return (
     <>
-      <h3>Repeat</h3>
       <Field label="Mode"><select value={r.mode} onChange={(e) => set({ mode: e.target.value as Repeat['mode'] })}>{REPEAT_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</select></Field>
       {(r.mode === 'linear' || r.mode === 'grid') && (
         <>
@@ -174,7 +195,6 @@ function SplitPanel({ feature }: { feature: Feature }) {
   const value = at ?? Math.round(mid * 10) / 10;
   return (
     <>
-      <h3>Split</h3>
       <Field label="Plane">
         <div className="seg">{(['x', 'y', 'z'] as const).map((ax) => <button key={ax} className={axis === ax ? 'on' : ''} onClick={() => { setAxis(ax); setAt(null); }}>{ax.toUpperCase()}</button>)}</div>
       </Field>
@@ -210,7 +230,6 @@ function ModifiersPanel({ feature }: { feature: Feature }) {
   if (!MOD_TYPES.has(feature.type)) return null;
   return (
     <>
-      <h3>Surface modifiers</h3>
       {MOD_DEFS.map((d) => (
         <Slider key={d.key} id={`mod-${d.key}`} label={d.label} min={d.min} max={d.max} step={d.step} unit={d.unit} value={feature.modifiers[d.key]}
           onChange={(v) => patch(feature.id, { modifiers: { ...feature.modifiers, [d.key]: v } }, { undoable: false })} />
@@ -264,11 +283,11 @@ function FeaturePanel({ feature }: { feature: Feature }) {
         <div className="note">{feature.childIds.length} children, {feature.childIds.filter((id) => featureById(doc, id)?.role === 'hole').length} holes, {feature.childIds.filter((id) => featureById(doc, id)?.role === 'intersect').length} keep. Solids are unioned, Keep parts intersected, holes subtracted. Edit any child in the tree to change the result.</div>
       )}
       {feature.type === 'mesh' && <div className="note">{(feature.positions.length / 9).toLocaleString()} triangles, imported as a watertight mesh; booleans and modifiers work on it like any other part.</div>}
-      <EdgesPanel feature={feature} />
-      <ModifiersPanel feature={feature} />
-      <RepeatPanel feature={feature} />
       <Placement feature={feature} />
-      <SplitPanel feature={feature} />
+      {EDGE_TYPES.has(feature.type) && <Section id="edges" title="Edges" summary={edgeSummary(feature)}><EdgesPanel feature={feature} /></Section>}
+      {MOD_TYPES.has(feature.type) && <Section id="mods" title="Surface modifiers" summary={modSummary(feature)}><ModifiersPanel feature={feature} /></Section>}
+      <Section id="repeat" title="Repeat" summary={repeatSummary(feature)}><RepeatPanel feature={feature} /></Section>
+      {feature.parentId === null && <Section id="split" title="Split in two" summary="print in parts"><SplitPanel feature={feature} /></Section>}
       <Actions feature={feature} />
     </>
   );

@@ -190,6 +190,13 @@ h4.group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; 
 
 /* properties */
 .props { padding-top: 2px; }
+.section { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 4px; }
+.sec-head { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; background: transparent; padding: 6px 4px; border-radius: 10px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 600; }
+.sec-head:hover { background: var(--panel-2); color: var(--text); }
+.sec-head svg { transition: transform .15s; flex: none; }
+.section.open .sec-head svg { transform: rotate(90deg); }
+.sec-head small { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted-2); font-size: 11px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sec-body { padding: 2px 0 4px; }
 .help-inline { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--muted-2); margin-left: 6px; font-size: 11px; }
 .keys { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: var(--muted); }
 .keys b { color: var(--text); font-family: var(--mono); font-weight: 500; }
