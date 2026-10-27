@@ -68,6 +68,8 @@ interface Actions {
   deleteSelected(): void;
   bakeModule(id: string): Promise<void>;
   rotateSelected(deg: number): void;
+  /** lay the visible top-level parts out on the plate in rows with a gap, no overlaps (selection only, if any) */
+  arrangeParts(plate?: number, gap?: number): void;
   splitFeature(id: string, opts: { axis: 'x' | 'y' | 'z'; at: number; gap: number }): void;
   // selection & view
   select(ids: string[], mode?: 'replace' | 'toggle' | 'add'): void;
@@ -342,6 +344,43 @@ export const useStore = create<State & Actions>((set, get) => {
       let doc = get().doc;
       for (const id of get().selection) doc = updateFeature(doc, id, (f) => ({ ...f, transform: { ...f.transform, rotation: { ...f.transform.rotation, z: (f.transform.rotation.z + deg) % 360 } } }));
       apply(doc);
+    },
+    arrangeParts: (plate = 256, gap = 8) => {
+      const { doc, results, selection } = get();
+      const pick = (f: Feature) => f.parentId === null && f.visible && (selection.length === 0 || selection.includes(f.id));
+      const items = doc.features.filter(pick).map((f) => {
+        const r = results.get(f.id);
+        const b = r?.bbox ?? { min: { x: -10, y: -10, z: 0 }, max: { x: 10, y: 10, z: 10 } };
+        const rot = f.transform.rotation;
+        // rotated parts: use the larger footprint extent on both axes (safe, slightly loose)
+        const turned = Math.abs(rot.x) > 1e-6 || Math.abs(rot.y) > 1e-6 || Math.abs(rot.z) > 1e-6;
+        const w = b.max.x - b.min.x, d = b.max.y - b.min.y, h = b.max.z - b.min.z;
+        const ext = turned ? Math.max(w, d, h) : 0;
+        return { f, w: turned ? ext : w, d: turned ? ext : d, cx: turned ? 0 : (b.min.x + b.max.x) / 2, cy: turned ? 0 : (b.min.y + b.max.y) / 2 };
+      });
+      if (items.length === 0) return;
+      items.sort((a, b) => b.d - a.d || b.w - a.w);
+      // shelf packing in rows, centred on the plate
+      const rows: { items: typeof items; w: number; d: number }[] = [];
+      for (const it of items) {
+        const row = rows[rows.length - 1];
+        if (row && row.w + gap + it.w <= plate) { row.items.push(it); row.w += gap + it.w; row.d = Math.max(row.d, it.d); }
+        else rows.push({ items: [it], w: it.w, d: it.d });
+      }
+      const totalD = rows.reduce((a, r) => a + r.d, 0) + gap * (rows.length - 1);
+      let y = -totalD / 2;
+      let next = doc;
+      for (const row of rows) {
+        let x = -row.w / 2;
+        for (const it of row.items) {
+          const px = x + it.w / 2 - it.cx, py = y + row.d / 2 - it.cy;
+          next = updateFeature(next, it.f.id, (f) => ({ ...f, transform: { ...f.transform, position: { ...f.transform.position, x: Math.round(px * 10) / 10, y: Math.round(py * 10) / 10 } } }));
+          x += it.w + gap;
+        }
+        y += row.d + gap;
+      }
+      apply(next);
+      get().toast(`Arranged ${items.length} part${items.length > 1 ? 's' : ''}${totalD > plate ? ' — taller than a 256 mm plate' : ''}`);
     },
 
     select: (ids, mode = 'replace') => {

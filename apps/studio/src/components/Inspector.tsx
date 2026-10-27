@@ -46,7 +46,7 @@ export function Inspector() {
 
   if (features.length === 0) return (
     <div className="props">
-      <div className="empty">Click a part to edit it. Every value stays live — change a hole's radius inside a combined part and the kernel recomputes the boolean.</div>
+      <div className="empty">Select a part to edit it. Every value stays live — change a hole's radius inside a combined part and the kernel recomputes the boolean.</div>
       <FilamentPalette />
       <h3>Keys</h3>
       <div className="keys">

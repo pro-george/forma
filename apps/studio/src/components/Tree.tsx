@@ -1,6 +1,7 @@
 import { childrenOf, topLevel, type Feature } from '@forma/core';
 import { useStore } from '../state/store';
 import { Icon, featureIcon } from './icons';
+import { onPartContext } from './ContextMenu';
 
 export function Tree() {
   const doc = useStore((s) => s.doc);
@@ -17,6 +18,8 @@ export function Tree() {
         key={f.id}
         className={`item${selection.includes(f.id) ? ' sel' : ''}${child ? ' child' : ''}${f.visible ? '' : ' hidden'}`}
         onClick={(e) => select([f.id], e.shiftKey || e.metaKey || e.ctrlKey ? 'toggle' : 'replace')}
+        onContextMenu={onPartContext(f.id)}
+        onDoubleClick={() => { select([f.id]); requestAnimationFrame(() => { const el = document.getElementById('f-name') as HTMLInputElement | null; el?.focus(); el?.select(); }); }}
         title={err ?? f.name}
       >
         {featureIcon(f.type)}

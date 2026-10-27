@@ -282,6 +282,20 @@ h4.group { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; 
 .dim-chip:hover { background: var(--accent); }
 .dim-input { width: 74px; background: #fff; color: var(--ink); border: 2px solid var(--accent); border-radius: var(--pill); padding: 2px 8px; font: 12px var(--mono); outline: none; box-shadow: var(--shadow); }
 
+/* right-click menu for parts */
+.ctx { position: fixed; z-index: 46; min-width: 200px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 6px; display: grid; gap: 1px; animation: pop-in .1s ease-out; }
+.ctx-title { font-size: 11px; color: var(--muted); padding: 4px 10px 6px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
+.ctx button { text-align: left; background: transparent; border-radius: 9px; display: flex; align-items: center; gap: 9px; padding: 6px 10px; font-size: 12.5px; }
+.ctx button:hover { background: var(--panel-2); }
+.ctx button.danger { color: var(--hole); }
+.ctx button svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; opacity: .75; }
+.ctx button small { margin-left: auto; color: var(--muted-2); font-family: var(--mono); font-size: 10.5px; }
+.ctx hr { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
+.ctx-slots { display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 10px; flex-wrap: wrap; }
+.ctx-slots > span { font-size: 11px; color: var(--muted); margin-right: 4px; }
+.ctx-slots .slot { width: 28px; height: 28px; padding: 0; display: grid; }
+.ctx-slots .slot span { font-size: 9.5px; }
+
 .radial { position: fixed; z-index: 45; width: 0; height: 0; }
 .radial-dot { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 6px rgba(255, 60, 0, .15); }
 .radial-item { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; background: var(--glass-strong); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-line); box-shadow: var(--glass-shadow); border-radius: var(--pill); padding: 8px 14px; font-weight: 500; animation: radial-in .16s ease-out; }

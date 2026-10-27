@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormaDocument } from '@forma/core';
 import { useStore } from '../state/store';
 import { Icon, featureIcon } from './icons';
+import { onPartContext } from './ContextMenu';
 
 /**
  * The timeline at the bottom, in the spirit of Fusion's: one chip per step
@@ -79,6 +80,7 @@ export function Timeline() {
         onDragOver={(e) => { if (drag) { e.preventDefault(); setOver(i); } }}
         onDrop={(e) => { e.preventDefault(); if (drag && drag !== f.id) reorder(drag, i); setDrag(null); setOver(null); }}
         onClick={(e) => { if (i >= cursor) setRollback(i + 1 >= n ? null : i + 1); select([f.id], e.shiftKey || e.metaKey ? 'toggle' : 'replace'); }}
+        onContextMenu={onPartContext(f.id)}
       >
         {featureIcon(f.type)}
         <span className="nm">{f.name}</span>

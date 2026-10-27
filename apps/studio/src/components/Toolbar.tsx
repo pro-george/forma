@@ -100,6 +100,7 @@ export function Toolbar() {
             {(['iso', 'top', 'front', 'right'] as const).map((p) => <button key={p} onClick={() => { view.setPreset(p); close(); }}>{p[0]!.toUpperCase() + p.slice(1)}</button>)}
             <hr />
             <button onClick={() => { view.fit(); close(); }}>Fit selection / all <small>F</small></button>
+            <button onClick={() => { s.arrangeParts(); view.fit(); close(); }} title="Lay the parts out in rows on a 256 mm plate, no overlaps">Arrange parts on plate</button>
           </div>
         )}</Dropdown>
       </nav>

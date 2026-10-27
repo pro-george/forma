@@ -15,6 +15,7 @@ import { usePushPull } from './state/pushpull';
 import { useEdges } from './state/edges';
 import { RadialMenu } from './components/RadialMenu';
 import { Timeline } from './components/Timeline';
+import { ContextMenu } from './components/ContextMenu';
 import { EdgeToolbar } from './components/EdgeToolbar';
 
 function useShortcuts() {
@@ -102,6 +103,7 @@ export default function App() {
         <SketchHUD />
         <EdgeToolbar />
         <RadialMenu />
+        <ContextMenu />
         <Toasts />
       </div>
     );
@@ -124,6 +126,7 @@ export default function App() {
       <StatusBar />
       <Timeline />
       <RadialMenu />
+      <ContextMenu />
       <Toasts />
     </div>
   );
