@@ -24,6 +24,14 @@ interface State {
   printLook: boolean;
   toasts: Toast[];
   fileName: string | null;
+  /**
+   * Timeline rollback: when set, only features before this index are built
+   * and shown, like dragging Fusion's marker back. New features are inserted
+   * at the marker. `null` = everything.
+   */
+  rollback: number | null;
+  /** what the kernel and the viewport show: `doc` with the rollback applied (same object as `doc` when not rolled back) */
+  viewDoc: FormaDocument;
 }
 
 interface Actions {
@@ -38,6 +46,9 @@ interface Actions {
   /** bumps on every history change so the strip re-renders */
   historyTick: number;
   canUndo(): boolean; canRedo(): boolean;
+  setRollback(index: number | null): void;
+  /** move a feature to another position in the timeline (document order) */
+  reorderFeature(id: string, toIndex: number): void;
   newDocument(): void;
   loadSample(): void;
   openFile(file: File): Promise<void>;
@@ -96,16 +107,50 @@ function download(bytes: Uint8Array | string, name: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+/**
+ * The document as it was at a timeline step: features past the marker are
+ * hidden, and parts whose combine comes later stand on their own again, the
+ * way they did before that step. Neither visibility nor parentId is part of
+ * the geometry cache key, so looking back costs nothing.
+ */
+export function maskedDoc(doc: FormaDocument, rollback: number | null): FormaDocument {
+  if (rollback === null || rollback >= doc.features.length) return doc;
+  const index = new Map(doc.features.map((f, i) => [f.id, i]));
+  return {
+    ...doc,
+    features: doc.features.map((f, i) => {
+      if (i >= rollback) return f.visible ? { ...f, visible: false } : f;
+      if (f.parentId !== null && (index.get(f.parentId) ?? -1) >= rollback) return { ...f, parentId: null };
+      return f;
+    }),
+  };
+}
+
 export const useStore = create<State & Actions>((set, get) => {
+  const evaluate = (doc: FormaDocument) => { const viewDoc = maskedDoc(doc, get().rollback); set({ viewDoc }); workerClient.evaluate(viewDoc); };
   const apply = (next: FormaDocument, undoable = true) => {
+    const rollback = get().rollback;
+    if (rollback !== null) {
+      // while rolled back, anything new goes in at the marker, not at the end
+      const prev = get().doc;
+      const known = new Set(prev.features.map((f) => f.id));
+      const added = next.features.filter((f) => !known.has(f.id));
+      if (added.length) {
+        const rest = next.features.filter((f) => known.has(f.id));
+        next = { ...next, features: [...rest.slice(0, rollback), ...added, ...rest.slice(rollback)] };
+        set({ rollback: rollback + added.length });
+      } else if (next.features.length < prev.features.length) {
+        set({ rollback: Math.min(rollback, next.features.length) });
+      }
+    }
     const doc = undoable && !gestureBefore ? history.commit(next) : history.replace(next);
     set({ doc, evaluating: true, historyTick: get().historyTick + 1 });
-    workerClient.evaluate(doc);
+    evaluate(doc);
     persist(doc);
   };
 
   workerClient.onResult((res, doc) => {
-    if (doc !== get().doc && doc !== history.value) return; // stale
+    if (doc !== get().viewDoc) return; // stale
     const map = new Map<string, EvaluatedFeature>();
     for (const f of res.features) map.set(f.id, f);
     set({ results: map, evaluating: false, lastEvalMs: res.totalMs });
@@ -113,7 +158,7 @@ export const useStore = create<State & Actions>((set, get) => {
   workerClient.onError((e) => { set({ evaluating: false }); get().toast(`Geometry error: ${e.message}`, 'error'); });
   workerClient.whenReady().then(({ modules }) => {
     set({ ready: true, modules });
-    workerClient.evaluate(get().doc);
+    evaluate(get().doc);
   });
 
   const snap5 = (v: number) => Math.round(v / 5) * 5;
@@ -136,6 +181,7 @@ export const useStore = create<State & Actions>((set, get) => {
 
   return {
     doc: history.value,
+    viewDoc: history.value,
     results: new Map(),
     evaluating: true,
     lastEvalMs: 0,
@@ -148,25 +194,42 @@ export const useStore = create<State & Actions>((set, get) => {
     printLook: false,
     toasts: [],
     fileName: null,
+    rollback: null,
 
     setDoc: (next, opts) => apply(next, opts?.undoable ?? true),
+    setRollback: (index) => {
+      const n = get().doc.features.length;
+      const rollback = index === null || index >= n ? null : Math.max(0, index);
+      if (rollback === get().rollback) return;
+      set({ rollback, evaluating: true, selection: get().selection.filter((id) => { const i = get().doc.features.findIndex((f) => f.id === id); return rollback === null || i < rollback; }) });
+      evaluate(get().doc);
+    },
+    reorderFeature: (id, toIndex) => {
+      const doc = get().doc;
+      const from = doc.features.findIndex((f) => f.id === id);
+      if (from < 0) return;
+      const features = doc.features.slice();
+      const [f] = features.splice(from, 1);
+      features.splice(Math.max(0, Math.min(features.length, toIndex)), 0, f!);
+      apply({ ...doc, features });
+    },
     beginGesture: () => { if (!gestureBefore) gestureBefore = history.value; },
     endGesture: () => {
       if (gestureBefore && gestureBefore !== history.value) { history.checkpoint(gestureBefore); set({ historyTick: get().historyTick + 1 }); }
       gestureBefore = null;
     },
     timeline: () => history.entries(),
-    jumpHistory: (delta) => { const d = history.jump(delta); set({ doc: d, selection: get().selection.filter((id) => featureById(d, id)), historyTick: get().historyTick + 1 }); workerClient.evaluate(d); persist(d); },
-    undo: () => { const d = history.undo(); set({ doc: d, selection: get().selection.filter((id) => featureById(d, id)), historyTick: get().historyTick + 1 }); workerClient.evaluate(d); persist(d); },
-    redo: () => { const d = history.redo(); set({ doc: d, selection: get().selection.filter((id) => featureById(d, id)), historyTick: get().historyTick + 1 }); workerClient.evaluate(d); persist(d); },
+    jumpHistory: (delta) => { const d = history.jump(delta); set({ doc: d, rollback: null, selection: get().selection.filter((id) => featureById(d, id)), historyTick: get().historyTick + 1 }); evaluate(d); persist(d); },
+    undo: () => { const d = history.undo(); set({ doc: d, rollback: null, selection: get().selection.filter((id) => featureById(d, id)), historyTick: get().historyTick + 1 }); evaluate(d); persist(d); },
+    redo: () => { const d = history.redo(); set({ doc: d, rollback: null, selection: get().selection.filter((id) => featureById(d, id)), historyTick: get().historyTick + 1 }); evaluate(d); persist(d); },
     canUndo: () => history.canUndo,
     canRedo: () => history.canRedo,
-    newDocument: () => { set({ selection: [], fileName: null }); apply(createDocument()); },
-    loadSample: () => { set({ selection: [], fileName: null }); apply(sampleDocument()); },
+    newDocument: () => { set({ selection: [], fileName: null, rollback: null }); apply(createDocument()); },
+    loadSample: () => { set({ selection: [], fileName: null, rollback: null }); apply(sampleDocument()); },
     openFile: async (file) => {
       try {
         const doc = parseDocument(JSON.parse(await file.text()));
-        set({ selection: [], fileName: file.name });
+        set({ selection: [], fileName: file.name, rollback: null });
         apply(doc);
         get().toast(`Opened ${file.name}`);
       } catch (e) { get().toast(`Could not open file: ${(e as Error).message}`, 'error'); }

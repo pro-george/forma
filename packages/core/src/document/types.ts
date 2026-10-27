@@ -163,10 +163,10 @@ export const FilamentSchema = z.object({
 });
 export type Filament = z.infer<typeof FilamentSchema>;
 export const DEFAULT_FILAMENTS: Filament[] = [
-  { color: '#e8e4dc', type: 'PLA', name: '' },
-  { color: '#c0392b', type: 'PLA', name: '' },
-  { color: '#2c3e50', type: 'PLA', name: '' },
-  { color: '#f1c40f', type: 'PLA', name: '' },
+  { color: '#d9d6cf', type: 'PLA', name: '' },
+  { color: '#ff3c00', type: 'PLA', name: '' },
+  { color: '#1f2329', type: 'PLA', name: '' },
+  { color: '#f2c94c', type: 'PLA', name: '' },
 ];
 
 export const BoxFeature = z.object({ ...base, type: z.literal('box'), width: z.number().positive(), depth: z.number().positive(), height: z.number().positive(), edges: EdgesSchema.default({}) });

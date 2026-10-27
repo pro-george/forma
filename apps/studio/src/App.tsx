@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from './state/store';
-import { TopBar } from './components/TopBar';
-import { ToolRail } from './components/ToolRail';
+import { Toolbar } from './components/Toolbar';
 import { Viewport } from './components/Viewport';
 import { useViewStore } from './state/view';
 import { useSketch } from './state/sketch';
@@ -15,7 +14,7 @@ import { useIsMobile } from './state/media';
 import { usePushPull } from './state/pushpull';
 import { useEdges } from './state/edges';
 import { RadialMenu } from './components/RadialMenu';
-import { HistoryStrip } from './components/HistoryStrip';
+import { Timeline } from './components/Timeline';
 import { EdgeToolbar } from './components/EdgeToolbar';
 
 function useShortcuts() {
@@ -113,18 +112,17 @@ export default function App() {
         <Viewport />
         {!ready && <div className="loading"><div><div className="spin" />Loading geometry kernel…</div></div>}
       </section>
-      <TopBar />
+      <Toolbar />
       <SketchHUD />
       <EdgeToolbar />
       <div className="dock left">
-        <Panel id="create" title="Create" side="left"><ToolRail /></Panel>
+        <Panel id="layers" title="Layers" side="left" badge={<span className="count">{partCount}</span>}><Tree /></Panel>
       </div>
       <div className="dock right">
-        <Panel id="parts" title="Parts" side="right" badge={<span className="count">{partCount}</span>}><Tree /></Panel>
         <Panel id="props" title={selection.length ? 'Properties' : 'Scene'} side="right"><Inspector /></Panel>
       </div>
       <StatusBar />
-      <HistoryStrip />
+      <Timeline />
       <RadialMenu />
       <Toasts />
     </div>

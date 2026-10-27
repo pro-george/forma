@@ -11,8 +11,8 @@ import { useMenu } from '../state/menu';
 import { useViewStore } from '../state/view';
 
 const TABS: { id: PanelId; label: string }[] = [
-  { id: 'create', label: 'Create' },
-  { id: 'parts', label: 'Parts' },
+  { id: 'create', label: 'Add' },
+  { id: 'layers', label: 'Layers' },
   { id: 'props', label: 'Edit' },
 ];
 
@@ -42,7 +42,10 @@ export function MobileShell() {
       </header>
       {exp && (
         <div className="m-export glass-strong" onClick={() => setExp(false)}>
-          {(['stl', '3mf', 'obj'] as const).map((f) => <button key={f} onClick={() => s.exportModel(f)}>{f.toUpperCase()}</button>)}
+          <button onClick={() => s.exportModel('bambu')}>3MF <small>Bambu</small></button>
+          <button onClick={() => s.exportModel('3mf')}>3MF <small>colours</small></button>
+          <button onClick={() => s.exportModel('stl')}>STL</button>
+          <button onClick={() => s.exportModel('obj')}>OBJ</button>
         </div>
       )}
       {sheet && !sketching && (
@@ -50,7 +53,7 @@ export function MobileShell() {
           <div className="m-handle" onClick={() => open(null)} role="button" aria-label="Close" />
           <div className="m-sheet-body">
             {sheet === 'create' && <ToolRail />}
-            {sheet === 'parts' && <Tree />}
+            {sheet === 'layers' && <Tree />}
             {sheet === 'props' && <Inspector />}
           </div>
         </section>
@@ -65,7 +68,7 @@ export function MobileShell() {
         <nav className="m-tabs glass-strong">
           {TABS.map((t) => (
             <button key={t.id} className={sheet === t.id ? 'on' : ''} onClick={() => open(t.id)}>
-              {t.label}{t.id === 'parts' && <span className="count">{partCount}</span>}
+              {t.label}{t.id === 'layers' && <span className="count">{partCount}</span>}
             </button>
           ))}
         </nav>

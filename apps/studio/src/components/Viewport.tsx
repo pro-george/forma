@@ -54,6 +54,7 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
   const hasError = !!result?.error;
   const hover = useHover((h) => (h.hover?.partId === feature.id ? h.hover : null));
   const pushArmed = usePushPull((s) => s.armed);
+  const slotColor = useStore((s) => s.doc.filaments[feature.filament - 1]?.color ?? s.doc.filaments[0]!.color);
   // faces are draggable on the selected part (modeless) or on any part while push/pull is armed
   const draggable = (selected || pushArmed) && !ghost && !picking;
   const faceGeometry = useMemo(() => {
@@ -113,7 +114,7 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
             useSketch.getState().startOnFace(feature.id, [e.point.x, e.point.y, e.point.z], [n.x, n.y, n.z]);
           }}>
           <meshStandardMaterial
-            color={isHole ? colors.hole : printLook ? '#e8e4dc' : colors.solid}
+            color={isHole ? colors.hole : slotColor}
             emissive={selected ? colors.accent : '#000000'}
             emissiveIntensity={selected && !printLook ? 0.035 : 0}
             roughness={printLook ? 0.92 : 0.55} metalness={printLook ? 0 : 0.12}
@@ -360,7 +361,8 @@ function Scene() {
   const gizmoMode = useViewStore((s) => s.gizmoMode);
   const colors = useThemeColors();
   const controls = useRef<OrbitControlsImpl | null>(null);
-  const parts = useMemo(() => topLevel(doc).filter((f) => f.visible), [doc]);
+  const viewDoc = useStore((s) => s.viewDoc);
+  const parts = useMemo(() => topLevel(viewDoc).filter((f) => f.visible), [viewDoc]);
   const primary = selection.length ? parts.find((f) => f.id === selection[selection.length - 1]) : undefined;
 
   return (

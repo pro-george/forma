@@ -26,6 +26,7 @@ export function Tree() {
         {f.role === 'intersect' && <span className="badge mod">keep</span>}
         {f.repeat && f.repeat.mode !== 'none' && <span className="badge mod">×{f.repeat.mode === 'grid' ? f.repeat.count * f.repeat.count2 : f.repeat.mode === 'mirror' ? 2 : f.repeat.count}</span>}
         {err && <span className="badge err">error</span>}
+        {doc.filaments.length > 1 && f.role === 'solid' && !child && <i className="fdot" style={{ background: doc.filaments[f.filament - 1]?.color }} title={`Filament ${f.filament}`} />}
         <button className={`eye${f.visible ? '' : ' off'}`} title={f.visible ? 'Hide' : 'Show'} onClick={(e) => { e.stopPropagation(); toggleVisible(f.id); }}><Icon.eye /></button>
       </div>
     );
@@ -33,7 +34,7 @@ export function Tree() {
 
   return (
     <div className="tree">
-      {roots.length === 0 && <div className="empty">Nothing here yet. Add a primitive or a module from the left, or draw a sketch and extrude it.</div>}
+      {roots.length === 0 && <div className="empty">Nothing here yet. Use <b>Add</b> in the toolbar, press <b>B</b> for a box, or right-click the ground.</div>}
       {[...roots].reverse().map((f) => (
         <div key={f.id}>
           {row(f, false)}

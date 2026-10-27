@@ -1,15 +1,15 @@
 import { create } from 'zustand';
 
 /** Floating-panel layout state (collapsed panels), remembered per browser. */
-export type PanelId = 'create' | 'parts' | 'props';
+export type PanelId = 'create' | 'layers' | 'props';
 
-const KEY = 'forma.ui.v1';
+const KEY = 'forma.ui.v2';
 function load(): Record<PanelId, boolean> {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { create: false, parts: false, props: false, ...JSON.parse(raw) };
+    if (raw) return { create: false, layers: false, props: false, ...JSON.parse(raw) };
   } catch { /* private mode or blocked storage: fall through */ }
-  return { create: false, parts: false, props: false };
+  return { create: false, layers: false, props: false };
 }
 
 export const useUI = create<{
