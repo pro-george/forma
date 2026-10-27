@@ -89,7 +89,7 @@ const api = {
         return Comlink.transfer(bytes, [bytes.buffer as ArrayBuffer]);
       } finally { m.delete(); }
     }
-    const objects: { name: string; mesh: TriangleMesh; filament: number }[] = [];
+    const objects: { name: string; mesh: TriangleMesh; filament: number; group?: string; bbox: [number, number, number, number, number, number] }[] = [];
     for (const f of topLevel(doc)) {
       if (!f.visible || f.role !== 'solid') continue;
       if (ids && !ids.includes(f.id)) continue;
@@ -99,8 +99,21 @@ const api = {
         const np = mesh.numProp, n = mesh.vertProperties.length / np;
         const positions = new Float32Array(n * 3);
         for (let i = 0; i < n; i++) { positions[i * 3] = mesh.vertProperties[i * np]!; positions[i * 3 + 1] = mesh.vertProperties[i * np + 1]!; positions[i * 3 + 2] = mesh.vertProperties[i * np + 2]!; }
-        objects.push({ name: featureById(doc, f.id)?.name ?? f.id, filament: f.filament, mesh: { positions, normals: new Float32Array(0), indices: new Uint32Array(mesh.triVerts) } });
+        const bb = m.boundingBox();
+        objects.push({ name: featureById(doc, f.id)?.name ?? f.id, filament: f.filament, bbox: [bb.min[0], bb.min[1], bb.min[2], bb.max[0], bb.max[1], bb.max[2]], mesh: { positions, normals: new Float32Array(0), indices: new Uint32Array(mesh.triVerts) } });
       } finally { m.delete(); }
+    }
+    // parts that touch or overlap print as one multi-material object (so a body and its lettering stay glued);
+    // parts standing apart stay separate objects the slicer can arrange
+    if (format !== 'obj') {
+      const touch = (a: typeof objects[number], b: typeof objects[number], tol = 0.5) =>
+        a.bbox[0] <= b.bbox[3] + tol && b.bbox[0] <= a.bbox[3] + tol && a.bbox[1] <= b.bbox[4] + tol && b.bbox[1] <= a.bbox[4] + tol && a.bbox[2] <= b.bbox[5] + tol && b.bbox[2] <= a.bbox[5] + tol;
+      const parent = objects.map((_, i) => i);
+      const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
+      for (let i = 0; i < objects.length; i++) for (let j = i + 1; j < objects.length; j++) if (touch(objects[i]!, objects[j]!)) parent[find(i)] = find(j);
+      const size = new Map<number, number>();
+      for (let i = 0; i < objects.length; i++) size.set(find(i), (size.get(find(i)) ?? 0) + 1);
+      for (let i = 0; i < objects.length; i++) if ((size.get(find(i)) ?? 0) > 1) objects[i]!.group = `g${find(i)}`;
     }
     const bytes = format === 'obj' ? toOBJ(objects, doc.name)
       : format === 'bambu' ? to3MF(objects, doc.name, { filaments: doc.filaments })

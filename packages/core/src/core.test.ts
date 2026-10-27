@@ -488,10 +488,10 @@ describe('export', () => {
     doc = addFeature(doc, makeFeature(doc, 'box', { width: 10, depth: 10, height: 2 }));
     doc = addFeature(doc, makeFeature(doc, 'cylinder', { radius: 2, height: 6, filament: 3 }));
     const [a, b] = ev.evaluate(doc);
-    const files = unzipSync(to3MF([{ name: 'plate', mesh: a!.mesh, filament: 1 }, { name: 'peg', mesh: b!.mesh, filament: 3 }], 'Test', { filaments: doc.filaments, colors: true }));
+    const files = unzipSync(to3MF([{ name: 'plate', mesh: a!.mesh, filament: 1, group: 'g' }, { name: 'peg', mesh: b!.mesh, filament: 3, group: 'g' }], 'Test', { filaments: doc.filaments, colors: true }));
     const text = (n: string) => strFromU8(files[n]!);
     const model = text('3D/3dmodel.model');
-    // two filaments → one assembly object with two component parts in the build
+    // grouped → one assembly object with two component parts in the build
     expect(model).toContain('<components>');
     expect(model.match(/<item /g)!.length).toBe(1);
     expect(model).toContain('<metadata name="Application">Forma</metadata>');
@@ -508,11 +508,16 @@ describe('export', () => {
     expect(prusa).toContain(`<volume firstid="0" lastid="${plateTris - 1}">`);
     expect(prusa).toContain(`<volume firstid="${plateTris}" lastid="${plateTris + b!.mesh.indices.length / 3 - 1}">`);
     expect(prusa).toContain('key="extruder" value="3"');
-    // single filament → independent objects, no colour groups unless asked
-    const single = strFromU8(unzipSync(to3MF([{ name: 'a', mesh: a!.mesh }, { name: 'b', mesh: b!.mesh }]))['3D/3dmodel.model']!);
-    expect(single).not.toContain('<components>');
-    expect(single.match(/<item /g)!.length).toBe(2);
-    expect(single).not.toContain('colorgroup');
+    // ungrouped → independent objects, no colour groups unless asked
+    const single = unzipSync(to3MF([{ name: 'a', mesh: a!.mesh }, { name: 'b', mesh: b!.mesh, filament: 2 }]));
+    const singleModel = strFromU8(single['3D/3dmodel.model']!);
+    expect(singleModel).not.toContain('<components>');
+    expect(singleModel.match(/<item /g)!.length).toBe(2);
+    expect(singleModel).not.toContain('colorgroup');
+    const singleCfg = strFromU8(single['Metadata/model_settings.config']!);
+    expect(singleCfg).toContain('<object id="2">');
+    expect(singleCfg).toContain('<part id="2" subtype="normal_part">');
+    expect(singleCfg.match(/key="extruder" value="2"/g)!.length).toBe(2); // object + its part
   });
 });
 

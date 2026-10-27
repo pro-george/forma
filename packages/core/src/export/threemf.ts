@@ -6,6 +6,8 @@ export interface ThreeMFObject {
   mesh: TriangleMesh;
   /** 1-based filament / AMS slot (slicer "extruder"); defaults to 1 */
   filament?: number;
+  /** objects sharing a group key are written as parts of one slicer object (`auto` layout) */
+  group?: string;
 }
 
 export interface ThreeMFOptions {
@@ -14,8 +16,10 @@ export interface ThreeMFOptions {
    * multi-colour print (body + lettering in another filament) keeps its parts
    * glued together and slices as a single multi-material object.
    * `objects`: one independent slicer object per entry, free to arrange.
+   * `auto` (default): objects that share a `group` become one slicer object,
+   * the rest stay independent.
    */
-  layout?: 'parts' | 'objects';
+  layout?: 'parts' | 'objects' | 'auto';
   /** filament palette; index + 1 is the slot number parts refer to */
   filaments?: Filament[];
   /**
@@ -52,18 +56,34 @@ const esc = (s: string) => s.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt
  * honours per-part extruders without expecting a full project profile.
  */
 export function to3MF(objects: ThreeMFObject[], title = 'Forma model', opts: ThreeMFOptions = {}): Uint8Array {
-  const layout = opts.layout ?? (objects.length > 1 && new Set(objects.map((o) => o.filament ?? 1)).size > 1 ? 'parts' : 'objects');
+  const layout = opts.layout ?? 'auto';
   const filaments = opts.filaments ?? [];
   const withColors = opts.colors === true && filaments.length > 0;
   const slotOf = (o: ThreeMFObject) => Math.max(1, Math.min(16, Math.round(o.filament ?? 1)));
   const colorOf = (slot: number) => filaments[slot - 1]?.color ?? '#e8e4dc';
 
-  // ids: 1..N meshes, then N+1 the assembly object (parts layout), colour groups after
+  // slicer objects: each is a list of mesh indices; one mesh → direct object, several → object with component parts
+  const groups: number[][] = [];
+  if (layout === 'parts') groups.push(objects.map((_, i) => i));
+  else if (layout === 'objects') objects.forEach((_, i) => groups.push([i]));
+  else {
+    const byKey = new Map<string, number[]>();
+    objects.forEach((o, i) => {
+      if (o.group === undefined) { groups.push([i]); return; }
+      const g = byKey.get(o.group);
+      if (g) g.push(i); else { const n = [i]; byKey.set(o.group, n); groups.push(n); }
+    });
+  }
+
+  // ids: 1..N meshes, then one id per multi-part assembly, colour groups after
   const meshId = (i: number) => i + 1;
-  const assemblyId = objects.length + 1;
-  let nextId = assemblyId + 1;
+  let nextId = objects.length + 1;
+  const assemblyId = new Map<number[], number>();
+  for (const g of groups) if (g.length > 1) assemblyId.set(g, nextId++);
   const colorGroupIds = new Map<number, number>();
   if (withColors) for (const o of objects) { const s = slotOf(o); if (!colorGroupIds.has(s)) colorGroupIds.set(s, nextId++); }
+  const groupName = (g: number[]) => (groups.length === 1 ? title : `${objects[g[0]!]!.name} + ${g.length - 1}`);
+  const I = '1 0 0 0 1 0 0 0 1 0 0 0';
 
   const m: string[] = [];
   m.push('<?xml version="1.0" encoding="UTF-8"?>');
@@ -81,14 +101,14 @@ export function to3MF(objects: ThreeMFObject[], title = 'Forma model', opts: Thr
     const color = withColors ? ` pid="${colorGroupIds.get(slotOf(o))}" pindex="0"` : '';
     m.push(`<object id="${meshId(i)}" name="${esc(o.name)}" type="model"${color}><mesh><vertices>${v.join('')}</vertices><triangles>${t.join('')}</triangles></mesh></object>`);
   });
-  if (layout === 'parts') {
-    m.push(`<object id="${assemblyId}" name="${esc(title)}" type="model"><components>`);
-    objects.forEach((_, i) => m.push(`<component objectid="${meshId(i)}" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>`));
+  for (const g of groups) {
+    if (g.length < 2) continue;
+    m.push(`<object id="${assemblyId.get(g)}" name="${esc(groupName(g))}" type="model"><components>`);
+    for (const i of g) m.push(`<component objectid="${meshId(i)}" transform="${I}"/>`);
     m.push('</components></object>');
   }
   m.push('</resources><build>');
-  if (layout === 'parts') m.push(`<item objectid="${assemblyId}" transform="1 0 0 0 1 0 0 0 1 0 0 0" printable="1"/>`);
-  else objects.forEach((_, i) => m.push(`<item objectid="${meshId(i)}" transform="1 0 0 0 1 0 0 0 1 0 0 0" printable="1"/>`));
+  for (const g of groups) m.push(`<item objectid="${g.length > 1 ? assemblyId.get(g) : meshId(g[0]!)}" transform="${I}" printable="1"/>`);
   m.push('</build></model>');
 
   // Bambu Studio / Orca: Metadata/model_settings.config
@@ -101,27 +121,27 @@ export function to3MF(objects: ThreeMFObject[], title = 'Forma model', opts: Thr
     `      <mesh_stat face_count="${o.mesh.indices.length / 3}" edges_fixed="0" degenerate_facets="0" facets_removed="0" facets_reversed="0" backwards_edges="0"/>`,
     '    </part>',
   ].join('\n');
-  if (layout === 'parts') {
-    b.push(`  <object id="${assemblyId}">`, `    <metadata key="name" value="${esc(title)}"/>`, `    <metadata key="extruder" value="${objects[0] ? slotOf(objects[0]) : 1}"/>`);
-    objects.forEach((o, i) => b.push(part(o, meshId(i))));
+  for (const g of groups) {
+    const multi = g.length > 1;
+    const first = objects[g[0]!]!;
+    b.push(`  <object id="${multi ? assemblyId.get(g) : meshId(g[0]!)}">`, `    <metadata key="name" value="${esc(multi ? groupName(g) : first.name)}"/>`, `    <metadata key="extruder" value="${slotOf(first)}"/>`);
+    for (const i of g) b.push(part(objects[i]!, meshId(i)));
     b.push('  </object>');
-  } else {
-    objects.forEach((o, i) => b.push(`  <object id="${meshId(i)}">`, `    <metadata key="name" value="${esc(o.name)}"/>`, `    <metadata key="extruder" value="${slotOf(o)}"/>`, part(o, meshId(i)), '  </object>'));
   }
   b.push('</config>');
 
-  // PrusaSlicer: Metadata/Slic3r_PE_model.config (volumes addressed by triangle ranges inside one object)
+  // PrusaSlicer: Metadata/Slic3r_PE_model.config (volumes addressed by triangle ranges; components are flattened into one mesh on import)
   const pr: string[] = ['<?xml version="1.0" encoding="UTF-8"?>', '<config>'];
   const prusaVolume = (o: ThreeMFObject, first: number, last: number) =>
     `    <volume firstid="${first}" lastid="${last}">\n      <metadata type="volume" key="name" value="${esc(o.name)}"/>\n      <metadata type="volume" key="volume_type" value="ModelPart"/>\n      <metadata type="volume" key="extruder" value="${slotOf(o)}"/>\n    </volume>`;
-  if (layout === 'parts') {
-    pr.push(`  <object id="${assemblyId}" instances_count="1">`, `    <metadata type="object" key="name" value="${esc(title)}"/>`);
-    // PrusaSlicer flattens components into one mesh, so ranges run on across parts
-    let first = 0;
-    for (const o of objects) { const n = o.mesh.indices.length / 3; pr.push(prusaVolume(o, first, first + n - 1)); first += n; }
+  for (const g of groups) {
+    const multi = g.length > 1;
+    const first = objects[g[0]!]!;
+    pr.push(`  <object id="${multi ? assemblyId.get(g) : meshId(g[0]!)}" instances_count="1">`, `    <metadata type="object" key="name" value="${esc(multi ? groupName(g) : first.name)}"/>`);
+    if (!multi) pr.push(`    <metadata type="object" key="extruder" value="${slotOf(first)}"/>`);
+    let tri = 0;
+    for (const i of g) { const o = objects[i]!, n = o.mesh.indices.length / 3; pr.push(prusaVolume(o, tri, tri + n - 1)); tri += n; }
     pr.push('  </object>');
-  } else {
-    objects.forEach((o, i) => pr.push(`  <object id="${meshId(i)}" instances_count="1">`, `    <metadata type="object" key="name" value="${esc(o.name)}"/>`, `    <metadata type="object" key="extruder" value="${slotOf(o)}"/>`, prusaVolume(o, 0, o.mesh.indices.length / 3 - 1), '  </object>'));
   }
   pr.push('</config>');
 
