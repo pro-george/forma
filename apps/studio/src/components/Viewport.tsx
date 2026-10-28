@@ -13,6 +13,8 @@ import { useHover, faceAt } from '../state/hover';
 import { useMenu, longPress, type MenuHit } from '../state/menu';
 import { DimensionTags } from './DimensionTags';
 import { useEdges, edgesFor, edgeJustClicked } from '../state/edges';
+import { useTool } from '../state/tool';
+import { useDrag } from '../state/drag';
 export { useViewStore };
 
 const cssVar = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888';
@@ -53,33 +55,36 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
   const isHole = feature.role !== 'solid';
   const hasError = !!result?.error;
   const hover = useHover((h) => (h.hover?.partId === feature.id ? h.hover : null));
-  const pushArmed = usePushPull((s) => s.armed);
+  const tool = useTool((s) => s.tool);
+  const pending = usePushPull((s) => (s.pending?.partId === feature.id ? s.pending : null));
   const slotColor = useStore((s) => s.doc.filaments[feature.filament - 1]?.color ?? s.doc.filaments[0]!.color);
-  // faces are draggable on the selected part (modeless) or on any part while push/pull is armed
-  const draggable = (selected || pushArmed) && !ghost && !picking;
+  // faces light up and can be dragged only in the Push / Pull tool (or while picking a plane to sketch on)
+  const draggable = tool === 'pushpull' && !ghost && !picking;
+  const showFace = (draggable || picking) && !ghost;
+  const litFace = hover?.face ?? (pending && result ? faceAt(result.mesh, pending.faceIndex) : null);
   const faceGeometry = useMemo(() => {
-    if (!geometry || !hover?.face || !draggable) return null;
+    if (!geometry || !litFace || !showFace) return null;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', geometry.getAttribute('position'));
-    const idx = new Uint32Array(hover.face.triangles.length * 3);
+    const idx = new Uint32Array(litFace.triangles.length * 3);
     const src = result!.mesh.indices;
-    hover.face.triangles.forEach((tri, k) => { idx[k * 3] = src[tri * 3]!; idx[k * 3 + 1] = src[tri * 3 + 1]!; idx[k * 3 + 2] = src[tri * 3 + 2]!; });
+    litFace.triangles.forEach((tri, k) => { idx[k * 3] = src[tri * 3]!; idx[k * 3 + 1] = src[tri * 3 + 1]!; idx[k * 3 + 2] = src[tri * 3 + 2]!; });
     g.setIndex(new THREE.BufferAttribute(idx, 1));
     return g;
-  }, [geometry, hover?.face, draggable, result]);
+  }, [geometry, litFace, showFace, result]);
   useEffect(() => () => faceGeometry?.dispose(), [faceGeometry]);
   const setHover = useHover.getState().set;
   const lpHit = useRef<{ x: number; y: number; hit: MenuHit } | null>(null);
-  const lp = useMemo(() => longPress(() => { const h = lpHit.current; if (h) { usePushPull.getState().end(); useMenu.getState().show(h.x, h.y, h.hit); } }), []);
+  const lp = useMemo(() => longPress(() => { const h = lpHit.current; if (h) { usePushPull.getState().end(); useDrag.getState().end(); useMenu.getState().show(h.x, h.y, h.hit); } }), []);
   return (
     <group position={[t.position.x, t.position.y, t.position.z]} rotation={[deg(t.rotation.x), deg(t.rotation.y), deg(t.rotation.z), 'ZYX']}>
       {geometry && (geometry.attributes.position?.count ?? 0) > 0 && (
         <mesh geometry={geometry} castShadow receiveShadow userData={{ id: feature.id }}
           onPointerMove={(e) => {
             lp.move(e.nativeEvent.clientX, e.nativeEvent.clientY);
-            if (useSketch.getState().active || usePushPull.getState().drag || e.faceIndex === undefined || e.faceIndex === null || !result) return;
+            if (useSketch.getState().active || usePushPull.getState().drag || useDrag.getState().drag || e.faceIndex === undefined || e.faceIndex === null || !result) return;
             e.stopPropagation();
-            setHover({ partId: feature.id, faceIndex: e.faceIndex, face: draggable ? faceAt(result.mesh, e.faceIndex) : null });
+            setHover({ partId: feature.id, faceIndex: e.faceIndex, face: showFace ? faceAt(result.mesh, e.faceIndex) : null });
           }}
           onPointerOut={() => { if (useHover.getState().hover?.partId === feature.id) setHover(null); lp.cancel(); }}
           onPointerUp={() => lp.cancel()}
@@ -97,15 +102,42 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
               lpHit.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY, hit: { point: [e.point.x, e.point.y, e.point.z], normal: [n.x, n.y, n.z], partId: feature.id, faceIndex: e.faceIndex ?? undefined } };
               lp.start(e.nativeEvent.clientX, e.nativeEvent.clientY);
             }
-            if (!draggable || e.button !== 0 || e.faceIndex === undefined || e.faceIndex === null || !result) return;
-            if (!faceAt(result.mesh, e.faceIndex)) return; // curved surface: let the orbit have it
-            e.stopPropagation();
-            const ray = { origin: [e.ray.origin.x, e.ray.origin.y, e.ray.origin.z] as [number, number, number], dir: [e.ray.direction.x, e.ray.direction.y, e.ray.direction.z] as [number, number, number] };
-            if (usePushPull.getState().begin(feature.id, e.faceIndex, [e.point.x, e.point.y, e.point.z], ray)) (e.target as Element & { setPointerCapture?: (id: number) => void }).setPointerCapture?.(e.pointerId);
+            if (e.button !== 0 || ghost || picking || useSketch.getState().active) return;
+            const t = useTool.getState().tool;
+            if (t === 'pushpull') {
+              if (e.faceIndex === undefined || e.faceIndex === null || !result) return;
+              if (!faceAt(result.mesh, e.faceIndex)) return; // curved surface: let the orbit have it
+              e.stopPropagation();
+              const ray = { origin: [e.ray.origin.x, e.ray.origin.y, e.ray.origin.z] as [number, number, number], dir: [e.ray.direction.x, e.ray.direction.y, e.ray.direction.z] as [number, number, number] };
+              // a press only remembers the face; it becomes a drag after a few pixels, or a pick on release
+              usePushPull.getState().pressAt(feature.id, e.faceIndex, [e.point.x, e.point.y, e.point.z], ray, e.nativeEvent.clientX, e.nativeEvent.clientY);
+              return;
+            }
+            if (t === 'select' || t === 'move') {
+              // press selects (⇧ adds) and starts sliding the selection on the plate
+              e.stopPropagation();
+              const st = useStore.getState();
+              const add = e.shiftKey || e.metaKey || e.ctrlKey;
+              if (!st.selection.includes(feature.id)) st.select([feature.id], add ? 'add' : 'replace');
+              useEdges.getState().clear();
+              useDrag.getState().begin(useStore.getState().selection, [e.point.x, e.point.y, e.point.z]);
+            }
           }}
           onClick={(e) => {
-            if (usePushPull.getState().justDragged()) { e.stopPropagation(); return; }
-            if (!picking) { useEdges.getState().clear(); onSelect(e); return; }
+            if (usePushPull.getState().justDragged() || useDrag.getState().justDragged()) { e.stopPropagation(); return; }
+            if (!picking) {
+              const t = useTool.getState().tool;
+              if (t === 'pushpull') {
+                // clicks on faces are handled on release by the press logic; a click elsewhere on the part just selects it
+                if (result && e.faceIndex !== undefined && e.faceIndex !== null && faceAt(result.mesh, e.faceIndex)) { e.stopPropagation(); return; }
+                useStore.getState().toast('That face is not flat — push/pull needs a flat face');
+                onSelect(e);
+                return;
+              }
+              if (t !== 'edges') useEdges.getState().clear();
+              onSelect(e);
+              return;
+            }
             if (!e.face) return;
             e.stopPropagation();
             // face normal → world space, point → world space
@@ -130,7 +162,7 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
         </mesh>
       )}
       {selected && !ghost && result && !result.error && <DimensionTags feature={feature} result={result} />}
-      {selected && !ghost && result && !result.error && <EdgeLayer partId={feature.id} mesh={result.mesh} accent={colors.accent} />}
+      {selected && !ghost && tool === 'edges' && result && !result.error && <EdgeLayer partId={feature.id} mesh={result.mesh} accent={colors.accent} />}
       {hasError && (
         <mesh onClick={onSelect}>
           <boxGeometry args={[10, 10, 10]} />
@@ -198,7 +230,7 @@ function SelectionGizmo({ primary, mode }: { primary: Feature; mode: 'translate'
       mode={mode}
       translationSnap={1}
       rotationSnap={deg(5)}
-      size={0.8}
+      size={1.15}
       onMouseDown={() => {
         beginGesture();
         const d = useStore.getState().doc;
@@ -278,22 +310,41 @@ function ViewController({ controls }: { controls: React.RefObject<OrbitControlsI
 function PushPullHandler() {
   const { camera, gl } = useThree();
   const drag = usePushPull((s) => s.drag);
+  const press = usePushPull((s) => s.press);
   const colors = useThemeColors();
   useEffect(() => {
-    if (!drag) return;
+    if (!drag && !press) return;
     const ray = new THREE.Raycaster();
     const onMove = (ev: PointerEvent) => {
+      const pp = usePushPull.getState();
+      if (pp.press && !pp.drag) {
+        // a press turns into a drag once the pointer has really moved
+        if (Math.hypot(ev.clientX - pp.press.x, ev.clientY - pp.press.y) < 4) return;
+        const pr = pp.press;
+        usePushPull.setState({ press: null });
+        if (!pp.begin(pr.partId, pr.faceIndex, pr.point, pr.ray)) return;
+      }
       const r = gl.domElement.getBoundingClientRect();
       const ndc = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(ndc, camera);
       usePushPull.getState().move([ray.ray.origin.x, ray.ray.origin.y, ray.ray.origin.z], [ray.ray.direction.x, ray.ray.direction.y, ray.ray.direction.z]);
     };
-    const onUp = () => usePushPull.getState().end();
+    const onUp = () => {
+      const pp = usePushPull.getState();
+      if (pp.press && !pp.drag) {
+        // a click: keep the face, show the handle, take a typed distance
+        const pr = pp.press;
+        usePushPull.setState({ press: null });
+        pp.pick(pr.partId, pr.faceIndex);
+        return;
+      }
+      pp.end();
+    };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp, { once: true });
     window.addEventListener('pointercancel', onUp, { once: true });
     return () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp); };
-  }, [drag?.featureId, camera, gl]);
+  }, [drag?.featureId, press, camera, gl]);
   if (!drag) return null;
   const o = new THREE.Vector3(...drag.origin), n = new THREE.Vector3(...drag.normal);
   const tip = o.clone().addScaledVector(n, drag.distance);
@@ -310,6 +361,68 @@ function PushPullHandler() {
   );
 }
 
+/** Drives a plate drag (sliding selected parts) from window pointer events. */
+function PlateDragHandler() {
+  const { camera, gl } = useThree();
+  const drag = useDrag((s) => s.drag);
+  useEffect(() => {
+    if (!drag) return;
+    const ray = new THREE.Raycaster();
+    const onMove = (ev: PointerEvent) => {
+      const r = gl.domElement.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+      useDrag.getState().move([ray.ray.origin.x, ray.ray.origin.y, ray.ray.origin.z], [ray.ray.direction.x, ray.ray.direction.y, ray.ray.direction.z], ev.shiftKey ? 10 : 1);
+    };
+    const onUp = () => useDrag.getState().end();
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+    window.addEventListener('pointercancel', onUp, { once: true });
+    return () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp); };
+  }, [drag, camera, gl]);
+  return null;
+}
+
+/**
+ * Handle on a clicked face in the Push / Pull tool: an arrow along the
+ * normal you can drag, and a chip that takes a typed distance (Enter
+ * applies, negative cuts).
+ */
+function FaceHandle() {
+  const pending = usePushPull((s) => s.pending);
+  const typed = usePushPull((s) => s.typed);
+  const colors = useThemeColors();
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (pending) requestAnimationFrame(() => inputRef.current?.focus()); }, [pending]);
+  if (!pending) return null;
+  const o = new THREE.Vector3(...pending.origin), n = new THREE.Vector3(...pending.normal);
+  const tip = o.clone().addScaledVector(n, 14);
+  const apply = () => usePushPull.getState().commitTyped();
+  return (
+    <group>
+      <Line points={[o, tip]} color={colors.accent} lineWidth={3} depthTest={false} />
+      <mesh position={tip} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n)}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          e.stopPropagation();
+          const ray = { origin: [e.ray.origin.x, e.ray.origin.y, e.ray.origin.z] as [number, number, number], dir: [e.ray.direction.x, e.ray.direction.y, e.ray.direction.z] as [number, number, number] };
+          usePushPull.getState().begin(pending.partId, pending.faceIndex, pending.origin, ray);
+        }}>
+        <coneGeometry args={[2.2, 6, 16]} />
+        <meshBasicMaterial color={colors.accent} depthTest={false} />
+      </mesh>
+      <Html position={tip} style={{ transform: 'translate(16px, -16px)' }} zIndexRange={[30, 0]}>
+        <form className="face-chip" onSubmit={(e) => { e.preventDefault(); apply(); }} onPointerDown={(e) => e.stopPropagation()}>
+          <input ref={inputRef} className="dim-input" value={typed} placeholder="mm" inputMode="decimal"
+            onChange={(e) => usePushPull.setState({ typed: e.target.value.replace(/[^0-9.\-]/g, '').slice(0, 8) })}
+            onKeyDown={(e) => { if (e.key === 'Escape') { usePushPull.setState({ pending: null, typed: '' }); } e.stopPropagation(); }} />
+          <small>type a distance, Enter · negative cuts · or drag the arrow</small>
+        </form>
+      </Html>
+    </group>
+  );
+}
+
 /** Invisible ground: remembers where the pointer is (new parts land there) and opens the radial menu on right-click / long-press. */
 function GroundPlane() {
   const lp = useMemo(() => longPress(() => { const h = pending.current; if (h) useMenu.getState().show(h.x, h.y, { point: h.point, normal: [0, 0, 1] }); }), []);
@@ -321,11 +434,12 @@ function GroundPlane() {
         lp.move(e.nativeEvent.clientX, e.nativeEvent.clientY);
       }}
       onPointerDown={(e) => {
-        if (useSketch.getState().active || usePushPull.getState().armed) return;
+        if (useSketch.getState().active) return;
         pending.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY, point: [e.point.x, e.point.y, 0] };
         if (e.nativeEvent.pointerType === 'touch') lp.start(e.nativeEvent.clientX, e.nativeEvent.clientY);
       }}
       onPointerUp={() => lp.cancel()}
+      onClick={(e) => { if (useSketch.getState().pickingFace && e.button === 0 && (e.delta ?? 0) < 4) { e.stopPropagation(); useSketch.getState().createAndStartAt([e.point.x, e.point.y, 0]); } }}
       onContextMenu={(e) => { if (useSketch.getState().active) return; e.nativeEvent.preventDefault(); useMenu.getState().show(e.nativeEvent.clientX, e.nativeEvent.clientY, { point: [e.point.x, e.point.y, 0], normal: [0, 0, 1] }); }}>
       <planeGeometry args={[6000, 6000]} />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -337,12 +451,14 @@ function GroundPlane() {
 function CursorFeedback() {
   const { gl } = useThree();
   const hoverFace = useHover((h) => !!h.hover?.face);
+  const hoverPart = useHover((h) => !!h.hover);
   const picking = useSketch((s) => s.pickingFace);
-  const armed = usePushPull((s) => s.armed);
+  const tool = useTool((s) => s.tool);
   const dragging = usePushPull((s) => !!s.drag);
+  const sliding = useDrag((s) => !!s.drag);
   useEffect(() => {
-    gl.domElement.style.cursor = dragging ? 'grabbing' : hoverFace ? 'grab' : picking || armed ? 'crosshair' : '';
-  }, [gl, hoverFace, picking, armed, dragging]);
+    gl.domElement.style.cursor = dragging || sliding ? 'grabbing' : picking ? 'crosshair' : tool === 'pushpull' ? (hoverFace ? 'ns-resize' : 'crosshair') : hoverPart && (tool === 'select' || tool === 'move') ? 'grab' : '';
+  }, [gl, hoverFace, hoverPart, picking, tool, dragging, sliding]);
   return null;
 }
 
@@ -357,8 +473,9 @@ function Scene() {
   const sketching = useSketch((s) => s.active?.featureId ?? null);
   const pickingFace = useSketch((s) => s.pickingFace);
   const pushDragging = usePushPull((s) => !!s.drag);
-  const pushArmed = usePushPull((s) => s.armed);
-  const gizmoMode = useViewStore((s) => s.gizmoMode);
+  const pushPressed = usePushPull((s) => !!s.press);
+  const plateDragging = useDrag((s) => !!s.drag);
+  const tool = useTool((s) => s.tool);
   const colors = useThemeColors();
   const controls = useRef<OrbitControlsImpl | null>(null);
   const viewDoc = useStore((s) => s.viewDoc);
@@ -377,12 +494,14 @@ function Scene() {
         <Part key={f.id} feature={f} result={results.get(f.id)} selected={selection.includes(f.id)} colors={colors} wireframe={wireframe} printLook={printLook} ghost={sketching === f.id} picking={pickingFace}
           onSelect={(e) => { if (sketching) return; e.stopPropagation(); select([f.id], e.shiftKey || e.metaKey || e.ctrlKey ? 'toggle' : 'replace'); }} />
       ))}
-      {primary && !sketching && !pushArmed && <SelectionGizmo key={primary.id + gizmoMode} primary={primary} mode={gizmoMode} />}
+      {primary && !sketching && (tool === 'move' || tool === 'rotate') && <SelectionGizmo key={primary.id + tool} primary={primary} mode={tool === 'move' ? 'translate' : 'rotate'} />}
       <SketchLayer colors={colors} />
       <PushPullHandler />
+      <FaceHandle />
+      <PlateDragHandler />
       <CursorFeedback />
       <GroundPlane />
-      <OrbitControls ref={controls} makeDefault enabled={!pushDragging} enableDamping dampingFactor={0.12} minDistance={10} maxDistance={3000} maxPolarAngle={sketching ? Math.PI : Math.PI / 2 + 0.25}
+      <OrbitControls ref={controls} makeDefault enabled={!pushDragging && !plateDragging && !pushPressed} enableDamping dampingFactor={0.12} minDistance={10} maxDistance={3000} maxPolarAngle={sketching ? Math.PI : Math.PI / 2 + 0.25}
         mouseButtons={sketching ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }} />
       <GizmoHelper alignment="bottom-right" margin={[70, 110]}>
         <GizmoViewport axisColors={['#e0574f', '#5fb37a', '#6ea0ff']} labelColor="white" />
@@ -401,7 +520,7 @@ export function Viewport() {
       dpr={[1, 2]}
       camera={{ position: [170, -170, 130], up: [0, 0, 1], fov: 38, near: 0.5, far: 6000 }}
       onCreated={({ camera }) => { camera.up.set(0, 0, 1); camera.lookAt(0, 0, 0); }}
-      onPointerMissed={(e) => { if (!useSketch.getState().active && e.button === 0 && !edgeJustClicked() && !usePushPull.getState().justDragged()) { useEdges.getState().clear(); clearSelection(); } }}
+      onPointerMissed={(e) => { if (!useSketch.getState().active && e.button === 0 && !edgeJustClicked() && !usePushPull.getState().justDragged() && !useDrag.getState().justDragged()) { useEdges.getState().clear(); usePushPull.setState({ pending: null, typed: '' }); clearSelection(); } }}
       gl={{ antialias: true, preserveDrawingBuffer: true }}
     >
       <Scene />

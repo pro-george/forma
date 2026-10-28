@@ -144,7 +144,7 @@ export const useSketch = create<SketchState>((set, get) => {
     },
     pickingFace: false,
     host: null,
-    armFacePick: () => { set({ pickingFace: true }); useStore.getState().toast('Click a flat face to sketch on it (Esc to cancel)'); },
+    armFacePick: () => set({ pickingFace: true }),
     disarmFacePick: () => set({ pickingFace: false }),
     startOnFace: (partId, point, normal) => {
       const st = useStore.getState();

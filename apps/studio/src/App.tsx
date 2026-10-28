@@ -13,6 +13,7 @@ import { MobileShell } from './components/MobileShell';
 import { useIsMobile } from './state/media';
 import { usePushPull } from './state/pushpull';
 import { useEdges } from './state/edges';
+import { useTool } from './state/tool';
 import { RadialMenu } from './components/RadialMenu';
 import { Timeline } from './components/Timeline';
 import { ContextMenu } from './components/ContextMenu';
@@ -46,7 +47,14 @@ function useShortcuts() {
         return;
       }
       if (sketch.pickingFace && e.key === 'Escape') { sketch.disarmFacePick(); return; }
-      if (usePushPull.getState().armed && e.key === 'Escape') { usePushPull.getState().disarm(); return; }
+      const pp = usePushPull.getState();
+      if (pp.pending && !meta) {
+        if (/^[0-9.-]$/.test(e.key)) { pp.typeChar(e.key); return; }
+        if (e.key === 'Enter') { pp.commitTyped(); return; }
+        if (e.key === 'Backspace') { usePushPull.setState({ typed: pp.typed.slice(0, -1) }); return; }
+        if (e.key === 'Escape') { usePushPull.setState({ pending: null, typed: '' }); return; }
+      }
+      if (e.key === 'Escape' && useTool.getState().tool !== 'select') { useTool.getState().set('select'); return; }
       if (meta && k === 'z') { e.preventDefault(); e.shiftKey ? s.redo() : s.undo(); return; }
       if (meta && k === 'y') { e.preventDefault(); s.redo(); return; }
       if (meta && k === 'g') { e.preventDefault(); e.shiftKey ? s.ungroupSelected() : s.combineSelected(); return; }
@@ -62,18 +70,19 @@ function useShortcuts() {
       if (e.key === 'ArrowRight') { s.moveSelectionBy(nudge, 0, 0); return; }
       if (e.key === 'ArrowUp') { s.moveSelectionBy(0, nudge, 0); return; }
       if (e.key === 'ArrowDown') { s.moveSelectionBy(0, -nudge, 0); return; }
+      const tool = useTool.getState();
       switch (k) {
         case 'b': s.addPrimitive('box'); break;
         case 'c': s.addPrimitive('cylinder'); break;
         case 's': s.addPrimitive('sphere'); break;
-        case 'v': s.addPrimitive('revolve'); break;
-        case 'k': e.shiftKey ? sketch.armFacePick() : sketch.createAndStart(); break;
-        case 'p': { const pp = usePushPull.getState(); pp.armed ? pp.disarm() : pp.arm(); break; }
+        case 'k': sketch.pickingFace ? sketch.disarmFacePick() : sketch.armFacePick(); break;
+        case 'v': tool.set('select'); break;
+        case 'm': case 'w': tool.set('move'); break;
+        case 'r': case 'e': if (e.shiftKey) s.rotateSelected(90); else tool.set('rotate'); break;
+        case 'p': case 'q': tool.set(tool.tool === 'pushpull' ? 'select' : 'pushpull'); break;
+        case 'f': tool.set(tool.tool === 'edges' ? 'select' : 'edges'); break;
         case 'h': s.toggleRole(); break;
-        case 'r': s.rotateSelected(e.shiftKey ? -90 : 90); break;
-        case 'w': v.setGizmoMode('translate'); break;
-        case 'e': v.setGizmoMode('rotate'); break;
-        case 'f': v.fit(); break;
+        case 'z': v.fit(); break;
         case 'g': s.toggleGrid(); break;
       }
     };

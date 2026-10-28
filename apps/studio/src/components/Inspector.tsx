@@ -73,8 +73,8 @@ export function Inspector() {
       <FilamentPalette />
       <h3>Keys</h3>
       <div className="keys">
-        <span><b>B</b> box</span><span><b>C</b> cylinder</span><span><b>S</b> sphere</span><span><b>V</b> revolve</span><span><b>K</b> sketch</span><span><b>P</b> push/pull</span>
-        <span><b>H</b> hole ⇄ solid</span><span><b>W</b>/<b>E</b> move/rotate</span><span><b>⌘G</b> combine</span><span><b>⌘D</b> duplicate</span><span><b>⌫</b> delete</span><span><b>⌘Z</b> undo</span><span><b>F</b> fit</span><span><b>G</b> grid</span>
+        <span><b>V</b> select</span><span><b>M</b> move</span><span><b>R</b> rotate</span><span><b>P</b> push/pull</span><span><b>F</b> fillet</span><span><b>K</b> sketch</span><span><b>Esc</b> back to select</span>
+        <span><b>B</b> box</span><span><b>C</b> cylinder</span><span><b>S</b> sphere</span><span><b>H</b> hole ⇄ solid</span><span><b>⌘G</b> combine</span><span><b>⌘D</b> duplicate</span><span><b>⌫</b> delete</span><span><b>⌘Z</b> undo</span><span><b>Z</b> fit view</span><span><b>G</b> grid</span>
       </div>
     </div>
   );
