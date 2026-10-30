@@ -35,7 +35,7 @@ export function SketchLayer({ colors }: { colors: Colors }) {
   const rectMode = useSketch((s) => s.rectMode);
   const circleMode = useSketch((s) => s.circleMode);
   const regions = useSel((s) => s.regions);
-  const touch = useUI((u) => u.touch);
+  const touch = useUI((u) => u.touch || u.phone);
   const { camera, size } = useThree();
   const press = useRef<{ local: Vec2; x: number; y: number } | null>(null);
   const doc = useStore((s) => s.doc);
@@ -123,6 +123,7 @@ export function SketchLayer({ colors }: { colors: Colors }) {
         onPointerDown={(e) => {
           if (e.button !== 0) return;
           const l = localOf(e); reportScale(l);
+          if (e.nativeEvent.pointerType === 'touch') api.move(l, mods(e)); // a tap has no hover before it: give the state a cursor
           if (active.tool === 'select') { if (api.beginVertexDrag(l)) e.stopPropagation(); return; }
           // touch: a press that turns into a drag draws the shape in one gesture (press = first point, release = second)
           if (e.nativeEvent.pointerType === 'touch' && !active.draft.length && ['line', 'rect', 'circle', 'polygon'].includes(active.tool)) press.current = { local: l, x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };

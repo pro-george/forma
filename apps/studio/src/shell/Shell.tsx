@@ -55,24 +55,19 @@ function usePopup<T extends HTMLElement>() {
 
 /* ---------- top-left: [logo][menu][project] ---------- */
 
-function TopLeft() {
+/** The ☰ menu's rows (shared by the floating shell and the phone sheet). */
+export function MenuItems({ close }: { close: () => void }) {
   const s = useStore();
   const [, force] = useState(0);
   useEffect(() => useStore.subscribe(() => force((n) => n + 1)), []);
-  const menu = usePopup<HTMLDivElement>();
   const fileInput = useRef<HTMLInputElement>(null);
   const view = useViewStore.getState();
   const ui = useUI();
   const item = (label: string, run: () => void, extra?: ReactNode, disabled?: boolean) => (
-    <button disabled={disabled} onClick={() => { run(); menu.setOpen(false); }}>{label}{extra && <small>{extra}</small>}</button>
+    <button key={label} disabled={disabled} onClick={() => { run(); close(); }}>{label}{extra && <small>{extra}</small>}</button>
   );
   return (
-    <div className="chips tl">
-      <div className="chip logo">F</div>
-      <div className="dd" ref={menu.ref}>
-        <IconButton icon={<Icon.menu />} tip="Menu: file, edit, view, help and settings" onClick={() => menu.setOpen(!menu.open)} on={menu.open} />
-        {menu.open && (
-          <div className="popup menu-list big">
+    <>
             <h6>File</h6>
             {item('New Project', () => s.newDocument())}
             {item('Open Project…', () => fileInput.current?.click())}
@@ -103,11 +98,24 @@ function TopLeft() {
             {item('Getting Started', () => ui.setTour(true))}
             {item('Keyboard Shortcuts', () => ui.setShortcuts(true))}
             {item('About Forma', () => s.toast('Forma — browser CAD for 3D printing. Geometry by Manifold; interaction model after Materializr (GPLv3).'))}
-          </div>
-        )}
+      <input ref={fileInput} type="file" accept=".forma,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) s.openFile(f); e.target.value = ''; }} />
+    </>
+  );
+}
+
+function TopLeft() {
+  const s = useStore();
+  const [, force] = useState(0);
+  useEffect(() => useStore.subscribe(() => force((n) => n + 1)), []);
+  const menu = usePopup<HTMLDivElement>();
+  return (
+    <div className="chips tl">
+      <div className="chip logo">F</div>
+      <div className="dd" ref={menu.ref}>
+        <IconButton icon={<Icon.menu />} tip="Menu: file, edit, view, help and settings" onClick={() => menu.setOpen(!menu.open)} on={menu.open} />
+        {menu.open && <div className="popup menu-list big"><MenuItems close={() => menu.setOpen(false)} /></div>}
       </div>
       <input className="chip name" aria-label="Project name" value={s.doc.name} onChange={(e) => s.setDoc({ ...s.doc, name: e.target.value }, { undoable: false })} />
-      <input ref={fileInput} type="file" accept=".forma,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) s.openFile(f); e.target.value = ''; }} />
     </div>
   );
 }
@@ -136,16 +144,14 @@ function TopRight() {
 
 /* ---------- top-centre: selection chip ---------- */
 
-function SelectionChip() {
+/** One line describing the selection with its measurements (Materializr's SelectionInfo). */
+export function useSelectionText(): string {
   const sel = useStore((s) => s.selection);
   const faces = useSel((x) => x.faces);
   const edges = useSel((x) => x.edges);
   const regions = useSel((x) => x.regions);
-  const op = useOp((o) => o.op);
-  const inSketch = useSketch((k) => !!k.active);
   const results = useStore((s) => s.results);
   const doc = useStore((s) => s.doc);
-  if (op || inSketch) return null;
   let text = '';
   if (edges.length === 1) {
     // Materializr's edge readout: length, plus the angle between the two faces
@@ -177,7 +183,14 @@ function SelectionChip() {
     const f = featureById(doc, sel[0]!); const r = results.get(sel[0]!);
     text = f ? `${f.name}${r && !r.error ? ` · ${fmt(r.bbox.max.x - r.bbox.min.x)} × ${fmt(r.bbox.max.y - r.bbox.min.y)} × ${fmt(r.bbox.max.z - r.bbox.min.z)} mm · ${fmt(r.volume / 1000)} cm³` : ''}` : '';
   } else if (sel.length > 1) text = `Selection: Body (${sel.length})`;
-  if (!text) return null;
+  return text;
+}
+
+function SelectionChip() {
+  const op = useOp((o) => o.op);
+  const inSketch = useSketch((k) => !!k.active);
+  const text = useSelectionText();
+  if (op || inSketch || !text) return null;
   return <div className="chip sel-chip">{text}</div>;
 }
 const fmt = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1).replace(/\.0$/, ''));
@@ -241,7 +254,7 @@ function PolygonSides() {
   );
 }
 
-function iconOf(name: keyof typeof Icon) { const C = Icon[name] ?? Icon.box; return <C />; }
+export function iconOf(name: keyof typeof Icon) { const C = Icon[name] ?? Icon.box; return <C />; }
 
 /* ---------- right edge: transparent items tree ---------- */
 
@@ -337,18 +350,25 @@ function HistoryStrip() {
 }
 
 function StepPopup({ id, index, cursor, onClose, setRollback }: { id: string; index: number; cursor: number; onClose: () => void; setRollback: (i: number | null) => void }) {
+  const s = useStore.getState();
+  const pop = usePopup<HTMLDivElement>();
+  useEffect(() => { pop.setOpen(true); s.select([id]); /* the step's own editor */ }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!pop.open) onClose(); }, [pop.open]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!pop.open) return null;
+  return <div className="popup step-pop" ref={pop.ref}><StepEditor id={id} index={index} cursor={cursor} onClose={onClose} setRollback={setRollback} /></div>;
+}
+
+/** A history step's editor: parameters, Go Here, Disable, Delete (shared by the popup and the phone history sheet). */
+export function StepEditor({ id, index, cursor, onClose, setRollback }: { id: string; index: number; cursor: number; onClose: () => void; setRollback: (i: number | null) => void }) {
   const doc = useStore((s) => s.doc);
   const results = useStore((s) => s.results);
   const s = useStore.getState();
   const f = featureById(doc, id);
-  const pop = usePopup<HTMLDivElement>();
-  useEffect(() => { pop.setOpen(true); s.select([id]); /* the step's own editor */ }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!pop.open) onClose(); }, [pop.open]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!f || !pop.open) return null;
+  if (!f) return null;
   const err = results.get(id)?.error;
   const n = doc.features.length;
   return (
-    <div className="popup step-pop" ref={pop.ref}>
+    <>
       <div className="sp-head">{index + 1}. {f.name}{!f.visible && <small> · Disabled</small>}{index >= cursor && <small> · Undone — Go Here replays it.</small>}</div>
       {err && <div className="sp-err">Couldn't build this step: {err}. Edit its parameters, fix the step before it, or delete it.</div>}
       <div className="sp-body"><Inspector /></div>
@@ -361,7 +381,7 @@ function StepPopup({ id, index, cursor, onClose, setRollback }: { id: string; in
           s.select([id]); s.deleteSelected(); onClose();
         }}>Delete</button>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -481,7 +501,7 @@ function PropsSheet() {
   );
 }
 
-function ShortcutsPanel() {
+export function ShortcutsPanel() {
   const open = useUI((u) => u.shortcuts);
   const set = useUI((u) => u.setShortcuts);
   if (!open) return null;
@@ -505,7 +525,7 @@ function ShortcutsPanel() {
 /* ---------- the shell ---------- */
 
 /** The ring that fills under a finger while a long-press charges (touch only). */
-function LongPressRing() {
+export function LongPressRing() {
   const pressing = useLongPress((s) => s.pressing);
   if (!pressing) return null;
   return (

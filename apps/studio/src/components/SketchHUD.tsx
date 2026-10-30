@@ -28,15 +28,7 @@ export function SketchHUD() {
   const st = sketchStatus(active.featureId);
   const api = useSketch.getState();
   const mode = f.role === 'hole' ? 'cut' : 'join';
-  const hint = {
-    select: regions.length ? 'Region selected — Push in the dock gives it depth (positive adds, negative cuts) · Esc clears' : active.selected ? 'Type its length or radius above · arrows nudge it 1 mm (⇧ 10) · Backspace removes it' : 'Click a segment to select it · click inside a closed region to select the region · drag a corner to move it',
-    line: active.draft.length ? 'Click the next point · type a length and press Enter · click the first point to close' : 'Click to start a line or polyline',
-    rect: active.draft.length ? (active.typedW !== null ? `Width ${active.typedW} locked — type the height and press Enter, or click` : rectMode === 'center' ? 'Click a corner (the first click was the centre) · or type the width, Enter, height, Enter' : 'Click the opposite corner · or type the width, Enter, height, Enter') : rectMode === 'center' ? 'Click the centre' : 'Click the first corner',
-    circle: active.draft.length ? (circleMode === '2pt' ? 'Click the other end of the diameter, or type the diameter and press Enter' : 'Click for the size, or type the diameter and press Enter') : circleMode === '2pt' ? 'Click one end of the diameter' : 'Click the centre',
-    arc: active.draft.length === 0 ? 'Click the start point' : active.draft.length === 1 ? 'Click the end point' : 'Click a point the arc should pass through',
-    polygon: active.draft.length ? 'Click for the size and rotation — the first corner sits under the cursor' : 'Click the centre',
-    trim: 'Click the piece to remove — it is cut back to the nearest crossings',
-  }[active.tool];
+  const hint = sketchHint(active, rectMode, circleMode, regions.length > 0);
   return (
     <div className="sketch-hud">
       <div className="sketch-tools">
@@ -82,4 +74,18 @@ export function SketchHUD() {
       </div>
     </div>
   );
+}
+
+/** The one-line instruction for the current sketch tool and state (shared with the phone bar). */
+export function sketchHint(active: NonNullable<ReturnType<typeof useSketch.getState>['active']>, rectMode: string, circleMode: string, regionSelected: boolean): string {
+  const regions = { length: regionSelected ? 1 : 0 };
+  return {
+    select: regions.length ? 'Region selected — Push in the dock gives it depth (positive adds, negative cuts) · Esc clears' : active.selected ? 'Type its length or radius above · arrows nudge it 1 mm (⇧ 10) · Backspace removes it' : 'Click a segment to select it · click inside a closed region to select the region · drag a corner to move it',
+    line: active.draft.length ? 'Click the next point · type a length and press Enter · click the first point to close' : 'Click to start a line or polyline',
+    rect: active.draft.length ? (active.typedW !== null ? `Width ${active.typedW} locked — type the height and press Enter, or click` : rectMode === 'center' ? 'Click a corner (the first click was the centre) · or type the width, Enter, height, Enter' : 'Click the opposite corner · or type the width, Enter, height, Enter') : rectMode === 'center' ? 'Click the centre' : 'Click the first corner',
+    circle: active.draft.length ? (circleMode === '2pt' ? 'Click the other end of the diameter, or type the diameter and press Enter' : 'Click for the size, or type the diameter and press Enter') : circleMode === '2pt' ? 'Click one end of the diameter' : 'Click the centre',
+    arc: active.draft.length === 0 ? 'Click the start point' : active.draft.length === 1 ? 'Click the end point' : 'Click a point the arc should pass through',
+    polygon: active.draft.length ? 'Click for the size and rotation — the first corner sits under the cursor' : 'Click the centre',
+    trim: 'Click the piece to remove — it is cut back to the nearest crossings',
+  }[active.tool];
 }

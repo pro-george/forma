@@ -2,6 +2,8 @@ import { create } from 'zustand';
 
 /** Shell state remembered per browser: open panels, theme, touch mode, grid step, onboarding. */
 export type PanelId = 'create' | 'layers' | 'props';
+export type PhoneSheet = 'items' | 'history' | 'create' | 'props' | 'menu' | null;
+const PHONE = '(max-width: 600px)';
 
 const KEY = 'forma.ui.v3';
 interface Persisted { light: boolean; touch: boolean; gridStep: number; tree: boolean; timeline: boolean; tourSeen: boolean }
@@ -14,6 +16,10 @@ const save = (p: Persisted) => { try { localStorage.setItem(KEY, JSON.stringify(
 
 export const useUI = create<Persisted & {
   sheet: PanelId | null;
+  /** narrow screen: the phone layout (bottom bar + sheets) replaces the floating im-touch shell */
+  phone: boolean;
+  phoneSheet: PhoneSheet;
+  openPhoneSheet(s: PhoneSheet): void;
   tour: boolean;
   shortcuts: boolean;
   /** legacy panel collapse map (mobile shell) */
@@ -35,6 +41,9 @@ export const useUI = create<Persisted & {
   return {
     ...init,
     sheet: null,
+    phone: matchMedia(PHONE).matches,
+    phoneSheet: null,
+    openPhoneSheet: (phoneSheet) => set({ phoneSheet }),
     tour: !init.tourSeen,
     shortcuts: false,
     collapsed: { create: false, layers: false, props: false },
@@ -51,3 +60,6 @@ export const useUI = create<Persisted & {
     markTourSeen: () => { set({ tourSeen: true, tour: false }); persist(); },
   };
 });
+
+// follow rotations and window resizes
+matchMedia(PHONE).addEventListener('change', (e) => useUI.setState({ phone: e.matches, phoneSheet: null }));

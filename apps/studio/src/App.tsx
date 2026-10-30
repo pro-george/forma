@@ -11,6 +11,7 @@ import { useUI } from './state/ui';
 import { SketchHUD } from './components/SketchHUD';
 import { RadialMenu } from './components/RadialMenu';
 import { Shell } from './shell/Shell';
+import { PhoneShell } from './shell/PhoneShell';
 import { dispatch } from './shell/actions';
 
 /**
@@ -130,14 +131,14 @@ export default function App() {
   useTouchGestures();
   const ready = useStore((s) => s.ready);
   const touch = useUI((u) => u.touch);
+  const phone = useUI((u) => u.phone);
   return (
-    <div className={`app${touch ? ' touch' : ''}`}>
+    <div className={`app${touch || phone ? ' touch' : ''}${phone ? ' phone' : ''}`}>
       <section className="viewport">
         <Viewport />
         {!ready && <div className="loading"><div><div className="spin" />Loading geometry kernel…</div></div>}
       </section>
-      <Shell />
-      <SketchHUD />
+      {phone ? <PhoneShell /> : <><Shell /><SketchHUD /></>}
       <RadialMenu />
       <Toasts />
     </div>
