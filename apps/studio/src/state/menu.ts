@@ -24,12 +24,16 @@ export const useMenu = create<{
   close: () => set({ open: null }),
 }));
 
-/** Long-press detector for touch: call start on pointerdown, cancel on move/up. */
-export function longPress(onFire: () => void, ms = 480) {
+/** Where a long-press is currently charging, so the shell can draw the progress ring under the finger. */
+export const useLongPress = create<{ pressing: { x: number; y: number; ms: number } | null }>(() => ({ pressing: null }));
+
+/** Long-press detector for touch: call start on pointerdown, cancel on move/up. Fires after `ms` if the finger stayed within 8 px. */
+export function longPress(onFire: () => void, ms = 450) {
   let timer = 0, sx = 0, sy = 0;
+  const stop = () => { clearTimeout(timer); timer = 0; if (useLongPress.getState().pressing) useLongPress.setState({ pressing: null }); };
   return {
-    start(x: number, y: number) { sx = x; sy = y; clearTimeout(timer); timer = window.setTimeout(onFire, ms); },
-    move(x: number, y: number) { if (Math.hypot(x - sx, y - sy) > 8) clearTimeout(timer); },
-    cancel() { clearTimeout(timer); },
+    start(x: number, y: number) { sx = x; sy = y; clearTimeout(timer); useLongPress.setState({ pressing: { x, y, ms } }); timer = window.setTimeout(() => { stop(); onFire(); }, ms); },
+    move(x: number, y: number) { if (timer && Math.hypot(x - sx, y - sy) > 8) stop(); },
+    cancel() { stop(); },
   };
 }

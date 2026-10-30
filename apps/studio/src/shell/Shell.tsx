@@ -17,12 +17,15 @@ import { useViewStore } from '../state/view';
 import { useUI } from '../state/ui';
 import { Icon, featureIcon } from '../components/icons';
 import { railTools, SKETCH_PLANES, PRIMITIVES, type RailTool } from './catalogue';
-import { dispatch } from './actions';
+import { dispatch, faceHit } from './actions';
+import { faceAt } from '../state/hover';
+import { edgesFor } from '../state/edges';
 import { Inspector } from '../components/Inspector';
 import { ContextMenu, useContextMenu } from '../components/ContextMenu';
 import { describeChange } from '../components/Timeline';
 import { FilamentPalette } from '../components/Filaments';
 import { Tour } from './Tour';
+import { useLongPress } from '../state/menu';
 
 /* ---------- small widget kit (railButton / iconButton / fab / popup) ---------- */
 
@@ -144,8 +147,31 @@ function SelectionChip() {
   const doc = useStore((s) => s.doc);
   if (op || inSketch) return null;
   let text = '';
-  if (edges.length) text = `Selection: Edge (${edges.length})`;
-  else if (faces.length) text = `Selection: Face (${faces.length})`;
+  if (edges.length === 1) {
+    // Materializr's edge readout: length, plus the angle between the two faces
+    const e = edges[0]!, r = results.get(e.partId);
+    const me = r && !r.error ? edgesFor(r.mesh)[e.index] : undefined;
+    const ang = me ? Math.round((Math.acos(Math.max(-1, Math.min(1, me.nA[0] * me.nB[0] + me.nA[1] * me.nB[1] + me.nA[2] * me.nB[2]))) * 180) / Math.PI) : 0;
+    text = me ? `Edge · ${fmt(me.length)} mm · ${me.convex ? 'convex' : 'concave'} ${ang}°` : 'Selection: Edge (1)';
+  } else if (edges.length) text = `Selection: Edge (${edges.length})`;
+  else if (faces.length === 1) {
+    // face readout: area, centre and normal in world space
+    const fs = faces[0]!, r = results.get(fs.partId), f = featureById(doc, fs.partId);
+    const pf = r && !r.error ? faceAt(r.mesh, fs.faceIndex) : null;
+    if (pf && f) {
+      const P = r!.mesh.positions, I = r!.mesh.indices;
+      let area = 0;
+      for (const t of pf.triangles) {
+        const a = I[t * 3]! * 3, b = I[t * 3 + 1]! * 3, c = I[t * 3 + 2]! * 3;
+        const ux = P[b]! - P[a]!, uy = P[b + 1]! - P[a + 1]!, uz = P[b + 2]! - P[a + 2]!, vx = P[c]! - P[a]!, vy = P[c + 1]! - P[a + 1]!, vz = P[c + 2]! - P[a + 2]!;
+        area += 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
+      }
+      const h = faceHit(fs.partId, fs.faceIndex);
+      const outer = pf.loops[0] ?? [];
+      const n = h ? h.normal : pf.normal;
+      text = `Face · ${fmt(area)} mm² · ${outer.length} corners · normal (${n.map((v) => fmt(v)).join(', ')})`;
+    } else text = 'Selection: Face (1)';
+  } else if (faces.length) text = `Selection: Face (${faces.length})`;
   else if (regions.length) text = `Selection: Region (${regions.length})`;
   else if (sel.length === 1) {
     const f = featureById(doc, sel[0]!); const r = results.get(sel[0]!);
@@ -478,6 +504,18 @@ function ShortcutsPanel() {
 
 /* ---------- the shell ---------- */
 
+/** The ring that fills under a finger while a long-press charges (touch only). */
+function LongPressRing() {
+  const pressing = useLongPress((s) => s.pressing);
+  if (!pressing) return null;
+  return (
+    <svg className="lp-ring" style={{ left: pressing.x, top: pressing.y, animationDuration: `${pressing.ms}ms` }} viewBox="0 0 48 48" aria-hidden>
+      <circle cx="24" cy="24" r="20" />
+      <circle cx="24" cy="24" r="20" className="arc" style={{ animationDuration: `${pressing.ms}ms` }} />
+    </svg>
+  );
+}
+
 export function Shell() {
   const light = useUI((u) => u.light);
   const touch = useUI((u) => u.touch);
@@ -496,6 +534,7 @@ export function Shell() {
       <ContextMenu />
       <ShortcutsPanel />
       <Tour />
+      <LongPressRing />
     </>
   );
 }
