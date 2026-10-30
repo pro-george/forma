@@ -9,6 +9,8 @@ const TOOLS: { id: SketchTool; label: string; key: string }[] = [
   { id: 'rect', label: 'Rectangle', key: 'R' },
   { id: 'circle', label: 'Circle', key: 'C' },
   { id: 'arc', label: 'Arc', key: 'A' },
+  { id: 'polygon', label: 'Polygon', key: 'G' },
+  { id: 'trim', label: 'Trim', key: 'T' },
 ];
 
 export function SketchHUD() {
@@ -28,14 +30,12 @@ export function SketchHUD() {
     rect: active.draft.length ? 'Click the opposite corner' : 'Click the first corner',
     circle: active.draft.length ? 'Click for the radius, or type it and press Enter' : 'Click the centre',
     arc: active.draft.length === 0 ? 'Click the start point' : active.draft.length === 1 ? 'Click the end point' : 'Click a point the arc should pass through',
+    polygon: active.draft.length ? 'Click for the size and rotation — the first corner sits under the cursor' : 'Click the centre',
+    trim: 'Click a segment to remove it',
   }[active.tool];
   return (
     <div className="sketch-hud">
       <div className="sketch-tools">
-        {TOOLS.map((t) => (
-          <button key={t.id} className={active.tool === t.id ? 'on' : ''} onClick={() => api.setTool(t.id)} title={`${t.label} (${t.key})`}>{t.label}<kbd>{t.key}</kbd></button>
-        ))}
-        <span className="sep" />
         {host && (
           <span className="seg hud-seg">
             <button className={mode === 'join' ? 'on' : ''} onClick={() => api.setMode('join')} title="Extrude outward and merge with the part">Join</button>
@@ -59,9 +59,6 @@ export function SketchHUD() {
           {st.closed ? `${st.closed} outline${st.closed > 1 ? 's' : ''}${st.holes ? `, ${st.holes} hole${st.holes > 1 ? 's' : ''}` : ''}` : 'no closed outline yet'}
           {st.open ? ` · ${st.open} open segment${st.open > 1 ? 's' : ''}` : ''}
         </span>
-        <span className="sep" />
-        <button onClick={api.cancel}>Cancel</button>
-        <button className="primary" onClick={api.finish}>Done<kbd>Esc</kbd></button>
       </div>
       <div className="sketch-hint">
         <b>{TOOLS.find((t) => t.id === active.tool)?.label}</b> · {hint} · hold <kbd>⇧</kbd> for 45° steps, <kbd>⌥</kbd> to disable snapping

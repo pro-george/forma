@@ -4,7 +4,6 @@ import {
   parseDocument, removeFeatures, sampleDocument, serializeDocument, ungroup as ungroupDoc, updateFeature, composeTransforms,
   type EvaluatedFeature, type Feature, type FeatureType, type FormaDocument, type Transform,
 } from '@forma/core';
-import { useViewStore } from './view';
 import { planeTransform } from './plane';
 import { workerClient, type ModuleInfo, type ExportFormat } from './worker-client';
 
@@ -54,7 +53,7 @@ interface Actions {
   openFile(file: File): Promise<void>;
   saveFile(): void;
   // features
-  /** `at` places the part with its base centred on that point and standing on that normal; otherwise it lands at the last pointed ground spot. */
+  /** `at` places the part with its base centred on that point and standing on that normal; otherwise the first part lands at the origin and later ones on a free spot around it. */
   addPrimitive(type: Exclude<FeatureType, 'combine' | 'module' | 'mesh' | 'extrude'>, at?: { point: [number, number, number]; normal: [number, number, number] }): void;
   addModule(id: string): void;
   patchFeature(id: string, patch: Partial<Feature> | ((f: Feature) => Feature), opts?: { undoable?: boolean }): void;
@@ -164,21 +163,20 @@ export const useStore = create<State & Actions>((set, get) => {
   });
 
   const snap5 = (v: number) => Math.round(v / 5) * 5;
-  /** Where the pointer last touched the ground, snapped to 5 mm. */
-  const placeAtPointer = (): Transform | null => {
-    const g = useViewStore.getState().ground;
-    if (!g) return null;
-    return { position: { x: snap5(g[0]), y: snap5(g[1]), z: 0 }, rotation: { x: 0, y: 0, z: 0 } };
-  };
   /** Standing on a plane through `point` with the given up normal (a face, or the ground). */
   const placeOn = (point: [number, number, number], normal: [number, number, number]): Transform => {
     const t = planeTransform(point, normal);
     if (Math.abs(normal[2] - 1) < 1e-6) t.position = { x: snap5(point[0]), y: snap5(point[1]), z: Math.round(point[2] * 10) / 10 };
     return t;
   };
+  /** Origin first (as a new body is expected to be), then a ring of spots 50 mm out, so new parts never land on each other. */
   const placeNew = (): Transform => {
-    const n = get().doc.features.filter((f) => f.parentId === null).length;
-    return { position: { x: ((n % 4) - 1.5) * 30, y: (Math.floor(n / 4) % 4 - 1.5) * 30, z: 0 }, rotation: { x: 0, y: 0, z: 0 } };
+    const taken = get().doc.features.filter((f) => f.parentId === null).map((f) => f.transform.position);
+    const free = (x: number, y: number) => !taken.some((p) => Math.hypot(p.x - x, p.y - y) < 25);
+    const spots: [number, number][] = [[0, 0]];
+    for (let ring = 1; ring <= 4; ring++) for (let k = 0; k < ring * 6; k++) { const a = (k / (ring * 6)) * Math.PI * 2; spots.push([snap5(Math.cos(a) * ring * 50), snap5(Math.sin(a) * ring * 50)]); }
+    const [x, y] = spots.find(([x, y]) => free(x, y)) ?? spots[0]!;
+    return { position: { x, y, z: 0 }, rotation: { x: 0, y: 0, z: 0 } };
   };
 
   return {
@@ -245,7 +243,7 @@ export const useStore = create<State & Actions>((set, get) => {
 
     addPrimitive: (type, at) => {
       const doc = get().doc;
-      const t = at ? placeOn(at.point, at.normal) : placeAtPointer() ?? placeNew();
+      const t = at ? placeOn(at.point, at.normal) : placeNew();
       let f: Feature;
       switch (type) {
         case 'box': f = makeFeature(doc, 'box', { width: 40, depth: 30, height: 20, transform: t }); break;

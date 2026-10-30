@@ -5,7 +5,7 @@
  * so every round and chamfer stays an editable feature.
  */
 import { create } from 'zustand';
-import { meshEdges, edgeToolSection, eulerFromBasis, composeTransforms, addFeature, addToCombine, combine as combineDoc, featureById, makeFeature, type MeshEdge, type TriangleMesh, type Transform } from '@forma/core';
+import { meshEdges, edgeToolSection, eulerFromBasis, composeTransforms, addFeature, addToCombine, combine as combineDoc, featureById, makeFeature, type Feature, type FormaDocument, type MeshEdge, type TriangleMesh, type Transform } from '@forma/core';
 import { useStore } from './store';
 
 const EPS = 0.02;
@@ -65,37 +65,47 @@ export const useEdges = create<{
     const part = featureById(st.doc, sel.partId);
     const result = st.results.get(sel.partId);
     if (!part || !result) return;
-    const edges = edgesFor(result.mesh);
     const { kind, size } = get();
-    let doc = st.doc;
-    const ids: string[] = [];
-    for (const i of sel.indices) {
-      const edge = edges[i];
-      if (!edge) continue;
-      const sec = edgeToolSection(edge, kind, Math.min(size, edge.length / 2), EPS);
-      if (!sec) continue;
-      const { u, v } = sec.frame;
-      const d = edge.dir;
-      const local: Transform = {
-        position: { x: edge.a[0] - d[0] * EPS, y: edge.a[1] - d[1] * EPS, z: edge.a[2] - d[2] * EPS },
-        rotation: eulerFromBasis({ x: u[0], y: u[1], z: u[2] }, { x: v[0], y: v[1], z: v[2] }, { x: d[0], y: d[1], z: d[2] }),
-      };
-      const world = composeTransforms(part.transform, local);
-      const f = makeFeature(doc, 'extrude', {
-        name: `${kind === 'round' ? 'Round' : 'Chamfer'} ${size} mm`, role: sec.role,
-        profile: { outer: sec.points, holes: [] }, height: edge.length + 2 * EPS, transform: world,
-      });
-      doc = addFeature(doc, f);
-      ids.push(f.id);
-    }
-    if (ids.length === 0) { st.toast('Those edges cannot take a round of that size', 'error'); return; }
-    let combineId: string;
-    if (part.type === 'combine') { combineId = part.id; for (const id of ids) doc = addToCombine(doc, combineId, id); }
-    else if (part.parentId) { combineId = part.parentId; for (const id of ids) doc = addToCombine(doc, combineId, id); }
-    else { const r = combineDoc(doc, [part.id, ...ids], part.name); doc = r.doc; combineId = r.combineId; }
-    st.setDoc(doc);
-    st.select([combineId]);
+    const r = buildEdgeTools(st.doc, part, edgesFor(result.mesh), sel.indices, kind, size);
+    if (!r) { st.toast('Those edges cannot take a round of that size', 'error'); return; }
+    st.setDoc(r.doc);
+    st.select([r.combineId]);
     set({ selected: null, hover: null });
-    st.toast(`${kind === 'round' ? 'Rounded' : 'Chamfered'} ${ids.length} edge${ids.length > 1 ? 's' : ''} — each is a feature in the tree`);
+    st.toast(`${kind === 'round' ? 'Rounded' : 'Chamfered'} ${r.count} edge${r.count > 1 ? 's' : ''} — each is a feature in the tree`);
   },
 }));
+
+/**
+ * Add one tool body per edge (a prism along the edge with a round or chamfer
+ * section) to the part's combine. Pure: returns the new document, or null
+ * when no edge could take the treatment.
+ */
+export function buildEdgeTools(doc0: FormaDocument, part: Feature, edges: MeshEdge[], indices: number[], kind: 'round' | 'chamfer', size: number): { doc: FormaDocument; combineId: string; count: number } | null {
+  let doc = doc0;
+  const ids: string[] = [];
+  for (const i of indices) {
+    const edge = edges[i];
+    if (!edge) continue;
+    const sec = edgeToolSection(edge, kind, Math.min(size, edge.length / 2), EPS);
+    if (!sec) continue;
+    const { u, v } = sec.frame;
+    const d = edge.dir;
+    const local: Transform = {
+      position: { x: edge.a[0] - d[0] * EPS, y: edge.a[1] - d[1] * EPS, z: edge.a[2] - d[2] * EPS },
+      rotation: eulerFromBasis({ x: u[0], y: u[1], z: u[2] }, { x: v[0], y: v[1], z: v[2] }, { x: d[0], y: d[1], z: d[2] }),
+    };
+    const world = composeTransforms(part.transform, local);
+    const f = makeFeature(doc, 'extrude', {
+      name: `${kind === 'round' ? 'Round' : 'Chamfer'} ${size} mm`, role: sec.role,
+      profile: { outer: sec.points, holes: [] }, height: edge.length + 2 * EPS, transform: world,
+    });
+    doc = addFeature(doc, f);
+    ids.push(f.id);
+  }
+  if (ids.length === 0) return null;
+  let combineId: string;
+  if (part.type === 'combine') { combineId = part.id; for (const id of ids) doc = addToCombine(doc, combineId, id); }
+  else if (part.parentId) { combineId = part.parentId; for (const id of ids) doc = addToCombine(doc, combineId, id); }
+  else { const r = combineDoc(doc, [part.id, ...ids], part.name); doc = r.doc; combineId = r.combineId; }
+  return { doc, combineId, count: ids.length };
+}

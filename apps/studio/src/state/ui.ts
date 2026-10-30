@@ -1,32 +1,53 @@
 import { create } from 'zustand';
 
-/** Floating-panel layout state (collapsed panels), remembered per browser. */
+/** Shell state remembered per browser: open panels, theme, touch mode, grid step, onboarding. */
 export type PanelId = 'create' | 'layers' | 'props';
 
-const KEY = 'forma.ui.v2';
-function load(): Record<PanelId, boolean> {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) return { create: false, layers: false, props: false, ...JSON.parse(raw) };
-  } catch { /* private mode or blocked storage: fall through */ }
-  return { create: false, layers: false, props: false };
+const KEY = 'forma.ui.v3';
+interface Persisted { light: boolean; touch: boolean; gridStep: number; tree: boolean; timeline: boolean; tourSeen: boolean }
+function load(): Persisted {
+  const def: Persisted = { light: false, touch: matchMedia('(pointer: coarse)').matches, gridStep: 1, tree: window.innerWidth > 600, timeline: true, tourSeen: false };
+  try { const raw = localStorage.getItem(KEY); if (raw) return { ...def, ...JSON.parse(raw) }; } catch { /* blocked storage */ }
+  return def;
 }
+const save = (p: Persisted) => { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ } };
 
-export const useUI = create<{
-  collapsed: Record<PanelId, boolean>;
-  /** phone layout: the one bottom sheet that is open */
+export const useUI = create<Persisted & {
   sheet: PanelId | null;
+  tour: boolean;
+  shortcuts: boolean;
+  /** legacy panel collapse map (mobile shell) */
+  collapsed: Record<PanelId, boolean>;
   toggle(id: PanelId): void;
   setCollapsed(id: PanelId, v: boolean): void;
   openSheet(id: PanelId | null): void;
-}>((set, get) => ({
-  collapsed: load(),
-  sheet: null,
-  openSheet: (sheet) => set((s) => ({ sheet: s.sheet === sheet ? null : sheet })),
-  toggle: (id) => get().setCollapsed(id, !get().collapsed[id]),
-  setCollapsed: (id, v) => {
-    const collapsed = { ...get().collapsed, [id]: v };
-    set({ collapsed });
-    try { localStorage.setItem(KEY, JSON.stringify(collapsed)); } catch { /* ignore */ }
-  },
-}));
+  setLight(v: boolean): void;
+  setTouch(v: boolean): void;
+  setGridStep(v: number): void;
+  setTree(v: boolean): void;
+  setTimeline(v: boolean): void;
+  setTour(v: boolean): void;
+  setShortcuts(v: boolean): void;
+  markTourSeen(): void;
+}>((set, get) => {
+  const persist = () => { const { light, touch, gridStep, tree, timeline, tourSeen } = get(); save({ light, touch, gridStep, tree, timeline, tourSeen }); };
+  const init = load();
+  return {
+    ...init,
+    sheet: null,
+    tour: !init.tourSeen,
+    shortcuts: false,
+    collapsed: { create: false, layers: false, props: false },
+    toggle: (id) => get().setCollapsed(id, !get().collapsed[id]),
+    setCollapsed: (id, v) => set({ collapsed: { ...get().collapsed, [id]: v } }),
+    openSheet: (sheet) => set((s) => ({ sheet: sheet === null ? null : s.sheet === sheet ? null : sheet })),
+    setLight: (light) => { set({ light }); persist(); },
+    setTouch: (touch) => { set({ touch }); persist(); },
+    setGridStep: (gridStep) => { set({ gridStep }); persist(); },
+    setTree: (tree) => { set({ tree }); persist(); },
+    setTimeline: (timeline) => { set({ timeline }); persist(); },
+    setTour: (tour) => set({ tour }),
+    setShortcuts: (shortcuts) => set({ shortcuts }),
+    markTourSeen: () => { set({ tourSeen: true, tour: false }); persist(); },
+  };
+});

@@ -2,16 +2,21 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { featureById } from '@forma/core';
 import { useStore } from '../state/store';
+import { useSel } from '../state/sel';
+import { useOp } from '../state/op';
+import { useSketch } from '../state/sketch';
+import { faceHit } from '../shell/actions';
 import { Icon } from './icons';
 
 /** Right-click menu for parts, shared by the Layers list and the timeline. */
+export interface FaceHit { partId: string; faceIndex: number; flat: boolean }
 export const useContextMenu = create<{
-  open: { x: number; y: number; ids: string[] } | null;
-  show(x: number, y: number, ids: string[]): void;
+  open: { x: number; y: number; ids: string[]; face?: FaceHit } | null;
+  show(x: number, y: number, ids: string[], face?: FaceHit): void;
   close(): void;
 }>((set) => ({
   open: null,
-  show: (x, y, ids) => set({ open: { x, y, ids } }),
+  show: (x, y, ids, face) => set({ open: { x, y, ids, face } }),
   close: () => set({ open: null }),
 }));
 
@@ -58,7 +63,15 @@ export function ContextMenu() {
   };
   return (
     <div className="ctx" ref={ref} style={{ left: pos?.x ?? open.x, top: pos?.y ?? open.y, visibility: pos ? 'visible' : 'hidden' }} role="menu">
-      <div className="ctx-title">{one ? one.name : `${feats.length} parts`}</div>
+      <div className="ctx-title">Object · {one ? one.name : `${feats.length} parts`}</div>
+      {open.face && open.face.flat && <>
+        <h6>Face</h6>
+        <button onClick={run(() => useSel.getState().pickFace({ partId: open.face!.partId, faceIndex: open.face!.faceIndex }, false))}>Select Face</button>
+        <button onClick={run(() => { const h = faceHit(open.face!.partId, open.face!.faceIndex); if (h) useSketch.getState().startOnFace(open.face!.partId, h.point, h.normal); })}><Icon.sketch />Sketch on this Face</button>
+        <button onClick={run(() => { useSel.getState().pickFace({ partId: open.face!.partId, faceIndex: open.face!.faceIndex }, false); useOp.getState().beginPushPull(); })}><Icon.pushpull />Push/Pull Face</button>
+        <h6>Body</h6>
+        <button onClick={run(() => { useSel.getState().setNavOnly(false); useSel.getState().pickBody(open.face!.partId, false); })}>Select Body</button>
+      </>}
       {one && <button onClick={run(rename)}>Rename <small>↵</small></button>}
       <button onClick={run(() => { s.select(open.ids); s.duplicateSelected(); })}><Icon.copy />Duplicate <small>⌘D</small></button>
       <button onClick={run(() => { for (const f of feats) if (f.visible === allHidden) s.toggleVisible(f.id); })}><Icon.eye />{allHidden ? 'Show' : 'Hide'}</button>

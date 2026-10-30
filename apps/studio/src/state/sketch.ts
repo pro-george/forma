@@ -5,14 +5,14 @@
  * numbers, selection.
  */
 import { create } from 'zustand';
-import { addFeature, addToCombine, combine as combineDoc, featureById, makeFeature, removeFeatures, sk, sketchToProfiles, endpoints, type FeatureOf, type FormaDocument, type Sketch, type SketchEntity, type Transform, type Vec2 } from '@forma/core';
+import { addFeature, addToCombine, combine as combineDoc, featureById, makeFeature, removeFeatures, sk, sketchToProfiles, endpoints, tessellate, type FeatureOf, type FormaDocument, type Sketch, type SketchEntity, type Transform, type Vec2 } from '@forma/core';
 import * as THREE from 'three';
 import { useStore } from './store';
 import { useViewStore } from './view';
 import { planeTransform } from './plane';
 export { planeTransform };
 
-export type SketchTool = 'select' | 'line' | 'rect' | 'circle' | 'arc';
+export type SketchTool = 'select' | 'line' | 'rect' | 'circle' | 'arc' | 'polygon' | 'trim';
 
 export interface SnapResult { p: Vec2; kind: 'grid' | 'point' | 'axis' | 'free'; ref?: Vec2 }
 
@@ -31,12 +31,19 @@ interface SketchState {
   };
   /** true while the user is asked to click a face to sketch on */
   pickingFace: boolean;
+  /** polygon tool: number of sides (3+) */
+  polygonSides: number;
+  setPolygonSides(n: number): void;
   /** the part the current face sketch was started on (its combine gets the join/cut) */
   host: { partId: string; combineId: string; point: [number, number, number]; normal: [number, number, number] } | null;
   start(featureId: string): void;
   createAndStart(): void;
   /** Start a ground sketch centred on a world point. */
   createAndStartAt(point: [number, number, number]): void;
+  /** Start a sketch on a world plane through the origin: XY (plate), XZ (front) or YZ (side). */
+  createAndStartOn(plane: 'xy' | 'xz' | 'yz'): void;
+  /** Look straight at the sketch plane again (orthographic-style framing). */
+  lookAt(): void;
   armFacePick(): void;
   disarmFacePick(): void;
   /** Start a sketch on a planar face of `partId`: `point` and `normal` are in world space. */
@@ -65,6 +72,13 @@ interface SketchState {
 }
 
 const GRID = 1;
+/** distance from p to segment ab */
+function segDist(p: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const L = dx * dx + dy * dy;
+  const t = L > 0 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L)) : 0;
+  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+}
 const POINT_SNAP = 1.6;
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -143,6 +157,8 @@ export const useSketch = create<SketchState>((set, get) => {
       if (!get().host) useViewStore.getState().setPreset('top');
     },
     pickingFace: false,
+    polygonSides: 6,
+    setPolygonSides: (n) => set({ polygonSides: Math.max(3, Math.min(64, Math.round(n))) }),
     host: null,
     armFacePick: () => set({ pickingFace: true }),
     disarmFacePick: () => set({ pickingFace: false }),
@@ -189,6 +205,24 @@ export const useSketch = create<SketchState>((set, get) => {
       const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [] }, height: 10, transform: { position: { x: Math.round(point[0]), y: Math.round(point[1]), z: Math.round(point[2] * 10) / 10 }, rotation: { x: 0, y: 0, z: 0 } } });
       st.setDoc(addFeature(st.doc, f));
       get().start(f.id);
+    },
+    createAndStartOn: (plane) => {
+      const st = useStore.getState();
+      const normal: [number, number, number] = plane === 'xy' ? [0, 0, 1] : plane === 'xz' ? [0, -1, 0] : [1, 0, 0];
+      const t = plane === 'xy' ? { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } } : planeTransform([0, 0, 0], normal);
+      const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [] }, height: 10, transform: t, name: `Sketch ${st.doc.features.filter((x) => x.type === 'extrude').length + 1}` });
+      st.setDoc(addFeature(st.doc, f));
+      set({ host: null });
+      get().start(f.id);
+      useViewStore.getState().alignTo([0, 0, 0], normal);
+    },
+    lookAt: () => {
+      const a = get().active; if (!a) return;
+      const f = featureById(useStore.getState().doc, a.featureId); if (!f) return;
+      const t = f.transform;
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(t.rotation.x), THREE.MathUtils.degToRad(t.rotation.y), THREE.MathUtils.degToRad(t.rotation.z), 'ZYX'));
+      const n = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+      useViewStore.getState().alignTo([t.position.x, t.position.y, t.position.z], [n.x, n.y, n.z]);
     },
     createAndStart: () => {
       const st = useStore.getState();
@@ -243,6 +277,30 @@ export const useSketch = create<SketchState>((set, get) => {
           const [s, e] = a.draft as [Vec2, Vec2];
           commitEntities([sk.arc3(s, p, e)]);
           upd({ draft: [], typed: '' });
+          return;
+        }
+        case 'polygon': {
+          // centre, then radius + rotation: vertex 0 sits under the cursor (SketchTool.cpp:4123)
+          if (!anchor) { upd({ draft: [p], typed: '' }); return; }
+          const r = Math.hypot(p[0] - anchor[0], p[1] - anchor[1]);
+          if (r < 0.05) return;
+          const n = Math.max(3, Math.round(get().polygonSides));
+          const a0 = Math.atan2(p[1] - anchor[1], p[0] - anchor[0]);
+          const pts: Vec2[] = [];
+          for (let i = 0; i < n; i++) { const t = a0 + (i * 2 * Math.PI) / n; pts.push([round2(anchor[0] + r * Math.cos(t)), round2(anchor[1] + r * Math.sin(t))]); }
+          commitEntities(pts.map((q, i) => sk.line(q, pts[(i + 1) % n]!)));
+          upd({ draft: [], typed: '' });
+          return;
+        }
+        case 'trim': {
+          // remove the segment nearest the click (whole element; intersections are split in the sketch phase)
+          const sketch = currentSketch(a.featureId);
+          let best: string | null = null, bd = Math.max(0.6, 1.2);
+          for (const e of sketch.entities) {
+            const pts = tessellate(e);
+            for (let i = 0; i + 1 < pts.length; i++) { const d = segDist(local, pts[i]!, pts[i + 1]!); if (d < bd) { bd = d; best = e.id; } }
+          }
+          if (best) writeSketch(a.featureId, sketch.entities.filter((e) => e.id !== best), true);
           return;
         }
       }

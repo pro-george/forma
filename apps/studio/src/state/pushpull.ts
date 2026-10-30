@@ -9,7 +9,6 @@ import * as THREE from 'three';
 import { addFeature, addToCombine, combine as combineDoc, featureById, makeFeature, planarFace, removeFeatures, ensureCCW, ensureCW, insetPolygon, type FeatureOf, type FormaDocument, type Profile, type Transform, type Vec2 } from '@forma/core';
 import { useStore } from './store';
 import { planeTransform } from './sketch';
-import { useTool } from './tool';
 
 export interface PushPullDrag {
   featureId: string;
@@ -74,8 +73,8 @@ export const usePushPull = create<PushPullState>((set, get) => ({
     set({ press: { partId, faceIndex, point, ray, x, y } });
     return true;
   },
-  arm: () => { useTool.getState().set('pushpull'); },
-  disarm: () => { if (useTool.getState().tool === 'pushpull') useTool.getState().set('select'); },
+  arm: () => set({ armed: true }),
+  disarm: () => set({ armed: false, press: null, pending: null, typed: '' }),
   pick: (partId, faceIndex) => {
     const st = useStore.getState();
     const part = featureById(st.doc, partId);
