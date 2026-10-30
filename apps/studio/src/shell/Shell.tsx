@@ -171,9 +171,9 @@ function ToolDock() {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const ctx = selContext(!!active);
   const first = sel[0] ? featureById(doc, sel[0]) : undefined;
-  const tools = useMemo(() => railTools(ctx, { bodies: sel.length, modules, selectedIsCombine: first?.type === 'combine', selectedIsModule: first?.type === 'module', ortho: false }),
+  const tools = useMemo(() => railTools(ctx, { bodies: sel.length, modules, selectedIsCombine: first?.type === 'combine', selectedIsModule: first?.type === 'module', ortho: false, inSketch: !!active }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ctx, sel.length, modules, first?.type, faces.length, edges.length, regions.length]);
+    [ctx, sel.length, modules, first?.type, faces.length, edges.length, regions.length, !!active]);
   useEffect(() => setOpenGroup(null), [ctx]);
   if (op) return null; // the action owns the screen; the corner ✓/✗ drive it
   const isActive = (t: RailTool) => (active ? `sk.${active.tool}` === t.id : t.id === tool);

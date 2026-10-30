@@ -218,6 +218,10 @@ h6 { margin: 8px 10px 2px; font-size: 10px; text-transform: uppercase; letter-sp
 .readout { background: rgba(20, 20, 28, .8); color: #ebebf0; border-radius: 6px; padding: 3px 8px; font: 11.5px var(--mono); white-space: nowrap; }
 .marquee { position: absolute; border: 1px solid rgba(77, 128, 255, .8); background: rgba(77, 128, 255, .1); }
 
+/* sketch inference glyphs next to the cursor */
+.sketch-guide { display: flex; gap: 6px; padding: 2px 7px; border-radius: 6px; background: rgba(16, 19, 24, .85); border: 1px solid rgba(140, 220, 255, .45); color: #8cdcff; font: 12px var(--mono); white-space: nowrap; }
+[data-theme="light"] .sketch-guide { background: rgba(255, 255, 255, .9); color: #0a7fb0; border-color: rgba(10, 127, 176, .4); }
+
 /* ---------- right-click / long-press menu ---------- */
 .ctx { position: fixed; z-index: 66; min-width: 220px; background: var(--panel); border: 1px solid var(--hair); border-radius: var(--r-win); box-shadow: var(--shadow); padding: 6px; display: grid; gap: 1px; animation: pop .1s ease-out; }
 .ctx-title { font-size: 11px; color: var(--accent); padding: 6px 10px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; border-bottom: 1px solid var(--hair); margin-bottom: 4px; }

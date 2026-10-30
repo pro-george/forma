@@ -44,17 +44,17 @@ export const PRIMITIVES: RailTool[] = [
   { id: 'prim.revolve', label: 'Revolve', icon: 'revolve', tip: 'Add a lathed shape: a side profile spun around the vertical axis.' },
 ];
 
-export function railTools(ctx: SelContext, opts: { bodies: number; modules: { id: string; name: string; description: string }[]; selectedIsCombine: boolean; selectedIsModule: boolean; ortho: boolean }): RailTool[] {
+export function railTools(ctx: SelContext, opts: { bodies: number; modules: { id: string; name: string; description: string }[]; selectedIsCombine: boolean; selectedIsModule: boolean; ortho: boolean; inSketch?: boolean }): RailTool[] {
   switch (ctx) {
     case 'sketch':
       return [
         { id: 'sk.select', label: 'Select', icon: 'select', tip: 'Pick sketch elements (points, lines, regions). Drag a selection to move it.' },
         { id: 'sk.line', label: 'Line', icon: 'line', tip: 'Draw straight line segments. Tap to add vertices; Finish ends the chain.' },
-        { id: 'sk.circle', label: 'Circle', icon: 'circle', tip: 'Draw a circle: press the centre, drag to the radius.' },
-        { id: 'sk.rect', label: 'Rectangle', icon: 'rect', tip: 'Draw a rectangle: press one corner, drag to the opposite.' },
+        { id: 'sk.circle', label: 'Circle', icon: 'circle', tip: 'Draw a circle: centre then a point on it, or two ends of the diameter. Type the diameter for an exact size.' },
+        { id: 'sk.rect', label: 'Rectangle', icon: 'rect', tip: 'Draw a rectangle: corner to corner, or centre out. Type width ⏎ height ⏎ for exact sizes.' },
         { id: 'sk.arc', label: 'Arc', icon: 'arc', tip: 'Three-point arc: tap start, end, then a point on the curve.' },
         { id: 'sk.polygon', label: 'Polygon', icon: 'polygon', tip: 'Regular polygon: tap the centre, drag to size. Side count in properties.' },
-        { id: 'sk.trim', label: 'Trim', icon: 'trim', tip: 'Trim a sketch segment at its nearest intersections.' },
+        { id: 'sk.trim', label: 'Trim', icon: 'trim', tip: 'Remove the piece of a segment or circle between its nearest crossings.' },
         ...(opts.ortho ? [] : [{ id: 'sk.lookat', label: 'Look At', icon: 'camera', tip: 'Snap the camera to look straight down the sketch plane (orthographic).' } as RailTool]),
       ];
     case 'none':
@@ -77,8 +77,8 @@ export function railTools(ctx: SelContext, opts: { bodies: number; modules: { id
       ];
     case 'region':
       return [
-        { id: 'pushpull', label: 'Push', icon: 'pushpull', tip: 'Push/pull the region into or out of the host body.' },
-        { id: 'sketch.edit', label: 'Edit', icon: 'sketch', tip: 'Reopen the sketch this region belongs to.' },
+        { id: 'pushpull', label: 'Push', icon: 'pushpull', tip: 'Push/pull the region: positive adds a body (or joins the host), negative cuts into the host.' },
+        ...(opts.inSketch ? railTools('sketch', opts) : [{ id: 'sketch.edit', label: 'Edit', icon: 'sketch', tip: 'Reopen the sketch this region belongs to.' } as RailTool]),
       ];
     case 'body': {
       const tools: RailTool[] = [

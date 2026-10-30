@@ -15,7 +15,8 @@
  */
 import { create } from 'zustand';
 import * as THREE from 'three';
-import { featureById, planarFace, type Feature, type FormaDocument, type MeshEdge, type Vec2 } from '@forma/core';
+import { featureById, planarFace, sketchToProfiles, type Feature, type FormaDocument, type MeshEdge, type Vec2 } from '@forma/core';
+import { useSketch } from './sketch';
 import { useStore } from './store';
 import { usePushPull } from './pushpull';
 import { edgesFor, buildEdgeTools } from './edges';
@@ -27,7 +28,9 @@ type V3 = [number, number, number];
 export interface PushPullOp {
   kind: 'pushpull';
   partId: string;
+  /** -1 when the op pushes a sketch region (then `region` is set) */
   faceIndex: number;
+  region?: { sketchId: string; index: number };
   /** world-space arrow frame */
   origin: V3;
   normal: V3;
@@ -68,6 +71,8 @@ interface OpState {
   dragging: boolean;
   typed: string;
   beginPushPull(): boolean;
+  /** Push a closed region of the active (or selected) sketch: the extrude's height, join or cut by sign. */
+  beginRegionPush(): boolean;
   beginEdgeOp(tool: 'round' | 'chamfer'): boolean;
   setValue(v: number, exact?: boolean): void;
   setSymmetric(v: boolean): void;
@@ -107,6 +112,25 @@ export const useOp = create<OpState>((set, get) => ({
     const [outer, ...holes] = pf.loops;
     get().cancel();
     set({ op: { kind: 'pushpull', partId: face.partId, faceIndex: face.faceIndex, origin, normal, profile: { outer: to2d(outer!), holes: holes.map(to2d) }, planeMatrix: planeM.elements.slice(), distance: 0, symmetric: false, t0: null, startDistance: 0 }, typed: '' });
+    return true;
+  },
+
+  beginRegionPush: () => {
+    const st = useStore.getState();
+    const r = useSel.getState().regions[0];
+    if (!r) { st.toast('Push/Pull: click inside a closed region first.'); return false; }
+    const f = featureById(st.doc, r.sketchId);
+    if (!f || f.type !== 'extrude' || !f.sketch) return false;
+    const pr = sketchToProfiles(f.sketch).profiles[r.index];
+    if (!pr) { st.toast('That region is no longer closed.'); return false; }
+    const mat = frameMatrix(f.transform);
+    const n = new THREE.Vector3(0, 0, 1).applyMatrix3(new THREE.Matrix3().getNormalMatrix(mat)).normalize();
+    const c = pr.outer.reduce((a, p) => [a[0] + p[0] / pr.outer.length, a[1] + p[1] / pr.outer.length], [0, 0]);
+    const o = new THREE.Vector3(c[0], c[1], 0).applyMatrix4(mat);
+    get().cancel();
+    const host = useSketch.getState().host;
+    const current = host ? (f.role === 'hole' ? -f.height : f.height) : f.flip ? -f.height : f.height;
+    set({ op: { kind: 'pushpull', partId: f.id, faceIndex: -1, region: r, origin: [o.x, o.y, o.z], normal: [n.x, n.y, n.z], profile: { outer: pr.outer, holes: pr.holes }, planeMatrix: mat.elements.slice(), distance: Math.round(current * 10) / 10, symmetric: false, t0: null, startDistance: 0 }, typed: '' });
     return true;
   },
 
@@ -172,6 +196,16 @@ export const useOp = create<OpState>((set, get) => ({
     if (op.kind === 'pushpull') {
       set({ op: null, dragging: false, typed: '' });
       if (Math.abs(op.distance) < 0.05) { st.toast('Push/Pull: nothing to apply — distance is 0.'); return; }
+      if (op.region) {
+        // a sketch region: the extrude's height; the sign joins (out of the plane) or cuts (into the host)
+        const sk = useSketch.getState();
+        const d = op.distance;
+        if (sk.host && sk.active?.featureId === op.partId) sk.setMode(d < 0 ? 'cut' : 'join');
+        st.patchFeature(op.partId, { height: Math.abs(d), ...(sk.host ? {} : { flip: d < 0 }) } as Partial<Feature>, { undoable: true });
+        if (sk.active?.featureId === op.partId) sk.finish();
+        useSel.getState().clear();
+        return;
+      }
       usePushPull.getState().applyDistance(op.partId, op.faceIndex, op.symmetric ? op.distance : op.distance);
       useSel.getState().clear();
       return;

@@ -264,6 +264,7 @@ function ViewController({ controls }: { controls: React.RefObject<OrbitControlsI
   const preset = useViewStore((s) => s.preset);
   const align = useViewStore((s) => s.align);
   const anim = useRef<{ from: THREE.Vector3; to: THREE.Vector3; up: THREE.Vector3; target: THREE.Vector3; t0: number } | null>(null);
+  (window as unknown as { __cam: unknown }).__cam = camera; // scripted tests read the camera
   /** 0.35 s eased camera move (the sketch ortho snap, Frame, presets) */
   const fly = (pos: THREE.Vector3, up: THREE.Vector3, target: THREE.Vector3) => {
     anim.current = { from: camera.position.clone(), to: pos, up, target, t0: performance.now() };
@@ -282,8 +283,9 @@ function ViewController({ controls }: { controls: React.RefObject<OrbitControlsI
     if (!align) return;
     const p = new THREE.Vector3(...align.point), n = new THREE.Vector3(...align.normal).normalize();
     const dist = Math.max(80, camera.position.distanceTo(controls.current?.target ?? p) * 0.8);
-    const up = Math.abs(n.z) > 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
-    fly(p.clone().addScaledVector(n, dist), up, p);
+    // OrbitControls keeps Z as up; a straight-down look gets a hair of -Y so the roll is defined (X right, Y up on screen)
+    const dir = Math.abs(n.z) > 0.999 ? new THREE.Vector3(0, -0.0001 * Math.sign(n.z), n.z).normalize() : n;
+    fly(p.clone().addScaledVector(dir, dist), new THREE.Vector3(0, 0, 1), p);
   }, [align]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (fitToken === 0 && !preset) return;
@@ -521,7 +523,9 @@ function Scene() {
       <Marquee />
       <GroundPlane />
       <OrbitControls ref={controls} makeDefault enabled={!opDragging && op?.kind !== 'pushpull'} enableDamping dampingFactor={0.12} minDistance={10} maxDistance={3000} maxPolarAngle={sketching ? Math.PI : Math.PI / 2 + 0.25}
-        mouseButtons={sketching ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }} />
+        mouseButtons={sketching ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
+        // in a sketch one finger draws (press-drag-release), two fingers pan and zoom
+        touches={sketching ? { ONE: -1 as unknown as THREE.TOUCH, TWO: THREE.TOUCH.DOLLY_PAN } : { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }} />
       <GizmoHelper alignment="bottom-right" margin={[100, 120]}>
         <GizmoViewport axisColors={['#e63333', '#33e633', '#4d66f2']} labelColor="white" />
       </GizmoHelper>

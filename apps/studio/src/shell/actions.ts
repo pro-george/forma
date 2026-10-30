@@ -41,7 +41,7 @@ export function dispatch(id: ActionId, arg?: string): void {
     case 'prim.box': case 'prim.cylinder': case 'prim.sphere': case 'prim.cone': case 'prim.torus': case 'prim.tube': case 'prim.revolve':
       s.addPrimitive(id.slice(5) as 'box'); return;
     case 'module': if (arg) s.addModule(arg); return;
-    case 'pushpull': op.beginPushPull(); return;
+    case 'pushpull': if (useSel.getState().regions.length) op.beginRegionPush(); else op.beginPushPull(); return;
     case 'fillet': op.beginEdgeOp('round'); return;
     case 'chamfer': op.beginEdgeOp('chamfer'); return;
     case 'move': useTool.getState().set('move'); return;

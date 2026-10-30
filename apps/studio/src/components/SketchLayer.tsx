@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
-import type { ThreeEvent } from '@react-three/fiber';
+import { useThree, type ThreeEvent } from '@react-three/fiber';
 import { featureById, tessellate, sketchToProfiles, endpoints, sk, arcSweep, type Vec2, type SketchEntity, type Transform } from '@forma/core';
 import { useStore } from '../state/store';
-import { useSketch } from '../state/sketch';
+import { useSketch, rectCorners, circleFrom } from '../state/sketch';
+import { useSel } from '../state/sel';
+import { useUI } from '../state/ui';
 
 interface Colors { accent: string; solid: string; hole: string; vp: string }
 
@@ -25,8 +27,17 @@ function frame(t: Transform) {
   return { toLocal, toWorld, euler };
 }
 
+const GUIDE = '#8cdcff'; // Materializr's inference cyan (140, 220, 255)
+const DRAG_PX = 12;
+
 export function SketchLayer({ colors }: { colors: Colors }) {
   const active = useSketch((s) => s.active);
+  const rectMode = useSketch((s) => s.rectMode);
+  const circleMode = useSketch((s) => s.circleMode);
+  const regions = useSel((s) => s.regions);
+  const touch = useUI((u) => u.touch);
+  const { camera, size } = useThree();
+  const press = useRef<{ local: Vec2; x: number; y: number } | null>(null);
   const doc = useStore((s) => s.doc);
   const feature = active ? featureById(doc, active.featureId) : undefined;
   const sketch = feature && feature.type === 'extrude' ? feature.sketch ?? { entities: [] } : null;
@@ -34,20 +45,25 @@ export function SketchLayer({ colors }: { colors: Colors }) {
   const fr = useMemo(() => (t ? frame(t) : null), [t]);
 
   const profiles = useMemo(() => (sketch ? sketchToProfiles(sketch) : null), [sketch]);
-  const fillGeometry = useMemo(() => {
-    if (!profiles || profiles.profiles.length === 0) return null;
-    const shapes = profiles.profiles.map((p) => {
+  // one fill per closed region so hover / selection can light a single one
+  const regionGeometries = useMemo(() => {
+    if (!profiles) return [];
+    return profiles.profiles.map((p) => {
       const sh = new THREE.Shape(p.outer.map(([x, y]) => new THREE.Vector2(x, y)));
       sh.holes = p.holes.map((h) => new THREE.Path(h.map(([x, y]) => new THREE.Vector2(x, y))));
-      return sh;
+      return new THREE.ShapeGeometry(sh);
     });
-    return new THREE.ShapeGeometry(shapes);
   }, [profiles]);
 
   if (!active || !feature || !sketch || !fr || !t) return null;
   const lift = 0.15;
   const mods = (e: { shiftKey: boolean; altKey: boolean }) => ({ shift: e.shiftKey, alt: e.altKey });
   const localOf = (e: ThreeEvent<PointerEvent | MouseEvent>) => fr.toLocal(e.point.x, e.point.y, e.point.z);
+  /** screen pixels per sketch mm around a local point, so the state can scale its pixel tolerances */
+  const reportScale = (local: Vec2) => {
+    const a = new THREE.Vector3(...fr.toWorld(local)).project(camera), b = new THREE.Vector3(...fr.toWorld([local[0] + 1, local[1]])).project(camera);
+    api.setScale(Math.hypot((a.x - b.x) * size.width, (a.y - b.y) * size.height) / 2);
+  };
   const planePos: [number, number, number] = [t.position.x, t.position.y, t.position.z];
   const sk3 = (pts: Vec2[], lz = lift) => pts.map((p) => fr.toWorld(p, lz));
   const openIds = new Set(profiles?.openIds ?? []);
@@ -70,14 +86,18 @@ export function SketchLayer({ colors }: { colors: Colors }) {
         break;
       }
       case 'rect': {
-        const p = cur;
-        preview.push({ pts: [a, [p[0], a[1]], p, [a[0], p[1]]], closed: true, label: `${fmt(Math.abs(p[0] - a[0]))} × ${fmt(Math.abs(p[1] - a[1]))} mm`, at: p });
+        const c = rectCorners(a, cur, rectMode, active.typedW, active.typed);
+        if (c) {
+          const [p0, p1] = c;
+          const w = Math.abs(p1[0] - p0[0]), h = Math.abs(p1[1] - p0[1]);
+          const lw = active.typedW !== null ? `${fmt(w)} ✓` : fmt(w), lh = active.typedW !== null && active.typed ? `${fmt(h)} ✓` : fmt(h);
+          preview.push({ pts: [p0, [p1[0], p0[1]], p1, [p0[0], p1[1]]], closed: true, label: `${lw} × ${lh} mm${active.typedW === null ? (active.typed ? '' : ' · type width ⏎ height ⏎') : ''}`, at: cur });
+        }
         break;
       }
       case 'circle': {
-        let r = Math.hypot(cur[0] - a[0], cur[1] - a[1]);
-        if (Number.isFinite(typed) && typed > 0) r = typed;
-        if (r > 0.01) preview.push({ pts: tessellate(sk.circle(a, r)), closed: true, label: `r ${fmt(r)} · ⌀ ${fmt(r * 2)} mm`, at: cur });
+        const c = circleFrom(a, cur, circleMode, active.typed);
+        if (c) { preview.push({ pts: tessellate(sk.circle(c.center, c.radius)), closed: true, label: `⌀ ${fmt(c.radius * 2)} mm · r ${fmt(c.radius)}`, at: cur }); if (circleMode === '2pt') preview.push({ pts: [a, cur] }); }
         break;
       }
       case 'arc': {
@@ -99,22 +119,39 @@ export function SketchLayer({ colors }: { colors: Colors }) {
       {/* pointer plane at the sketch level */}
       <mesh
         position={planePos} rotation={fr.euler}
-        onPointerMove={(e) => { e.stopPropagation(); if (active.dragVertex) api.dragVertexTo(localOf(e), mods(e)); else api.move(localOf(e), mods(e)); }}
-        onPointerDown={(e) => { if (e.button !== 0) return; if (active.tool === 'select') { if (api.beginVertexDrag(localOf(e))) e.stopPropagation(); } }}
-        onPointerUp={(e) => { if (active.dragVertex) { e.stopPropagation(); api.endVertexDrag(); } }}
-        onClick={(e) => { if (e.button !== 0 || (e.delta ?? 0) > 4) return; e.stopPropagation(); if (active.tool === 'select') { api.select(null); return; } api.click(localOf(e), mods(e)); }}
+        onPointerMove={(e) => { e.stopPropagation(); const l = localOf(e); reportScale(l); if (active.dragVertex) api.dragVertexTo(l, mods(e)); else api.move(l, mods(e)); }}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          const l = localOf(e); reportScale(l);
+          if (active.tool === 'select') { if (api.beginVertexDrag(l)) e.stopPropagation(); return; }
+          // touch: a press that turns into a drag draws the shape in one gesture (press = first point, release = second)
+          if (e.nativeEvent.pointerType === 'touch' && !active.draft.length && ['line', 'rect', 'circle', 'polygon'].includes(active.tool)) press.current = { local: l, x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+        }}
+        onPointerUp={(e) => {
+          if (active.dragVertex) { e.stopPropagation(); api.endVertexDrag(); return; }
+          const pr = press.current; press.current = null;
+          if (pr && Math.hypot(e.nativeEvent.clientX - pr.x, e.nativeEvent.clientY - pr.y) > DRAG_PX) {
+            e.stopPropagation();
+            api.click(pr.local, mods(e)); api.click(localOf(e), mods(e));
+          }
+        }}
+        onClick={(e) => { if (e.button !== 0 || (e.delta ?? 0) > 4) return; e.stopPropagation(); api.click(localOf(e), mods(e)); }}
         onDoubleClick={(e) => { e.stopPropagation(); api.doubleClick(); }}
       >
         <planeGeometry args={[4000, 4000]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* closed area fill */}
-      {fillGeometry && (
-        <mesh geometry={fillGeometry} position={fr.toWorld([0, 0], lift * 0.5)} rotation={fr.euler}>
-          <meshBasicMaterial color={colors.accent} transparent opacity={0.12} depthWrite={false} side={THREE.DoubleSide} />
-        </mesh>
-      )}
+      {/* closed regions: faint fill, brighter when hovered with Select, blue when selected (then the dock offers Push) */}
+      {regionGeometries.map((g, i) => {
+        const sel = regions.some((r) => r.sketchId === active.featureId && r.index === i);
+        const hov = active.hoverRegion === i;
+        return (
+          <mesh key={i} geometry={g} position={fr.toWorld([0, 0], lift * 0.5)} rotation={fr.euler}>
+            <meshBasicMaterial color={sel ? '#408cff' : hov ? GUIDE : colors.accent} transparent opacity={sel ? 0.4 : hov ? 0.25 : 0.12} depthWrite={false} side={THREE.DoubleSide} />
+          </mesh>
+        );
+      })}
 
       {/* entities */}
       {sketch.entities.map((e) => {
@@ -147,12 +184,17 @@ export function SketchLayer({ colors }: { colors: Colors }) {
       ))}
       {active.draft.map((p, i) => <Dot key={`d${i}`} p={fr.toWorld(p, lift + 0.1)} color={colors.accent} r={0.8} />)}
 
-      {/* snap cursor + guide */}
+      {/* snap cursor + inference guides (cyan, with a glyph saying why) */}
       {active.snap && (
         <>
-          <Dot p={fr.toWorld(active.snap.p, lift + 0.1)} color={active.snap.kind === 'point' ? colors.accent : '#9fb0c8'} r={active.snap.kind === 'point' ? 1.1 : 0.7} ring />
-          {active.snap.kind === 'axis' && active.snap.ref && (
-            <Line points={sk3([active.snap.ref, active.snap.p], lift)} color={colors.accent} lineWidth={1} dashed dashSize={1} gapSize={1} transparent opacity={0.6} />
+          <Dot p={fr.toWorld(active.snap.p, lift + 0.1)} color={active.snap.kind === 'point' ? GUIDE : active.snap.kind === 'axis' ? GUIDE : '#9fb0c8'} r={active.snap.kind === 'point' ? 1.1 : 0.7} ring />
+          {active.snap.guides.map((g, i) => g.line && (
+            <Line key={i} points={sk3(g.line, lift)} color={GUIDE} lineWidth={1} dashed dashSize={1.2} gapSize={0.8} transparent opacity={0.8} />
+          ))}
+          {active.snap.guides.some((g) => g.glyph) && (
+            <Html position={fr.toWorld(active.snap.p, 2)} style={{ pointerEvents: 'none', transform: touch ? 'translate(-50%, -44px)' : 'translate(14px, 6px)' }}>
+              <div className="sketch-guide">{active.snap.guides.filter((g) => g.glyph).map((g, i) => <span key={i} title={g.kind}>{g.glyph}{g.label ? ` ${g.label}` : ''}</span>)}</div>
+            </Html>
           )}
         </>
       )}

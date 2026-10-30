@@ -78,10 +78,10 @@ export const useSel = create<SelState>((set, get) => ({
 /** What the toolbar should offer right now. */
 export function selContext(inSketch: boolean): SelContext {
   const s = useSel.getState();
+  if (s.regions.length) return 'region';
   if (inSketch) return 'sketch';
   if (s.edges.length) return 'edge';
   if (s.faces.length) return 'face';
-  if (s.regions.length) return 'region';
   if (useStore.getState().selection.length) return 'body';
   return 'none';
 }
