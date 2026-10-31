@@ -75,39 +75,76 @@ function TopLeft() {
         {menu.open && (
           <div className="popup menu-list big">
             <h6>File</h6>
+            {item('Open Project...', () => fileInput.current?.click())}
+            {item('Save Project', () => s.saveFile())}
+            {item('Save Project As...', () => s.saveFile())}
             {item('New Project', () => s.newDocument())}
-            {item('Open Project…', () => fileInput.current?.click())}
             {EXTRAS && item('Open sample scene', () => s.loadSample())}
-            {item('Save Project', () => s.saveFile(), '⌘S')}
             <h6>Export</h6>
-            {item('STL', () => s.exportModel('stl'))}
-            {item('3MF', () => s.exportModel('3mf'))}
-            {item('OBJ', () => s.exportModel('obj'))}
-            {EXTRAS && item('3MF for Bambu Studio', () => s.exportModel('bambu'), 'AMS slots')}
+            {item('STL...', () => s.exportModel('stl'))}
+            {item('OBJ...', () => s.exportModel('obj'))}
+            {item('3MF...', () => s.exportModel('3mf'))}
+            {EXTRAS && item('3MF for Bambu Studio...', () => s.exportModel('bambu'), 'AMS slots')}
             <h6>Edit</h6>
-            {item('Undo', () => s.undo(), '⌘Z', !s.canUndo())}
-            {item('Redo', () => s.redo(), '⌘Y', !s.canRedo())}
-            {item('Select all', () => s.select(topLevel(s.doc).filter((f) => f.visible).map((f) => f.id)), '⌘A')}
+            {item('Undo', () => s.undo(), undefined, !s.canUndo())}
+            {item('Redo', () => s.redo(), undefined, !s.canRedo())}
             <h6>View</h6>
-            {item('Reset Camera', () => view.setPreset('iso'), 'Home')}
-            {item('Frame Selection', () => view.fit(), 'F')}
-            {item('Top / Front / Right', () => view.setPreset(['top', 'front', 'right'][Date.now() % 3] as 'top'))}
-            {item(s.showGrid ? '✓ Grid' : 'Grid', () => s.toggleGrid())}
-            {item(s.wireframe ? '✓ Wireframe' : 'Wireframe', () => s.toggleWireframe())}
+            {item('Reset Camera', () => view.setPreset('iso'))}
+            {item('Frame Selection', () => view.fit())}
+            {item('Measure...', () => ui.setMeasure(true))}
+            {item(ui.tree || ui.timeline ? 'Hide Panels' : '✓ Hide Panels', () => { const hide = ui.tree || ui.timeline; ui.setTree(!hide); ui.setTimeline(!hide); })}
+            <div className="menu-theme"><span>Theme</span><div className="seg"><button className={ui.light ? '' : 'on'} onClick={() => ui.setLight(false)}>Dark</button><button className={ui.light ? 'on' : ''} onClick={() => ui.setLight(true)}>Light</button></div></div>
             {EXTRAS && item(s.printLook ? '✓ Print look' : 'Print look', () => s.togglePrintLook())}
             {EXTRAS && item('Arrange parts on plate', () => { s.arrangeParts(); view.fit(); })}
-            <h6>Settings</h6>
-            {item(ui.light ? '✓ Light theme' : 'Light theme', () => ui.setLight(!ui.light))}
-            {item(ui.touch ? '✓ Touch mode' : 'Touch mode', () => ui.setTouch(!ui.touch), 'bigger targets, long-press')}
-            {item(`Grid step: ${ui.gridStep} mm`, () => ui.setGridStep(ui.gridStep === 0.1 ? 0.5 : ui.gridStep === 0.5 ? 1 : ui.gridStep === 1 ? 10 : 0.1), 'tap to cycle')}
             <h6>Help</h6>
-            {item('Getting Started', () => ui.setTour(true))}
             {item('Keyboard Shortcuts', () => ui.setShortcuts(true))}
-            {item('About Forma', () => s.toast('Forma — browser CAD for 3D printing. Geometry by Manifold; interaction model after Materializr (GPLv3).'))}
+            {item('Getting Started', () => ui.setTour(true))}
+            {item('About Forma...', () => s.toast('Forma — browser CAD for 3D printing. Geometry by Manifold; interaction model after Materializr (GPLv3).'))}
+            <hr />
+            {item('Settings...', () => ui.setSettings(true))}
           </div>
         )}
       </div>
-      <input className="chip name" aria-label="Project name" value={s.doc.name} onChange={(e) => s.setDoc({ ...s.doc, name: e.target.value }, { undoable: false })} />
+      <ProjectChip />
+      <input ref={fileInput} type="file" accept=".forma,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) s.openFile(f); e.target.value = ''; }} />
+    </div>
+  );
+}
+
+/** Project chip: name, unsaved dot, the selection summary and a ▾ that opens the project list (Materializr's "Open projects"). */
+function ProjectChip() {
+  const s = useStore();
+  const [, force] = useState(0);
+  useEffect(() => useStore.subscribe(() => force((n) => n + 1)), []);
+  const pop = usePopup<HTMLDivElement>();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const sel = useStore((x) => x.selection);
+  const faces = useSel((x) => x.faces);
+  const edges = useSel((x) => x.edges);
+  const regions = useSel((x) => x.regions);
+  const inSketch = useSketch((k) => !!k.active);
+  const summary = edges.length ? `Edge (${edges.length})` : faces.length ? `Face (${faces.length})` : regions.length ? `Region (${regions.length})` : inSketch ? 'Sketch (1)' : sel.length ? `Body (${sel.length})` : '';
+  const item = (label: string, run: () => void) => <button key={label} onClick={() => { run(); pop.setOpen(false); }}>{label}</button>;
+  return (
+    <div className="dd" ref={pop.ref}>
+      <div className={`chip name${pop.open ? ' on' : ''}`}>
+        <input aria-label="Project name" value={s.doc.name} onChange={(e) => s.setDoc({ ...s.doc, name: e.target.value }, { undoable: false })} />
+        {s.canUndo() && <span className="dot" title="Unsaved changes">•</span>}
+        {summary && <span className="sum">·  {summary}</span>}
+        <button className="chev" aria-label="Open projects" onClick={() => pop.setOpen(!pop.open)}>▾</button>
+      </div>
+      {pop.open && (
+        <div className="popup menu-list big">
+          <h6>Open projects</h6>
+          <div className="proj-row"><span>{s.doc.name || 'Untitled'} (current)</span></div>
+          <hr />
+          {item('Save', () => s.saveFile())}
+          {item('Save As...', () => s.saveFile())}
+          <hr />
+          {item('New Project', () => s.newDocument())}
+          {item('Open Project...', () => fileInput.current?.click())}
+        </div>
+      )}
       <input ref={fileInput} type="file" accept=".forma,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) s.openFile(f); e.target.value = ''; }} />
     </div>
   );
@@ -125,28 +162,42 @@ function TopRight() {
   const setTree = useUI((u) => u.setTree);
   const touch = useUI((u) => u.touch);
   const inSketch = useSketch((k) => !!k.active);
+  const skTool = useSketch((k) => k.active?.tool);
+  const snap = useUI((u) => u.snap);
+  const gridStep = useUI((u) => u.gridStep);
+  const snapPop = usePopup<HTMLDivElement>();
+  const ui = useUI.getState();
   return (
     <div className="chips tr">
-      {(touch || multi) && <IconButton icon={<span className="txt">Multi</span>} tip="Multi-select: add taps to the current selection (the touch equivalent of holding Ctrl)" on={multi} onClick={() => setMulti(!multi)} />}
-      <IconButton icon={<Icon.undo />} tip={inSketch ? 'Undo (in a sketch: backs out the in-progress shape first)' : 'Undo'} disabled={!s.canUndo()} onClick={() => { if (inSketch && useSketch.getState().active?.draft.length) useSketch.getState().escape(); else s.undo(); }} />
-      <IconButton icon={<Icon.redo />} tip="Redo" disabled={!s.canRedo()} onClick={s.redo} />
+      {(touch || multi) && (!inSketch || skTool === 'select') && <IconButton icon={<span className="txt">Multi</span>} tip="Multi-select: add taps to the current selection (the touch equivalent of holding Ctrl)" on={multi} onClick={() => setMulti(!multi)} />}
+      <div className="dd" ref={snapPop.ref}>
+        <IconButton icon={<span className="txt">{snap ? `⌗ ${gridStep}` : '⌗ off'}</span>} tip="Snap & Grid: grid step and snapping" on={snap} onClick={() => snapPop.setOpen(!snapPop.open)} />
+        {snapPop.open && (
+          <div className="popup snap-pop" onPointerDown={(e) => e.stopPropagation()}>
+            <h6>Snap & Grid</h6>
+            <label className="chk"><input type="checkbox" checked={snap} onChange={(e) => ui.setSnap(e.target.checked)} /> Snap to grid</label>
+            <div className="snap-step"><span>Step (mm)</span><div className="seg">{[0.1, 0.5, 1, 10].map((v) => <button key={v} className={gridStep === v ? 'on' : ''} onClick={() => ui.setGridStep(v)}>{v}</button>)}</div></div>
+            <small className="dim">Settings persist across launches.</small>
+          </div>
+        )}
+      </div>
       <IconButton icon={<Icon.list />} tip={tree ? 'Hide the items list' : 'Show bodies and sketches'} on={tree} onClick={() => setTree(!tree)} />
+      <IconButton icon={<Icon.undo />} tip={inSketch ? 'Undo (in a sketch: backs out the in-progress shape first)' : 'Undo'} disabled={!s.canUndo() && !useSketch.getState().active?.draft.length} onClick={() => { if (inSketch && useSketch.getState().active?.draft.length) useSketch.getState().escape(); else s.undo(); }} />
+      <IconButton icon={<Icon.redo />} tip="Redo" disabled={!s.canRedo()} onClick={s.redo} />
     </div>
   );
 }
 
 /* ---------- top-centre: selection chip ---------- */
 
-function SelectionChip() {
+/** One line describing the selection with its measurements (Materializr's Measure tool / SelectionInfo). */
+function useSelectionText(): string {
   const sel = useStore((s) => s.selection);
   const faces = useSel((x) => x.faces);
   const edges = useSel((x) => x.edges);
   const regions = useSel((x) => x.regions);
-  const op = useOp((o) => o.op);
-  const inSketch = useSketch((k) => !!k.active);
   const results = useStore((s) => s.results);
   const doc = useStore((s) => s.doc);
-  if (op || inSketch) return null;
   let text = '';
   if (edges.length === 1) {
     // Materializr's edge readout: length, plus the angle between the two faces
@@ -178,8 +229,36 @@ function SelectionChip() {
     const f = featureById(doc, sel[0]!); const r = results.get(sel[0]!);
     text = f ? `${f.name}${r && !r.error ? ` · ${fmt(r.bbox.max.x - r.bbox.min.x)} × ${fmt(r.bbox.max.y - r.bbox.min.y)} × ${fmt(r.bbox.max.z - r.bbox.min.z)} mm · ${fmt(r.volume / 1000)} cm³` : ''}` : '';
   } else if (sel.length > 1) text = `Selection: Body (${sel.length})`;
-  if (!text) return null;
-  return <div className="chip sel-chip">{text}</div>;
+  return text;
+}
+
+/** View ▸ Measure...: the selection's measurements (Materializr's Measure results: length, area, bounding box). */
+function MeasurePanel() {
+  const open = useUI((u) => u.measure);
+  const set = useUI((u) => u.setMeasure);
+  const text = useSelectionText();
+  const sel = useStore((x) => x.selection);
+  const results = useStore((x) => x.results);
+  const doc = useStore((x) => x.doc);
+  if (!open) return null;
+  const rows: [string, string][] = [];
+  if (sel.length === 1) {
+    const r = results.get(sel[0]!), f = featureById(doc, sel[0]!);
+    if (r && !r.error && f) {
+      const p = f.transform.position;
+      rows.push(['Bounding box', `X ${fmt(r.bbox.max.x - r.bbox.min.x)} · Y ${fmt(r.bbox.max.y - r.bbox.min.y)} · Z ${fmt(r.bbox.max.z - r.bbox.min.z)} mm`]);
+      rows.push(['Min', `${fmt(r.bbox.min.x + p.x)}, ${fmt(r.bbox.min.y + p.y)}, ${fmt(r.bbox.min.z + p.z)}`]);
+      rows.push(['Max', `${fmt(r.bbox.max.x + p.x)}, ${fmt(r.bbox.max.y + p.y)}, ${fmt(r.bbox.max.z + p.z)}`]);
+      rows.push(['Volume', `${fmt(r.volume / 1000)} cm³`]);
+    }
+  }
+  return (
+    <div className="popup measure-pop" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="pp-head"><span>Measure</span><button className="ib" onClick={() => set(false)} aria-label="Close"><Icon.close /></button></div>
+      {text ? <div className="measure-line">{text}</div> : <div className="dim">Select a body, a face or an edge to measure it.</div>}
+      {rows.map(([k, v]) => <div key={k} className="measure-row"><span>{k}</span><b>{v}</b></div>)}
+    </div>
+  );
 }
 const fmt = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1).replace(/\.0$/, ''));
 
@@ -202,42 +281,73 @@ function ToolDock() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [ctx, sel.length, modules, first?.type, faces.length, edges.length, regions.length, !!active]);
   useEffect(() => setOpenGroup(null), [ctx]);
+  const dockRef = useRef<HTMLElement>(null);
+  const circleMode = useSketch((k) => k.circleMode);
+  const rectMode = useSketch((k) => k.rectMode);
+  useEffect(() => {
+    if (!openGroup) return;
+    const onDoc = (e: PointerEvent) => { if (!dockRef.current?.contains(e.target as Node)) setOpenGroup(null); };
+    document.addEventListener('pointerdown', onDoc, true);
+    return () => document.removeEventListener('pointerdown', onDoc, true);
+  }, [openGroup]);
   if (op) return null; // the action owns the screen; the corner ✓/✗ drive it
-  const isActive = (t: RailTool) => (active ? `sk.${active.tool}` === t.id : t.id === tool);
+  const isActive = (t: RailTool) => (active ? `sk.${active.tool}` === t.id : (t.id === 'move' || t.id === 'rotate') && t.id === tool && sel.length > 0);
   return (
-    <nav className="dock" aria-label="Tools">
-      {tools.map((t) => (
-        <div key={t.id + (t.arg ?? '')} className="dock-item">
-          <button className={`rail${isActive(t) ? ' on' : ''}${openGroup === t.id ? ' open' : ''}`} onClick={() => { if (t.children) setOpenGroup(openGroup === t.id ? null : t.id); else { dispatch(t.id, t.arg); } }} aria-label={t.label}>
-            {iconOf(t.icon)}<span>{t.label}</span>
-            {t.children && <i className="caret" />}
-            <Tip text={t.tip} />
-          </button>
-          {t.children && openGroup === t.id && (
-            <div className="popup dock-pop" onPointerDown={(e) => e.stopPropagation()}>
-              {t.children.length === 0 && <div className="dim">Nothing here yet</div>}
-              {t.children.map((c) => (
-                <button key={c.id + (c.arg ?? '')} className="pop-row" onClick={() => { dispatch(c.id, c.arg); setOpenGroup(null); }}>
-                  {iconOf(c.icon)}<span>{c.label}</span><small>{c.tip}</small>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-      {active && active.tool === 'polygon' && <PolygonSides />}
+    <nav className="dock" aria-label="Tools" ref={dockRef}>
+      {tools.map((t) => {
+        // a group shows whichever member is active (ImTouchLayout: Transform reads "Move" while the move gizmo is up)
+        const live = t.children?.find(isActive);
+        const shown = live ?? t;
+        const on = live ? true : isActive(t);
+        const isPolygon = t.id === 'sk.polygon';
+        return (
+          <div key={t.id + (t.arg ?? '')} className="dock-item">
+            <button className={`rail${on ? ' on' : ''}${openGroup === t.id ? ' open' : ''}`} onClick={() => { if (t.children || isPolygon) { if (isPolygon) dispatch(t.id); setOpenGroup(openGroup === t.id ? null : t.id); } else dispatch(t.id, t.arg); }} aria-label={t.label}>
+              {iconOf(shown.icon)}<span>{shown.label}</span>
+              {(t.children || isPolygon) && <i className="caret" />}
+              <Tip text={t.tip} />
+            </button>
+            {isPolygon && openGroup === t.id && <PolygonSides onDone={() => setOpenGroup(null)} />}
+            {active && t.id === 'sk.circle' && active.tool === 'circle' && <ModeToggle a="Center" b="2-Point" value={circleMode === 'center' ? 0 : 1} onChange={(i) => useSketch.getState().setCircleMode(i === 0 ? 'center' : '2pt')} />}
+            {active && t.id === 'sk.rect' && active.tool === 'rect' && <ModeToggle a="Corner" b="Center" value={rectMode === 'corner' ? 0 : 1} onChange={(i) => useSketch.getState().setRectMode(i === 0 ? 'corner' : 'center')} />}
+            {t.children && openGroup === t.id && (
+              <div className="popup dock-pop" onPointerDown={(e) => e.stopPropagation()}>
+                {t.children.length === 0 && <div className="dim">Nothing here yet</div>}
+                {t.children.map((c) => (
+                  <button key={c.id + (c.arg ?? '')} className={`pop-row${isActive(c) ? ' on' : ''}`} onClick={() => { dispatch(c.id, c.arg); setOpenGroup(null); }}>
+                    {iconOf(c.icon)}<span>{c.label}</span><small>{c.tip}</small>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </nav>
   );
 }
 
-function PolygonSides() {
+/** The two-way toggle that follows Circle (Center / 2-Point) and Rectangle (Corner / Center) while the tool is active. */
+function ModeToggle({ a, b, value, onChange }: { a: string; b: string; value: 0 | 1; onChange: (i: 0 | 1) => void }) {
+  return (
+    <div className="dock-item sides mode">
+      <button className={`rail${value === 0 ? ' on' : ''}`} onClick={() => onChange(0)}>{a}</button>
+      <button className={`rail${value === 1 ? ' on' : ''}`} onClick={() => onChange(1)}>{b}</button>
+    </div>
+  );
+}
+
+/** Polygon side picker: named counts, then Custom... (Materializr's PolygonSidesMenu). */
+function PolygonSides({ onDone }: { onDone: () => void }) {
   const n = useSketch((k) => k.polygonSides);
   const set = useSketch((k) => k.setPolygonSides);
+  const [custom, setCustom] = useState(String(n));
+  const named: [string, number][] = [['Triangle', 3], ['Square', 4], ['Pentagon', 5], ['Hexagon', 6], ['Heptagon', 7], ['Octagon', 8]];
   return (
-    <div className="dock-item sides">
-      <button className="rail" onClick={() => set(n - 1)} aria-label="Fewer sides">−</button>
-      <div className="rail static">{n}<span>sides</span></div>
-      <button className="rail" onClick={() => set(n + 1)} aria-label="More sides">+</button>
+    <div className="popup dock-pop sides-pop" onPointerDown={(e) => e.stopPropagation()}>
+      {named.map(([name, k]) => <button key={k} className={`pop-row${n === k ? ' on' : ''}`} onClick={() => { set(k); onDone(); }}><Icon.polygon /><span>{name} ({k})</span></button>)}
+      <hr />
+      <div className="pop-row custom"><span>Custom...</span><input inputMode="numeric" value={custom} onChange={(e) => setCustom(e.target.value)} aria-label="Sides (3–128)" /><button onClick={() => { const v = Math.max(3, Math.min(128, parseInt(custom) || 9)); set(v); onDone(); }}>Draw</button></div>
     </div>
   );
 }
@@ -257,7 +367,8 @@ function ItemsTree() {
   const [sketchesOpen, setSketchesOpen] = useState(true);
   if (!open) return null;
   const roots = topLevel(doc);
-  const bodies = roots.filter((f) => !(f.type === 'extrude' && f.sketch && f.parentId === null && f.role === 'solid' && !results.get(f.id)));
+  // a sketch with no closed outline is not a body yet (Materializr lists sketches apart from bodies)
+  const bodies = roots.filter((f) => !(f.type === 'extrude' && f.sketch && f.parentId === null && f.role === 'solid' && (!results.get(f.id) || results.get(f.id)?.error)));
   const sketches = roots.filter((f) => f.type === 'extrude' && !!f.sketch);
   const row = (f: (typeof roots)[number]) => (
     <div key={f.id} className={`trow${selection.includes(f.id) ? ' sel' : ''}${f.visible ? '' : ' off'}`}
@@ -267,7 +378,7 @@ function ItemsTree() {
       <button className="eye" aria-label={f.visible ? 'Hide' : 'Show'} onClick={(e) => { e.stopPropagation(); toggleVisible(f.id); }}><Icon.eye /></button>
       {featureIcon(f.type)}
       <span className="nm">{f.name}</span>
-      {f.role === 'hole' && <span className="tag hole">hole</span>}
+      {EXTRAS && f.role === 'hole' && <span className="tag hole">hole</span>}
       {results.get(f.id)?.error && <span className="tag err">!</span>}
       {EXTRAS && <i className="fdot" style={{ background: doc.filaments[f.filament - 1]?.color }} />}
       <button className="more" aria-label="More" onClick={(e) => { e.stopPropagation(); useSel.getState().setNavOnly(true); pickBody(f.id, false); useContextMenu.getState().show(e.clientX, e.clientY, [f.id]); }}><Icon.more /></button>
@@ -353,6 +464,7 @@ function StepPopup({ id, index, cursor, onClose, setRollback }: { id: string; in
       <div className="sp-head">{index + 1}. {f.name}{!f.visible && <small> · Disabled</small>}{index >= cursor && <small> · Undone — Go Here replays it.</small>}</div>
       {err && <div className="sp-err">Couldn't build this step: {err}. Edit its parameters, fix the step before it, or delete it.</div>}
       <div className="sp-body"><Inspector /></div>
+      {!err && <button className="primary sp-apply" onClick={onClose}>Apply Changes</button>}
       <div className="sp-foot">
         <button disabled={index + 1 === cursor} onClick={() => setRollback(index + 1 >= n ? null : index + 1)}>Go Here</button>
         <button onClick={() => s.toggleVisible(id)}>{f.visible ? 'Disable' : 'Enable'}</button>
@@ -411,8 +523,7 @@ function CornerFab() {
       {pop.open && (
         <div className="popup fab-menu">
           {face && <button onClick={() => { dispatch('sketch.face'); pop.setOpen(false); }}><Icon.sketch /><span>Sketch on selection</span></button>}
-          {sel.length === 1 && !face && <button onClick={() => { dispatch('sketch.edit'); pop.setOpen(false); }}><Icon.sketch /><span>Edit selection</span></button>}
-          <button className={sub === 'sketch' ? 'on' : ''} onClick={() => setSub(sub === 'sketch' ? null : 'sketch')}><Icon.sketch /><span>New Sketch</span><i className="caret" /></button>
+          {!face && <button className={sub === 'sketch' ? 'on' : ''} onClick={() => setSub(sub === 'sketch' ? null : 'sketch')}><Icon.sketch /><span>New Sketch</span><i className="caret" /></button>}
           {sub === 'sketch' && SKETCH_PLANES.map((p) => <button key={p.id} className="subrow" onClick={() => { dispatch(p.id); pop.setOpen(false); }}>{p.label}</button>)}
           <button className={sub === 'prim' ? 'on' : ''} onClick={() => setSub(sub === 'prim' ? null : 'prim')}><Icon.box /><span>Primitive</span><i className="caret" /></button>
           {sub === 'prim' && PRIMITIVES.map((p) => <button key={p.id} className="subrow" onClick={() => { dispatch(p.id); pop.setOpen(false); }}>{p.label}</button>)}
@@ -439,10 +550,8 @@ function OpOverlay() {
   useEffect(() => { if (op && !dragging) setBuf(fmtVal(valueOf(op))); }, [op && valueOf(op), dragging]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (op && !useUI.getState().touch) requestAnimationFrame(() => inputRef.current?.focus()); }, [op?.kind, op && 'partId' in op ? op.partId : null]); // eslint-disable-line react-hooks/exhaustive-deps
   let banner: ReactNode = null;
-  if (active) banner = <>SKETCH MODE — Draw shapes. <b>✓</b> finishes the sketch, <b>✗</b> discards.</>;
-  else if (op?.kind === 'pushpull') banner = <>PUSH/PULL — Positive = extrude, Negative = cut. Drag the arrow, then <b>✓</b> / <b>✗</b> (Enter / Esc).</>;
-  else if (op?.kind === 'edgeop') banner = <>{op.tool === 'round' ? 'FILLET' : 'CHAMFER'} — Drag the handle away from the edge or type a size, then <b>✓</b> / <b>✗</b>.</>;
-  else if ((tool === 'move' || tool === 'rotate') && sel.length) banner = <>Arrows: Move | Rings: Rotate — drag a handle; <b>Esc</b> for Select</>;
+  if (active) banner = <>SKETCH MODE - Finish Sketch applies, Exit Sketch discards</>;
+  else if (!op && (tool === 'move' || tool === 'rotate') && sel.length) banner = <>Arrows: Move | Rings: Rotate</>;
   return (
     <>
       {banner && <div className={`banner${op ? ' op' : ''}`}>{banner}</div>}
@@ -479,6 +588,36 @@ function PropsSheet() {
       <div className="pp-head"><span>Properties</span><button className="ib" onClick={() => close(null)} aria-label="Close"><Icon.close /></button></div>
       <div className="pp-body"><Inspector /></div>
     </aside>
+  );
+}
+
+/** Settings...: the Materializr settings Forma can honour. Applied live; Close returns to the model. */
+function SettingsDialog() {
+  const open = useUI((u) => u.settings);
+  const ui = useUI();
+  const s = useStore();
+  if (!open) return null;
+  const Row = ({ label, children }: { label: string; children: ReactNode }) => <div className="set-row"><span>{label}</span>{children}</div>;
+  return (
+    <div className="modal-back" onClick={() => ui.setSettings(false)}>
+      <div className="modal settings" onClick={(e) => e.stopPropagation()}>
+        <h2>Settings</h2>
+        <h6>Appearance</h6>
+        <Row label="Display unit"><span className="dim">Millimetres</span></Row>
+        <Row label="Interface"><span className="dim">im-touch</span></Row>
+        <Row label="Touch mode (large UI + touch gestures)"><input type="checkbox" checked={ui.touch} onChange={(e) => ui.setTouch(e.target.checked)} /></Row>
+        <Row label="Theme"><div className="seg"><button className={ui.light ? '' : 'on'} onClick={() => ui.setLight(false)}>Dark</button><button className={ui.light ? 'on' : ''} onClick={() => ui.setLight(true)}>Light</button></div></Row>
+        <Row label="Show toolbar tooltips"><input type="checkbox" checked={ui.tooltips} onChange={(e) => ui.setTooltips(e.target.checked)} /></Row>
+        <h6>Sketch</h6>
+        <Row label="Angle snap"><div className="seg">{[0, 5, 15, 30, 45, 90].map((a) => <button key={a} className={ui.angleSnap === a ? 'on' : ''} onClick={() => ui.setAngleSnap(a)}>{a === 0 ? 'Off' : `${a}°`}</button>)}</div></Row>
+        <Row label="Snap to grid"><input type="checkbox" checked={ui.snap} onChange={(e) => ui.setSnap(e.target.checked)} /></Row>
+        <Row label="Grid step (mm)"><div className="seg">{[0.1, 0.5, 1, 10].map((v) => <button key={v} className={ui.gridStep === v ? 'on' : ''} onClick={() => ui.setGridStep(v)}>{v}</button>)}</div></Row>
+        <h6>Rendering</h6>
+        <Row label="Grid rendering"><input type="checkbox" checked={s.showGrid} onChange={() => s.toggleGrid()} /></Row>
+        <Row label="Show mesh wireframe"><input type="checkbox" checked={s.wireframe} onChange={() => s.toggleWireframe()} /></Row>
+        <div className="foot"><span className="spacer" /><button className="primary" onClick={() => ui.setSettings(false)}>Close</button></div>
+      </div>
+    </div>
   );
 }
 
@@ -520,12 +659,14 @@ function LongPressRing() {
 export function Shell() {
   const light = useUI((u) => u.light);
   const touch = useUI((u) => u.touch);
-  useEffect(() => { document.documentElement.dataset.theme = light ? 'light' : 'dark'; document.documentElement.dataset.touch = touch ? '1' : '0'; }, [light, touch]);
+  const tooltips = useUI((u) => u.tooltips);
+  useEffect(() => { document.documentElement.dataset.theme = light ? 'light' : 'dark'; document.documentElement.dataset.touch = touch ? '1' : '0'; document.documentElement.dataset.tips = tooltips ? '1' : '0'; }, [light, touch, tooltips]);
   return (
     <>
       <TopLeft />
       <TopRight />
-      <SelectionChip />
+      <MeasurePanel />
+      <SettingsDialog />
       <OpOverlay />
       <ToolDock />
       <ItemsTree />

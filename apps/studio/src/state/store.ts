@@ -169,15 +169,8 @@ export const useStore = create<State & Actions>((set, get) => {
     if (Math.abs(normal[2] - 1) < 1e-6) t.position = { x: snap5(point[0]), y: snap5(point[1]), z: Math.round(point[2] * 10) / 10 };
     return t;
   };
-  /** Origin first (as a new body is expected to be), then a ring of spots 50 mm out, so new parts never land on each other. */
-  const placeNew = (): Transform => {
-    const taken = get().doc.features.filter((f) => f.parentId === null).map((f) => f.transform.position);
-    const free = (x: number, y: number) => !taken.some((p) => Math.hypot(p.x - x, p.y - y) < 25);
-    const spots: [number, number][] = [[0, 0]];
-    for (let ring = 1; ring <= 4; ring++) for (let k = 0; k < ring * 6; k++) { const a = (k / (ring * 6)) * Math.PI * 2; spots.push([snap5(Math.cos(a) * ring * 50), snap5(Math.sin(a) * ring * 50)]); }
-    const [x, y] = spots.find(([x, y]) => free(x, y)) ?? spots[0]!;
-    return { position: { x, y, z: 0 }, rotation: { x: 0, y: 0, z: 0 } };
-  };
+  /** Every new primitive starts at the origin (Materializr); Move repositions it. */
+  const placeNew = (): Transform => ({ position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } });
 
   return {
     doc: history.value,
@@ -246,11 +239,11 @@ export const useStore = create<State & Actions>((set, get) => {
       const t = at ? placeOn(at.point, at.normal) : placeNew();
       let f: Feature;
       switch (type) {
-        case 'box': f = makeFeature(doc, 'box', { width: 40, depth: 30, height: 20, transform: t }); break;
-        case 'cylinder': f = makeFeature(doc, 'cylinder', { radius: 15, height: 30, transform: t }); break;
-        case 'cone': f = makeFeature(doc, 'cone', { radiusBottom: 15, radiusTop: 0, height: 30, transform: t }); break;
-        case 'sphere': f = makeFeature(doc, 'sphere', { radius: 15, transform: t }); break;
-        case 'torus': f = makeFeature(doc, 'torus', { ringRadius: 18, tubeRadius: 5, transform: t }); break;
+        case 'box': f = makeFeature(doc, 'box', { width: 10, depth: 10, height: 10, transform: t }); break;
+        case 'cylinder': f = makeFeature(doc, 'cylinder', { radius: 5, height: 10, transform: t }); break;
+        case 'cone': f = makeFeature(doc, 'cone', { radiusBottom: 5, radiusTop: 0, height: 10, transform: t }); break;
+        case 'sphere': f = makeFeature(doc, 'sphere', { radius: 5, transform: t }); break;
+        case 'torus': f = makeFeature(doc, 'torus', { ringRadius: 5, tubeRadius: 2, transform: t }); break;
         case 'tube': f = makeFeature(doc, 'tube', { radius: 15, innerRadius: 11, height: 30, transform: t }); break;
         case 'revolve': f = makeFeature(doc, 'revolve', { height: 60, profile: [[20, 0], [27, 0.14], [30, 0.34], [21, 0.56], [24, 0.76], [17, 0.9], [20, 1]], transform: t }); break;
       }

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
-import { featureById } from '@forma/core';
+import { featureById, topLevel } from '@forma/core';
+import { useTool } from '../state/tool';
 import { useStore } from '../state/store';
 import { useSel } from '../state/sel';
 import { useOp } from '../state/op';
@@ -62,6 +63,20 @@ export function ContextMenu() {
     s.select([feats[0]!.id]);
     requestAnimationFrame(() => { const el = document.getElementById('f-name') as HTMLInputElement | null; el?.focus(); el?.select(); });
   };
+  const isSketch = one?.type === 'extrude' && !!one.sketch;
+  const others = topLevel(s.doc).filter((f) => !open.ids.includes(f.id));
+  const isolated = others.length > 0 && others.every((f) => !f.visible);
+  const shared = (
+    <>
+      <button onClick={run(() => { for (const f of others) if (f.visible) s.toggleVisible(f.id); for (const f of feats) if (!f.visible) s.toggleVisible(f.id); })}>Isolate</button>
+      <button disabled={!isolated && others.every((f) => f.visible)} onClick={run(() => { for (const f of topLevel(s.doc)) if (!f.visible) s.toggleVisible(f.id); })}>Show All Bodies</button>
+      <h6>Export</h6>
+      <button onClick={run(() => { s.select(open.ids); s.exportModel('stl', true); })}>STL...</button>
+      <button onClick={run(() => { s.select(open.ids); s.exportModel('obj', true); })}>OBJ...</button>
+      <button onClick={run(() => { s.select(open.ids); s.exportModel('3mf', true); })}>3MF...</button>
+      {one?.type === 'combine' && <button onClick={run(() => { s.select([one.id]); s.ungroupSelected(); })}>Separate</button>}
+    </>
+  );
   return (
     <div className="ctx" ref={ref} style={{ left: pos?.x ?? open.x, top: pos?.y ?? open.y, visibility: pos ? 'visible' : 'hidden' }} role="menu">
       <div className="ctx-title">Object · {one ? one.name : `${feats.length} parts`}</div>
@@ -69,27 +84,41 @@ export function ContextMenu() {
         <h6>Face</h6>
         <button onClick={run(() => useSel.getState().pickFace({ partId: open.face!.partId, faceIndex: open.face!.faceIndex }, false))}>Select Face</button>
         <button onClick={run(() => { const h = faceHit(open.face!.partId, open.face!.faceIndex); if (h) useSketch.getState().startOnFace(open.face!.partId, h.point, h.normal); })}><Icon.sketch />Sketch on this Face</button>
-        <button onClick={run(() => { useSel.getState().pickFace({ partId: open.face!.partId, faceIndex: open.face!.faceIndex }, false); useOp.getState().beginPushPull(); })}><Icon.pushpull />Push/Pull Face</button>
-        <h6>Body</h6>
-        <button onClick={run(() => { useSel.getState().setNavOnly(false); useSel.getState().pickBody(open.face!.partId, false); })}>Select Body</button>
+        <button onClick={run(() => { useSel.getState().pickFace({ partId: open.face!.partId, faceIndex: open.face!.faceIndex }, false); useOp.getState().beginPushPull(); })}><Icon.pushpull />Extrude Face</button>
       </>}
-      {one && <button onClick={run(rename)}>Rename <small>↵</small></button>}
-      <button onClick={run(() => { s.select(open.ids); s.duplicateSelected(); })}><Icon.copy />Duplicate <small>⌘D</small></button>
-      <button onClick={run(() => { for (const f of feats) if (f.visible === allHidden) s.toggleVisible(f.id); })}><Icon.eye />{allHidden ? 'Show' : 'Hide'}</button>
-      <button onClick={run(() => s.toggleRole(open.ids))}><Icon.hole />{feats.every((f) => f.role === 'hole') ? 'Make solid' : 'Make hole'} <small>H</small></button>
-      {feats.length > 1 && <button onClick={run(() => { s.select(open.ids); s.combineSelected(); })}><Icon.combine />Combine <small>⌘G</small></button>}
-      {one?.type === 'combine' && <button onClick={run(() => { s.select([one.id]); s.ungroupSelected(); })}><Icon.ungroup />Ungroup</button>}
-      {EXTRAS && feats.some((f) => f.parentId === null && f.role === 'solid') && (
-        <div className="ctx-slots">
-          <span>Filament</span>
-          {s.doc.filaments.map((fl, i) => (
-            <button key={i} className={`slot${feats.every((f) => f.filament === i + 1) ? ' on' : ''}`} style={{ '--c': fl.color } as React.CSSProperties} title={`Slot ${i + 1}`}
-              onClick={run(() => s.setDoc({ ...s.doc, features: s.doc.features.map((f) => (open.ids.includes(f.id) ? { ...f, filament: i + 1 } : f)) }))}><i /><span>{i + 1}</span></button>
-          ))}
-        </div>
-      )}
+      {!isSketch && <>
+        <h6>Body</h6>
+        {open.face && <button onClick={run(() => { useSel.getState().setNavOnly(false); useSel.getState().pickBody(open.face!.partId, false); })}>Select Body</button>}
+        {shared}
+      </>}
+      {isSketch && <>
+        <h6>Sketch</h6>
+        <button onClick={run(() => useSketch.getState().start(one!.id))}><Icon.sketch />Edit Sketch</button>
+        <button onClick={run(() => { s.select(open.ids); useTool.getState().set('move'); })}><Icon.move />Move</button>
+        <button onClick={run(() => { s.select(open.ids); useTool.getState().set('rotate'); })}><Icon.rotate />Rotate</button>
+        <button className="danger" onClick={run(() => { s.select(open.ids); s.deleteSelected(); })}><Icon.trash />Delete</button>
+        {shared}
+      </>}
+      {EXTRAS && <>
+        <hr />
+        {one && <button onClick={run(rename)}>Rename <small>↵</small></button>}
+        <button onClick={run(() => { s.select(open.ids); s.duplicateSelected(); })}><Icon.copy />Duplicate <small>⌘D</small></button>
+        <button onClick={run(() => { for (const f of feats) if (f.visible === allHidden) s.toggleVisible(f.id); })}><Icon.eye />{allHidden ? 'Show' : 'Hide'}</button>
+        <button onClick={run(() => s.toggleRole(open.ids))}><Icon.hole />{feats.every((f) => f.role === 'hole') ? 'Make solid' : 'Make hole'} <small>H</small></button>
+        {feats.length > 1 && <button onClick={run(() => { s.select(open.ids); s.combineSelected(); })}><Icon.combine />Combine <small>⌘G</small></button>}
+        {feats.some((f) => f.parentId === null && f.role === 'solid') && (
+          <div className="ctx-slots">
+            <span>Filament</span>
+            {s.doc.filaments.map((fl, i) => (
+              <button key={i} className={`slot${feats.every((f) => f.filament === i + 1) ? ' on' : ''}`} style={{ '--c': fl.color } as React.CSSProperties} title={`Slot ${i + 1}`}
+                onClick={run(() => s.setDoc({ ...s.doc, features: s.doc.features.map((f) => (open.ids.includes(f.id) ? { ...f, filament: i + 1 } : f)) }))}><i /><span>{i + 1}</span></button>
+            ))}
+          </div>
+        )}
+      </>}
       <hr />
-      <button className="danger" onClick={run(() => { s.select(open.ids); s.deleteSelected(); })}><Icon.trash />Delete <small>⌫</small></button>
+      {!isSketch && <button className="danger" onClick={run(() => { s.select(open.ids); s.deleteSelected(); })}><Icon.trash />Delete</button>}
+      <button onClick={close}>Cancel</button>
     </div>
   );
 }

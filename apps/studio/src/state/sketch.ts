@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { useStore } from './store';
 import { useViewStore } from './view';
 import { useSel } from './sel';
+import { useUI } from './ui';
 import { infer, lineLineIntersection, lineCircleIntersections, type Guide } from './inference';
 import { planeTransform } from './plane';
 export { planeTransform };
@@ -90,7 +91,7 @@ interface SketchState {
   cancel(): void;
 }
 
-const GRID = 1;
+const GRID = 1; // fallback when the UI store is unavailable
 /** pixel tolerances (Materializr SketchTool): weld points at 6 px, point at lines / directions at 12 px */
 const WELD_PX = 6, POINT_PX = 12;
 /** distance from p to segment ab */
@@ -125,7 +126,8 @@ function snapPoints(sketch: Sketch): Vec2[] {
 /** Inference with the current zoom: pixel tolerances become mm through pxPerMm. */
 export function computeSnap(raw: Vec2, sketch: Sketch, anchor: Vec2 | null, mods: { shift: boolean; alt: boolean }, extra: Vec2[] = [], ignore: string[] = []): SnapResult {
   const ppm = Math.max(0.5, useSketch.getState().pxPerMm || 8);
-  const r = infer(raw, sketch, anchor, { weld: WELD_PX / ppm, point: POINT_PX / ppm, grid: GRID, shift: mods.shift, alt: mods.alt, extra, ignore });
+  const ui = useUI.getState();
+  const r = infer(raw, sketch, anchor, { weld: WELD_PX / ppm, point: POINT_PX / ppm, grid: ui.snap ? ui.gridStep : 0, angle: ui.angleSnap, shift: mods.shift, alt: mods.alt, extra, ignore });
   const k = r.guides[0]?.kind ?? 'grid';
   const kind: SnapResult['kind'] = k === 'free' ? 'free' : k === 'grid' ? 'grid' : ['endpoint', 'midpoint', 'center', 'intersection', 'online'].includes(k) ? 'point' : 'axis';
   return { p: r.p, kind, ref: kind === 'axis' && anchor ? anchor : undefined, guides: r.guides };

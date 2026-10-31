@@ -86,7 +86,8 @@ export function dispatch(id: ActionId, arg?: string): void {
       return;
     }
     case 'ungroup': s.ungroupSelected(); return;
-    case 'measure': useUI.getState().openSheet('props'); return;
+    case 'measure': useUI.getState().setMeasure(true); return;
+    case 'group.transform': case 'group.multiply': case 'group.modify': case 'group.more': return; // groups only open their popup
     case 'frame': useViewStore.getState().fit(); return;
     case 'sk.select': sk.setTool('select'); return;
     case 'sk.line': sk.setTool('line'); return;

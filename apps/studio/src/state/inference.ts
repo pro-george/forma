@@ -35,6 +35,8 @@ export interface InferenceOpts {
   /** pointing tolerance (mm) — lines, directions */
   point: number;
   grid: number;
+  /** angle snap step in degrees (0 = off); shift always snaps */
+  angle: number;
   shift: boolean;
   alt: boolean;
   /** extra snap points (e.g. the first draft point so a polyline can close) */
@@ -135,7 +137,8 @@ export function infer(raw: Vec2, sketch: Sketch, anchor: Vec2 | null, o: Inferen
         cands.push({ kind: 'parallel', dir: [ex / L, ey / L], ref: e }, { kind: 'perpendicular', dir: [-ey / L, ex / L], ref: e });
       }
       if (o.shift) {
-        const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 12)) * (Math.PI / 12);
+        const stepA = (Math.max(5, o.angle || 15) * Math.PI) / 180;
+        const a = Math.round(Math.atan2(dy, dx) / stepA) * stepA;
         cands.length = 0; cands.push({ kind: 'angle', dir: [Math.cos(a), Math.sin(a)], label: `${Math.round((a * 180) / Math.PI)}°` });
       }
       let bestD: typeof cands[number] | null = null, bdd = o.point;
@@ -149,11 +152,11 @@ export function infer(raw: Vec2, sketch: Sketch, anchor: Vec2 | null, o: Inferen
         const w = c.kind === 'horizontal' || c.kind === 'vertical' ? 0.9 : 1;
         if (d * w < bdd) { bdd = d * w; bestD = c; }
       }
-      if (!bestD && !o.shift) {
-        // 15° steps as a weaker hint when nothing else is close
-        const ang = Math.atan2(dy, dx), step = Math.PI / 12, a = Math.round(ang / step) * step;
+      if (!bestD && !o.shift && o.angle > 0) {
+        // angle-snap steps as a weaker hint when nothing else is close
+        const ang = Math.atan2(dy, dx), step = (o.angle * Math.PI) / 180, a = Math.round(ang / step) * step;
         const d = Math.abs(Math.sin(ang - a)) * len;
-        if (d < o.point * 0.5 && Math.abs(Math.round(ang / step)) % 6 !== 0) bestD = { kind: 'angle', dir: [Math.cos(a), Math.sin(a)], label: `${((Math.round((a * 180) / Math.PI) % 360) + 360) % 360}°` };
+        if (d < o.point * 0.5 && Math.abs(Math.round(ang / step) * o.angle) % 90 !== 0) bestD = { kind: 'angle', dir: [Math.cos(a), Math.sin(a)], label: `${((Math.round((a * 180) / Math.PI) % 360) + 360) % 360}°` };
       }
       if (bestD) {
         const t = dx * bestD.dir[0] + dy * bestD.dir[1];

@@ -202,7 +202,7 @@ function SelectionGizmo({ primary, mode }: { primary: Feature; mode: 'translate'
   const startRef = useRef<{ pos: THREE.Vector3; rot: THREE.Euler; others: { id: string; t: Feature['transform'] }[]; mine: Feature['transform'] } | null>(null);
   const { beginGesture, endGesture } = useStore.getState();
   const touch = useUI((u) => u.touch);
-  const step = useUI((u) => u.gridStep);
+  const step = useUI((u) => (u.snap ? u.gridStep : 0));
   const t = primary.transform;
   useEffect(() => {
     proxy.current.position.set(t.position.x, t.position.y, t.position.z);
@@ -238,7 +238,7 @@ function SelectionGizmo({ primary, mode }: { primary: Feature; mode: 'translate'
       <TransformControls
         object={proxy}
         mode={mode}
-        translationSnap={step}
+        translationSnap={step || null}
         rotationSnap={deg(15)}
         size={touch ? 1.4 : 1}
         onMouseDown={() => {
@@ -334,7 +334,7 @@ function OpLayer() {
   const op = useOp((o) => o.op);
   const dragging = useOp((o) => o.dragging);
   const touch = useUI((u) => u.touch);
-  const step = useUI((u) => u.gridStep);
+  const step = useUI((u) => (u.snap ? u.gridStep : 0));
   const opKey = op ? `${op.kind}:${op.partId}` : '';
   useEffect(() => {
     if (!op) return;
@@ -502,7 +502,7 @@ function Scene() {
   const colors = useThemeColors();
   const controls = useRef<OrbitControlsImpl | null>(null);
   const viewDoc = useStore((s) => s.viewDoc);
-  const step = useUI((u) => u.gridStep);
+  const step = useUI((u) => (u.snap ? u.gridStep : 0));
   const parts = useMemo(() => topLevel(viewDoc).filter((f) => f.visible), [viewDoc]);
   const primary = selection.length ? parts.find((f) => f.id === selection[selection.length - 1]) : undefined;
   const gizmoOn = !!primary && !sketching && !op && !navOnly;

@@ -138,7 +138,7 @@ export default function App() {
         {!ready && <div className="loading"><div><div className="spin" />Loading geometry kernel…</div></div>}
       </section>
       <Shell />
-      <SketchHUD />
+      {EXTRAS && <SketchHUD />}
       {EXTRAS && <RadialMenu />}
       <Toasts />
     </div>
