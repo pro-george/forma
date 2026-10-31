@@ -12,6 +12,8 @@ export { planarFace, loopArea, meshEdges, edgeToolSection, type PlanarFace, type
 export * from './raster/trace.js';
 export * from './raster/heightmap.js';
 export * from './sketch/sketch.js';
+export * from './sketch/constraints.js';
+export * from './sketch/expr.js';
 export * from './export/stl.js';
 export * from './export/threemf.js';
 export * from './export/obj.js';

@@ -17,7 +17,7 @@ export function newId(prefix = 'f'): string {
 
 export function createDocument(name = 'Untitled'): FormaDocument {
   const now = new Date().toISOString();
-  return { version: DOCUMENT_VERSION, name, units: 'mm', features: [], filaments: DEFAULT_FILAMENTS.map((f) => ({ ...f })), createdAt: now, updatedAt: now };
+  return { version: DOCUMENT_VERSION, name, units: 'mm', features: [], params: [], filaments: DEFAULT_FILAMENTS.map((f) => ({ ...f })), createdAt: now, updatedAt: now };
 }
 
 /** Parse + validate JSON (from a .forma file or storage). Throws ZodError on bad input. */

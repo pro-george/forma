@@ -244,6 +244,8 @@ export const DocumentSchema = z.object({
   name: z.string().default('Untitled'),
   units: z.literal('mm').default('mm'),
   features: z.array(FeatureSchema),
+  /** named parameters with unit-aware expressions (`width = 2 * base + 5 mm`); dimensions refer to them */
+  params: z.array(z.object({ name: z.string(), expr: z.string(), value: z.number().optional(), kind: z.enum(['length', 'angle', 'number']).optional() })).optional(),
   /** printer filament slots; parts reference them by 1-based `filament` */
   filaments: z.array(FilamentSchema).min(1).max(16).default(DEFAULT_FILAMENTS),
   createdAt: z.string().optional(),

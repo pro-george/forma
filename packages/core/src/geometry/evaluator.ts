@@ -139,7 +139,7 @@ export class Evaluator {
     try { specs = def.build(inputs, this.opts.api); } catch (e) { throw new BuildError(`Module error: ${(e as Error).message}`, f.id); }
     const feats = specsToFeatures(specs, f.id);
     if (feats.length === 0) throw new BuildError('Module produced no parts', f.id);
-    const tmpDoc: FormaDocument = { version: 1, name: '', units: 'mm', features: feats, filaments: DEFAULT_FILAMENTS };
+    const tmpDoc: FormaDocument = { version: 1, name: '', units: 'mm', features: feats, params: [], filaments: DEFAULT_FILAMENTS };
     return this.combineManifold(feats, tmpDoc, f.id);
   }
 

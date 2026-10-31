@@ -105,7 +105,7 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 
 function currentSketch(featureId: string): Sketch {
   const f = featureById(useStore.getState().doc, featureId);
-  return f && f.type === 'extrude' && f.sketch ? f.sketch : { entities: [] };
+  return f && f.type === 'extrude' && f.sketch ? f.sketch : { entities: [], constraints: [] };
 }
 
 function writeSketch(featureId: string, entities: SketchEntity[], undoable: boolean) {
@@ -202,7 +202,7 @@ export const useSketch = create<SketchState>((set, get) => {
       const part = featureById(st.doc, partId);
       if (!part) return;
       const t = planeTransform(point, normal);
-      const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [] }, height: 10, transform: t });
+      const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [], constraints: [] }, height: 10, transform: t });
       let doc = addFeature(st.doc, f);
       // the sketch must live in the same combine as the part so its extrusion joins or cuts it
       let combineId: string;
@@ -237,7 +237,7 @@ export const useSketch = create<SketchState>((set, get) => {
     },
     createAndStartAt: (point) => {
       const st = useStore.getState();
-      const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [] }, height: 10, transform: { position: { x: Math.round(point[0]), y: Math.round(point[1]), z: Math.round(point[2] * 10) / 10 }, rotation: { x: 0, y: 0, z: 0 } } });
+      const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [], constraints: [] }, height: 10, transform: { position: { x: Math.round(point[0]), y: Math.round(point[1]), z: Math.round(point[2] * 10) / 10 }, rotation: { x: 0, y: 0, z: 0 } } });
       st.setDoc(addFeature(st.doc, f));
       get().start(f.id);
     },
@@ -245,7 +245,7 @@ export const useSketch = create<SketchState>((set, get) => {
       const st = useStore.getState();
       const normal: [number, number, number] = plane === 'xy' ? [0, 0, 1] : plane === 'xz' ? [0, -1, 0] : [1, 0, 0];
       const t = plane === 'xy' ? { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } } : planeTransform([0, 0, 0], normal);
-      const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [] }, height: 10, transform: t, name: `Sketch ${st.doc.features.filter((x) => x.type === 'extrude').length + 1}` });
+      const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [], constraints: [] }, height: 10, transform: t, name: `Sketch ${st.doc.features.filter((x) => x.type === 'extrude').length + 1}` });
       st.setDoc(addFeature(st.doc, f));
       set({ host: null, aligning: true });
       get().start(f.id);
@@ -263,7 +263,7 @@ export const useSketch = create<SketchState>((set, get) => {
     createAndStart: () => {
       const st = useStore.getState();
       const n = st.doc.features.filter((x) => x.parentId === null).length;
-      const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [] }, height: 10, transform: { position: { x: ((n % 4) - 1.5) * 30, y: (Math.floor(n / 4) % 4 - 1.5) * 30, z: 0 }, rotation: { x: 0, y: 0, z: 0 } } });
+      const f = makeFeature(st.doc, 'extrude', { sketch: { entities: [], constraints: [] }, height: 10, transform: { position: { x: ((n % 4) - 1.5) * 30, y: (Math.floor(n / 4) % 4 - 1.5) * 30, z: 0 }, rotation: { x: 0, y: 0, z: 0 } } });
       st.setDoc(addFeature(st.doc, f));
       get().start(f.id);
     },
@@ -448,7 +448,7 @@ export const useSketch = create<SketchState>((set, get) => {
       const a = get().active; if (!a || !a.dragVertex) return;
       const { from, ids } = a.dragVertex;
       const sketch = currentSketch(a.featureId);
-      const others: Sketch = { entities: sketch.entities.filter((e) => !ids.includes(e.id)) };
+      const others: Sketch = { entities: sketch.entities.filter((e) => !ids.includes(e.id)), constraints: [] };
       const target = computeSnap(local, others, null, mods, [], ids).p;
       const same = (p: Vec2) => Math.hypot(p[0] - from[0], p[1] - from[1]) < 0.01;
       const entities = sketch.entities.map((e): SketchEntity => {

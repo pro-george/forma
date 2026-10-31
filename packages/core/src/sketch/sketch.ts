@@ -16,7 +16,9 @@ export const SketchEntitySchema = z.discriminatedUnion('type', [
 ]);
 export type SketchEntity = z.infer<typeof SketchEntitySchema>;
 
-export const SketchSchema = z.object({ entities: z.array(SketchEntitySchema) });
+import { ConstraintSchema } from './constraints.js';
+
+export const SketchSchema = z.object({ entities: z.array(SketchEntitySchema), /** constraints and driving dimensions solved at edit time; the entities hold the solved coordinates */ constraints: z.array(ConstraintSchema).optional() });
 export type Sketch = z.infer<typeof SketchSchema>;
 
 const TAU = Math.PI * 2;
