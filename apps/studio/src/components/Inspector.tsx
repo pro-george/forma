@@ -7,6 +7,7 @@ import { ProfileCanvas, ProfileEditor } from './ProfileEditor';
 import { ImageField } from './ImageField';
 import { useSketch } from '../state/sketch';
 import { FilamentPicker, FilamentPalette } from './Filaments';
+import { EXTRAS } from '../features';
 
 type NumKey<T> = { [K in keyof T]: T[K] extends number ? K : never }[keyof T];
 interface FieldDef<T extends Feature> { key: NumKey<T>; label: string; min?: number; max?: number; step?: number; unit?: string }
@@ -70,7 +71,7 @@ export function Inspector() {
   if (features.length === 0) return (
     <div className="props">
       <div className="empty">Select a part to edit it. Every value stays live — change a hole's radius inside a combined part and the kernel recomputes the boolean.</div>
-      <FilamentPalette />
+      {EXTRAS && <FilamentPalette />}
       <h3>Keys</h3>
       <div className="keys">
         <span><b>V</b> select</span><span><b>M</b> move</span><span><b>R</b> rotate</span><span><b>P</b> push/pull</span><span><b>F</b> fillet</span><span><b>K</b> sketch</span><span><b>Esc</b> back to select</span>
@@ -101,7 +102,7 @@ function CommonHeader({ feature }: { feature: Feature }) {
           <button className={feature.role === 'intersect' ? 'on' : ''} onClick={() => patch(feature.id, { role: 'intersect' })} title="Keep only where this overlaps the solids before it (inside a combine)">Keep</button>
         </div>
       </Field>
-      {feature.role === 'solid' && feature.parentId === null && <FilamentPicker ids={[feature.id]} />}
+      {EXTRAS && feature.role === 'solid' && feature.parentId === null && <FilamentPicker ids={[feature.id]} />}
     </>
   );
 }
@@ -382,7 +383,7 @@ function MultiPanel({ features }: { features: Feature[] }) {
     <div className="props">
       <h3>{features.length} parts selected</h3>
       <div className="note">Total volume {formatNum(vol / 1000)} cm³ · ≈{formatNum((vol / 1000) * 1.24)} g PLA</div>
-      <FilamentPicker ids={features.filter((f) => f.parentId === null).map((f) => f.id)} />
+      {EXTRAS && <FilamentPicker ids={features.filter((f) => f.parentId === null).map((f) => f.id)} />}
       <div className="actions">
         <button className="primary" onClick={s.combineSelected}>Combine</button>
         <button onClick={() => s.toggleRole()}>Toggle hole</button>

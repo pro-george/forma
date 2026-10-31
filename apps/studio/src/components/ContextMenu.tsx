@@ -7,6 +7,7 @@ import { useOp } from '../state/op';
 import { useSketch } from '../state/sketch';
 import { faceHit } from '../shell/actions';
 import { Icon } from './icons';
+import { EXTRAS } from '../features';
 
 /** Right-click menu for parts, shared by the Layers list and the timeline. */
 export interface FaceHit { partId: string; faceIndex: number; flat: boolean }
@@ -78,7 +79,7 @@ export function ContextMenu() {
       <button onClick={run(() => s.toggleRole(open.ids))}><Icon.hole />{feats.every((f) => f.role === 'hole') ? 'Make solid' : 'Make hole'} <small>H</small></button>
       {feats.length > 1 && <button onClick={run(() => { s.select(open.ids); s.combineSelected(); })}><Icon.combine />Combine <small>⌘G</small></button>}
       {one?.type === 'combine' && <button onClick={run(() => { s.select([one.id]); s.ungroupSelected(); })}><Icon.ungroup />Ungroup</button>}
-      {feats.some((f) => f.parentId === null && f.role === 'solid') && (
+      {EXTRAS && feats.some((f) => f.parentId === null && f.role === 'solid') && (
         <div className="ctx-slots">
           <span>Filament</span>
           {s.doc.filaments.map((fl, i) => (

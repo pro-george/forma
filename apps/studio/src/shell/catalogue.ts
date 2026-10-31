@@ -6,6 +6,7 @@
  */
 import type { SelContext } from '../state/sel';
 import type { Icon } from '../components/icons';
+import { EXTRAS } from '../features';
 
 export type ActionId =
   | 'sketch.xy' | 'sketch.xz' | 'sketch.yz' | 'sketch.face' | 'sketch.edit'
@@ -61,7 +62,7 @@ export function railTools(ctx: SelContext, opts: { bodies: number; modules: { id
       return [
         { id: 'sketch.xy', label: 'Sketch', icon: 'sketch', tip: 'Start a sketch on a world plane (XY / XZ / YZ)', children: SKETCH_PLANES },
         { id: 'prim.box', label: 'Primitive', icon: 'box', tip: 'Add a primitive solid: box, cylinder, sphere, cone or torus', children: PRIMITIVES },
-        { id: 'module', label: 'Parts', icon: 'module', tip: 'Ready-made parametric parts: vases, boxes, name tags…', children: opts.modules.map((m) => ({ id: 'module' as const, arg: m.id, label: m.name, icon: 'module' as const, tip: m.description })) },
+        ...(EXTRAS ? [{ id: 'module' as const, label: 'Parts', icon: 'module' as const, tip: 'Ready-made parametric parts: vases, boxes, name tags…', children: opts.modules.map((m) => ({ id: 'module' as const, arg: m.id, label: m.name, icon: 'module' as const, tip: m.description })) }] : []),
         { id: 'measure', label: 'Measure', icon: 'ruler', tip: 'Measure distance, length, or angle between picked features.' },
       ];
     case 'face':

@@ -12,6 +12,7 @@ import { SketchHUD } from './components/SketchHUD';
 import { RadialMenu } from './components/RadialMenu';
 import { Shell } from './shell/Shell';
 import { dispatch } from './shell/actions';
+import { EXTRAS } from './features';
 
 /**
  * Key bindings (Materializr's KeyBindings): Ctrl+Z/Y undo/redo, Ctrl+S save,
@@ -138,7 +139,7 @@ export default function App() {
       </section>
       <Shell />
       <SketchHUD />
-      <RadialMenu />
+      {EXTRAS && <RadialMenu />}
       <Toasts />
     </div>
   );

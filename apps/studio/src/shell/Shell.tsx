@@ -26,6 +26,7 @@ import { describeChange } from '../components/Timeline';
 import { FilamentPalette } from '../components/Filaments';
 import { Tour } from './Tour';
 import { useLongPress } from '../state/menu';
+import { EXTRAS } from '../features';
 
 /* ---------- small widget kit (railButton / iconButton / fab / popup) ---------- */
 
@@ -76,13 +77,13 @@ function TopLeft() {
             <h6>File</h6>
             {item('New Project', () => s.newDocument())}
             {item('Open Project…', () => fileInput.current?.click())}
-            {item('Open sample scene', () => s.loadSample())}
+            {EXTRAS && item('Open sample scene', () => s.loadSample())}
             {item('Save Project', () => s.saveFile(), '⌘S')}
             <h6>Export</h6>
-            {item('3MF for Bambu Studio', () => s.exportModel('bambu'), 'AMS slots')}
-            {item('3MF with colours', () => s.exportModel('3mf'), 'Prusa, Cura')}
             {item('STL', () => s.exportModel('stl'))}
+            {item('3MF', () => s.exportModel('3mf'))}
             {item('OBJ', () => s.exportModel('obj'))}
+            {EXTRAS && item('3MF for Bambu Studio', () => s.exportModel('bambu'), 'AMS slots')}
             <h6>Edit</h6>
             {item('Undo', () => s.undo(), '⌘Z', !s.canUndo())}
             {item('Redo', () => s.redo(), '⌘Y', !s.canRedo())}
@@ -93,8 +94,8 @@ function TopLeft() {
             {item('Top / Front / Right', () => view.setPreset(['top', 'front', 'right'][Date.now() % 3] as 'top'))}
             {item(s.showGrid ? '✓ Grid' : 'Grid', () => s.toggleGrid())}
             {item(s.wireframe ? '✓ Wireframe' : 'Wireframe', () => s.toggleWireframe())}
-            {item(s.printLook ? '✓ Print look' : 'Print look', () => s.togglePrintLook())}
-            {item('Arrange parts on plate', () => { s.arrangeParts(); view.fit(); })}
+            {EXTRAS && item(s.printLook ? '✓ Print look' : 'Print look', () => s.togglePrintLook())}
+            {EXTRAS && item('Arrange parts on plate', () => { s.arrangeParts(); view.fit(); })}
             <h6>Settings</h6>
             {item(ui.light ? '✓ Light theme' : 'Light theme', () => ui.setLight(!ui.light))}
             {item(ui.touch ? '✓ Touch mode' : 'Touch mode', () => ui.setTouch(!ui.touch), 'bigger targets, long-press')}
@@ -268,7 +269,7 @@ function ItemsTree() {
       <span className="nm">{f.name}</span>
       {f.role === 'hole' && <span className="tag hole">hole</span>}
       {results.get(f.id)?.error && <span className="tag err">!</span>}
-      <i className="fdot" style={{ background: doc.filaments[f.filament - 1]?.color }} />
+      {EXTRAS && <i className="fdot" style={{ background: doc.filaments[f.filament - 1]?.color }} />}
       <button className="more" aria-label="More" onClick={(e) => { e.stopPropagation(); useSel.getState().setNavOnly(true); pickBody(f.id, false); useContextMenu.getState().show(e.clientX, e.clientY, [f.id]); }}><Icon.more /></button>
     </div>
   );
@@ -278,7 +279,7 @@ function ItemsTree() {
       {bodiesOpen && (bodies.length ? [...bodies].reverse().map(row) : <div className="dim">Nothing here yet</div>)}
       <button className="tgroup" onClick={() => setSketchesOpen(!sketchesOpen)}><i className={`caret${sketchesOpen ? ' open' : ''}`} />Sketches <small>{sketches.length}</small></button>
       {sketchesOpen && (sketches.length ? [...sketches].reverse().map(row) : <div className="dim">No sketches yet</div>)}
-      <div className="tree-filaments"><FilamentPalette /></div>
+      {EXTRAS && <div className="tree-filaments"><FilamentPalette /></div>}
     </aside>
   );
 }
@@ -415,8 +416,8 @@ function CornerFab() {
           {sub === 'sketch' && SKETCH_PLANES.map((p) => <button key={p.id} className="subrow" onClick={() => { dispatch(p.id); pop.setOpen(false); }}>{p.label}</button>)}
           <button className={sub === 'prim' ? 'on' : ''} onClick={() => setSub(sub === 'prim' ? null : 'prim')}><Icon.box /><span>Primitive</span><i className="caret" /></button>
           {sub === 'prim' && PRIMITIVES.map((p) => <button key={p.id} className="subrow" onClick={() => { dispatch(p.id); pop.setOpen(false); }}>{p.label}</button>)}
-          <button className={sub === 'parts' ? 'on' : ''} onClick={() => setSub(sub === 'parts' ? null : 'parts')}><Icon.module /><span>Ready-made part</span><i className="caret" /></button>
-          {sub === 'parts' && modules.map((m) => <button key={m.id} className="subrow" title={m.description} onClick={() => { dispatch('module', m.id); pop.setOpen(false); }}>{m.name}</button>)}
+          {EXTRAS && <button className={sub === 'parts' ? 'on' : ''} onClick={() => setSub(sub === 'parts' ? null : 'parts')}><Icon.module /><span>Ready-made part</span><i className="caret" /></button>}
+          {EXTRAS && sub === 'parts' && modules.map((m) => <button key={m.id} className="subrow" title={m.description} onClick={() => { dispatch('module', m.id); pop.setOpen(false); }}>{m.name}</button>)}
         </div>
       )}
       <button className={`fab${pop.open ? ' on' : ''}`} aria-label="Create: a sketch or a primitive solid" onClick={() => { setSub(null); pop.setOpen(!pop.open); }}><Icon.plus /><Tip text="Create: a sketch or a primitive solid" /></button>

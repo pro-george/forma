@@ -16,6 +16,7 @@ import { faceAt } from '../state/hover';
 import { useMenu, longPress } from '../state/menu';
 import { edgesFor } from '../state/edges';
 import { useContextMenu } from './ContextMenu';
+import { EXTRAS } from '../features';
 export { useViewStore };
 
 /* colours after Materializr's SelectionHighlight / Gizmo */
@@ -421,7 +422,7 @@ function GhostPrism({ op }: { op: PushPullOp }) {
 
 /** Invisible ground: remembers where the pointer is, starts a sketch there while picking a plane, right-click / long-press adds a part here. */
 function GroundPlane() {
-  const lp = useMemo(() => longPress(() => { const h = pending.current; if (h) useMenu.getState().show(h.x, h.y, { point: h.point, normal: [0, 0, 1] }); }), []);
+  const lp = useMemo(() => longPress(() => { const h = pending.current; if (h && EXTRAS) useMenu.getState().show(h.x, h.y, { point: h.point, normal: [0, 0, 1] }); }), []);
   const pending = useRef<{ x: number; y: number; point: [number, number, number] } | null>(null);
   return (
     <mesh position={[0, 0, -0.01]}
@@ -433,7 +434,7 @@ function GroundPlane() {
       }}
       onPointerUp={() => lp.cancel()}
       onClick={(e) => { if (useSketch.getState().pickingFace && e.button === 0 && (e.delta ?? 0) < 4) { e.stopPropagation(); useSketch.getState().createAndStartAt([e.point.x, e.point.y, 0]); } }}
-      onContextMenu={(e) => { if (useSketch.getState().active || useOp.getState().op) return; e.nativeEvent.preventDefault(); useMenu.getState().show(e.nativeEvent.clientX, e.nativeEvent.clientY, { point: [e.point.x, e.point.y, 0], normal: [0, 0, 1] }); }}>
+      onContextMenu={(e) => { if (!EXTRAS || useSketch.getState().active || useOp.getState().op) return; e.nativeEvent.preventDefault(); useMenu.getState().show(e.nativeEvent.clientX, e.nativeEvent.clientY, { point: [e.point.x, e.point.y, 0], normal: [0, 0, 1] }); }}>
       <planeGeometry args={[6000, 6000]} />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
