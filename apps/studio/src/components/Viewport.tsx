@@ -85,7 +85,7 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
   const allEdges = useSel((s) => s.edges);
   const selFaces = useMemo(() => allFaces.filter((f) => f.partId === feature.id), [allFaces, feature.id]);
   const selEdges = useMemo(() => allEdges.filter((e) => e.partId === feature.id), [allEdges, feature.id]);
-  const touch = useUI((u) => u.touch || u.phone);
+  const touch = useUI((u) => u.touch);
   const lpHit = useRef<{ x: number; y: number; faceIndex: number } | null>(null);
 
   const openMenu = (x: number, y: number, faceIndex: number) => {
@@ -156,22 +156,8 @@ function Part({ feature, result, selected, colors, wireframe, printLook, ghost, 
               return;
             }
             useSel.getState().setNavOnly(false);
-            const rect = (e.nativeEvent.target as HTMLElement).getBoundingClientRect();
-            if (useUI.getState().phone) {
-              // phone layout: the bar's filter says what a tap picks, so nothing is guessed from distance
-              const filter = useSel.getState().filter;
-              if (filter === 'body') { useSel.getState().pickBody(feature.id, add); return; }
-              if (filter === 'face') {
-                if (faceAt(result.mesh, e.faceIndex)) useSel.getState().pickFace({ partId: feature.id, faceIndex: e.faceIndex }, add);
-                else useStore.getState().toast('That face is curved — Push/Pull and Sketch need a flat one. Tap a flat face, or switch the filter to Body.');
-                return;
-              }
-              const ei = edgeNear(e.nativeEvent.clientX - rect.left, e.nativeEvent.clientY - rect.top);
-              if (ei >= 0) useSel.getState().pickEdge({ partId: feature.id, index: ei }, add);
-              else useStore.getState().toast('No edge under the finger — tap right on an edge line (zoom in if they are small).');
-              return;
-            }
             // priority: edge within the pick radius → flat face → body (curved surfaces)
+            const rect = (e.nativeEvent.target as HTMLElement).getBoundingClientRect();
             const ei = edgeNear(e.nativeEvent.clientX - rect.left, e.nativeEvent.clientY - rect.top);
             if (ei >= 0) { useSel.getState().pickEdge({ partId: feature.id, index: ei }, add); return; }
             if (faceAt(result.mesh, e.faceIndex)) { useSel.getState().pickFace({ partId: feature.id, faceIndex: e.faceIndex }, add); return; }
@@ -214,7 +200,7 @@ function SelectionGizmo({ primary, mode }: { primary: Feature; mode: 'translate'
   const proxy = useRef<THREE.Group>(null!);
   const startRef = useRef<{ pos: THREE.Vector3; rot: THREE.Euler; others: { id: string; t: Feature['transform'] }[]; mine: Feature['transform'] } | null>(null);
   const { beginGesture, endGesture } = useStore.getState();
-  const touch = useUI((u) => u.touch || u.phone);
+  const touch = useUI((u) => u.touch);
   const step = useUI((u) => u.gridStep);
   const t = primary.transform;
   useEffect(() => {
@@ -346,7 +332,7 @@ function OpLayer() {
   const { camera, gl } = useThree();
   const op = useOp((o) => o.op);
   const dragging = useOp((o) => o.dragging);
-  const touch = useUI((u) => u.touch || u.phone);
+  const touch = useUI((u) => u.touch);
   const step = useUI((u) => u.gridStep);
   const opKey = op ? `${op.kind}:${op.partId}` : '';
   useEffect(() => {
@@ -510,7 +496,6 @@ function Scene() {
   const pickingFace = useSketch((s) => s.pickingFace);
   const op = useOp((o) => o.op);
   const opDragging = useOp((o) => o.dragging);
-  const phone = useUI((u) => u.phone);
   const tool = useTool((s) => s.tool);
   const navOnly = useSel((s) => s.navOnly);
   const colors = useThemeColors();
@@ -541,7 +526,7 @@ function Scene() {
         mouseButtons={sketching ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
         // in a sketch one finger draws (press-drag-release), two fingers pan and zoom
         touches={sketching ? { ONE: -1 as unknown as THREE.TOUCH, TWO: THREE.TOUCH.DOLLY_PAN } : { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }} />
-      <GizmoHelper alignment={phone ? "top-right" : "bottom-right"} margin={phone ? [56, 150] : [100, 120]}>
+      <GizmoHelper alignment="bottom-right" margin={[100, 120]}>
         <GizmoViewport axisColors={['#e63333', '#33e633', '#4d66f2']} labelColor="white" />
       </GizmoHelper>
       <ViewController controls={controls} />

@@ -23,9 +23,6 @@ interface SelState {
   regions: RegionSel[];
   /** touch "Multi" toggle: taps add instead of replace */
   multi: boolean;
-  /** phone layout: what a tap picks — explicit instead of nearest-wins */
-  filter: 'body' | 'face' | 'edge';
-  setFilter(f: 'body' | 'face' | 'edge'): void;
   /** the body was picked from the items list, not the viewport: no gizmo until a viewport click (SelectionManager navigationOnly) */
   navOnly: boolean;
   setNavOnly(v: boolean): void;
@@ -43,8 +40,6 @@ const sameEdge = (a: EdgeSel, b: EdgeSel) => a.partId === b.partId && a.index ==
 const sameRegion = (a: RegionSel, b: RegionSel) => a.sketchId === b.sketchId && a.index === b.index;
 
 export const useSel = create<SelState>((set, get) => ({
-  filter: 'body',
-  setFilter: (filter) => set({ filter }),
   faces: [],
   edges: [],
   regions: [],
