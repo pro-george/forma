@@ -441,3 +441,17 @@ h6 { margin: 8px 10px 2px; font-size: 10px; text-transform: uppercase; letter-sp
 .sides-pop .pop-row.custom button { min-height: 32px; padding: 0 12px; background: var(--accent); color: var(--on-accent); border-radius: 8px; }
 :root[data-tips="0"] .tt { display: none; }
 .dock-item.sides.mode .rail { font-size: 10.5px; height: 32px; }
+
+/* ---------- sketch constraints and dimensions ---------- */
+.sk-cons { min-height: 0; width: 18px; height: 18px; border-radius: 4px; padding: 0; font: 12px var(--mono); line-height: 1; background: rgba(16, 19, 24, .85); color: #8cdcff; border: 1px solid rgba(140, 220, 255, .35); }
+.sk-cons.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+[data-theme="light"] .sk-cons { background: rgba(255, 255, 255, .9); color: #0a7fb0; }
+.sk-dim { min-height: 0; padding: 2px 7px; border-radius: 6px; font: 12px var(--mono); background: rgba(16, 19, 24, .88); color: var(--text); border: 1px solid var(--hair); white-space: nowrap; display: inline-flex; gap: 6px; align-items: baseline; }
+.sk-dim small { color: #8cdcff; font-size: 10px; }
+.sk-dim.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+[data-theme="light"] .sk-dim { background: rgba(255, 255, 255, .92); }
+.sk-dim-edit { display: flex; gap: 4px; align-items: center; background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 3px; box-shadow: var(--shadow); }
+.sk-dim-edit input { width: 150px; background: var(--row); border: none; border-radius: 5px; color: var(--text); font: 13px var(--mono); padding: 4px 8px; outline: none; }
+.sk-dim-edit button { min-height: 0; width: 26px; height: 26px; padding: 0; border-radius: 5px; background: var(--accent); color: var(--on-accent); font-size: 13px; }
+.sk-dof { color: var(--dim); }
+.ctx button.sub { padding-left: 24px; font-size: 12px; }

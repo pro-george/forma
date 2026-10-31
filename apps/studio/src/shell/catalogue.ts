@@ -16,7 +16,7 @@ export type ActionId =
   | 'move' | 'rotate' | 'mirror' | 'split' | 'duplicate' | 'delete' | 'pattern.linear' | 'pattern.circular'
   | 'bool.union' | 'bool.subtract' | 'bool.intersect' | 'ungroup' | 'hole'
   | 'measure' | 'frame'
-  | 'sk.select' | 'sk.line' | 'sk.rect' | 'sk.circle' | 'sk.arc' | 'sk.polygon' | 'sk.trim' | 'sk.finish' | 'sk.exit' | 'sk.lookat'
+  | 'sk.select' | 'sk.line' | 'sk.rect' | 'sk.circle' | 'sk.arc' | 'sk.polygon' | 'sk.trim' | 'sk.dim' | 'sk.finish' | 'sk.exit' | 'sk.lookat'
   | 'group.transform' | 'group.multiply' | 'group.modify' | 'group.more';
 
 export interface RailTool {
@@ -65,6 +65,7 @@ export function railTools(ctx: SelContext, opts: { bodies: number; modules: { id
         { id: 'sk.rect', label: 'Rectangle', icon: 'rect', tip: 'Draw a rectangle: corner to corner, or centre out. Type width ⏎ height ⏎ for exact sizes.' },
         { id: 'sk.arc', label: 'Arc', icon: 'arc', tip: 'Three-point arc: tap start, end, then a point on the curve.' },
         { id: 'sk.polygon', label: 'Polygon', icon: 'polygon', tip: 'Regular polygon: pick the side count, tap the centre, drag to size.' },
+        { id: 'sk.dim', label: 'Dimension', icon: 'ruler', tip: 'Dimension: click a line, circle or arc, two points or two lines, then type the value — a number, an expression, or name = expr to make a parameter.' },
         { id: 'group.modify', label: 'Modify', icon: 'trim', tip: 'Trim', children: [
           { id: 'sk.trim', label: 'Trim', icon: 'trim', tip: 'Remove the piece of a segment or circle between its nearest crossings.' },
         ] },

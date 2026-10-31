@@ -12,6 +12,7 @@ const TOOLS: { id: SketchTool; label: string; key: string }[] = [
   { id: 'arc', label: 'Arc', key: 'A' },
   { id: 'polygon', label: 'Polygon', key: 'G' },
   { id: 'trim', label: 'Trim', key: 'T' },
+  { id: 'dim', label: 'Dimension', key: 'D' },
 ];
 
 export function SketchHUD() {
@@ -36,6 +37,7 @@ export function SketchHUD() {
     arc: active.draft.length === 0 ? 'Click the start point' : active.draft.length === 1 ? 'Click the end point' : 'Click a point the arc should pass through',
     polygon: active.draft.length ? 'Click for the size and rotation — the first corner sits under the cursor' : 'Click the centre',
     trim: 'Click the piece to remove — it is cut back to the nearest crossings',
+    dim: active.dimEdit ? 'Type the value (a number, an expression, or name = expr) and press Enter' : 'Click a line (length), a circle (diameter), an arc (radius), two points (distance) or two lines (angle)',
   }[active.tool];
   return (
     <div className="sketch-hud">

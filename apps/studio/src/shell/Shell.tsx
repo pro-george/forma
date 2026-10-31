@@ -21,7 +21,7 @@ import { dispatch, faceHit } from './actions';
 import { faceAt } from '../state/hover';
 import { edgesFor } from '../state/edges';
 import { Inspector } from '../components/Inspector';
-import { ContextMenu, useContextMenu } from '../components/ContextMenu';
+import { ContextMenu, useContextMenu, SketchContextMenu } from '../components/ContextMenu';
 import { describeChange } from '../components/Timeline';
 import { FilamentPalette } from '../components/Filaments';
 import { Tour } from './Tour';
@@ -550,7 +550,7 @@ function OpOverlay() {
   useEffect(() => { if (op && !dragging) setBuf(fmtVal(valueOf(op))); }, [op && valueOf(op), dragging]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (op && !useUI.getState().touch) requestAnimationFrame(() => inputRef.current?.focus()); }, [op?.kind, op && 'partId' in op ? op.partId : null]); // eslint-disable-line react-hooks/exhaustive-deps
   let banner: ReactNode = null;
-  if (active) banner = <>SKETCH MODE - Finish Sketch applies, Exit Sketch discards</>;
+  if (active) banner = <>SKETCH MODE - Finish Sketch applies, Exit Sketch discards<SketchDof /></>;
   else if (!op && (tool === 'move' || tool === 'rotate') && sel.length) banner = <>Arrows: Move | Rings: Rotate</>;
   return (
     <>
@@ -589,6 +589,15 @@ function PropsSheet() {
       <div className="pp-body"><Inspector /></div>
     </aside>
   );
+}
+
+/** Degrees of freedom of the active sketch, next to the banner (SolidCraft shows the solver state the same way). */
+function SketchDof() {
+  const active = useSketch((k) => k.active);
+  const doc = useStore((s) => s.doc);
+  const r = useMemo(() => (active ? useSketch.getState().solved() : null), [active?.featureId, doc]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!r || r.rows === 0) return null;
+  return <span className="sk-dof"> · {r.status === 'failed' ? 'constraints conflict' : r.dof === 0 ? 'fully constrained' : `${r.dof} degree${r.dof === 1 ? '' : 's'} of freedom`}</span>;
 }
 
 /** Settings...: the Materializr settings Forma can honour. Applied live; Close returns to the model. */
@@ -674,6 +683,7 @@ export function Shell() {
       <HistoryStrip />
       <CornerFab />
       <ContextMenu />
+      <SketchContextMenu />
       <ShortcutsPanel />
       <Tour />
       <LongPressRing />

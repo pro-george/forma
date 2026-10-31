@@ -122,3 +122,56 @@ export function ContextMenu() {
     </div>
   );
 }
+
+/* ---------- the sketch's own long-press / right-click menu (Materializr: "Selection: n points, n lines, n curves" + Add Constraint ▸) ---------- */
+
+export const useSketchMenu = create<{ open: { x: number; y: number } | null; show(x: number, y: number): void; close(): void }>((set) => ({
+  open: null,
+  show: (x, y) => set({ open: { x, y } }),
+  close: () => set({ open: null }),
+}));
+
+export function SketchContextMenu() {
+  const open = useSketchMenu((m) => m.open);
+  const close = useSketchMenu((m) => m.close);
+  const active = useSketch((k) => k.active);
+  const doc = useStore((s) => s.doc);
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [sub, setSub] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    setSub(false);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    const onDown = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest('.ctx')) close(); };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onDown, true);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('pointerdown', onDown, true); };
+  }, [open, close]);
+  useLayoutEffect(() => {
+    if (!open || !ref.current) { setPos(null); return; }
+    const r = ref.current.getBoundingClientRect();
+    setPos({ x: Math.min(open.x, window.innerWidth - r.width - 8), y: Math.min(open.y, window.innerHeight - r.height - 8) });
+  }, [open, sub]);
+  if (!open || !active) return null;
+  const f = featureById(doc, active.featureId);
+  const entities = f?.type === 'extrude' && f.sketch ? f.sketch.entities : [];
+  const byId = new Map(entities.map((e) => [e.id, e]));
+  const picks = active.picks.filter((p) => byId.has(p.id));
+  const nPts = picks.filter((p) => p.pt).length;
+  const nLines = picks.filter((p) => !p.pt && byId.get(p.id)!.type === 'line').length;
+  const nCurves = picks.filter((p) => !p.pt && byId.get(p.id)!.type !== 'line').length;
+  const api = useSketch.getState();
+  const options = api.constraintOptions();
+  const run = (fn: () => void) => () => { fn(); close(); };
+  return (
+    <div className="ctx" ref={ref} style={{ left: pos?.x ?? open.x, top: pos?.y ?? open.y, visibility: pos ? 'visible' : 'hidden' }} role="menu">
+      <div className="ctx-title">Selection: {nPts} point{nPts === 1 ? '' : 's'}, {nLines} line{nLines === 1 ? '' : 's'}, {nCurves} curve{nCurves === 1 ? '' : 's'}</div>
+      <button disabled={!options.length} onClick={() => setSub(!sub)}>Add Constraint <small>▸</small></button>
+      {sub && options.map((o) => <button key={o.kind} className="sub" onClick={run(() => api.addConstraint(o.kind))}>{o.label}</button>)}
+      <hr />
+      <button className="danger" disabled={!picks.some((p) => !p.pt)} onClick={run(() => api.deleteSelected())}><Icon.trash />Delete</button>
+      <button onClick={close}>Cancel</button>
+    </div>
+  );
+}

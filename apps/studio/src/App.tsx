@@ -33,6 +33,7 @@ function useShortcuts() {
       const k = e.key.toLowerCase();
       const sketch = useSketch.getState();
       const op = useOp.getState();
+      if (e.key === 'Escape' && document.querySelector('.ctx, .modal-back, .popup')) return; // an open menu or dialog takes Escape itself
       if (meta && k === 'z') { e.preventDefault(); if (op.op) op.cancel(); e.shiftKey ? s.redo() : s.undo(); return; }
       if (meta && k === 'y') { e.preventDefault(); s.redo(); return; }
       if (meta && k === 's') { e.preventDefault(); s.saveFile(); return; }
@@ -53,7 +54,8 @@ function useShortcuts() {
           if (d) { e.preventDefault(); sketch.nudgeSelected(d[0], d[1]); return; }
         }
         if (e.key === 'Escape') { if (sketch.active.draft.length) sketch.escape(); else sketch.finish(); return; }
-        const tool = ({ v: 'select', l: 'line', r: 'rect', c: 'circle', a: 'arc', g: 'polygon', t: 'trim' } as const)[k as 'v'];
+        if (sketch.active.dimEdit) return; // the inline editor owns the keys
+        const tool = ({ v: 'select', l: 'line', r: 'rect', c: 'circle', a: 'arc', g: 'polygon', t: 'trim', d: 'dim' } as const)[k as 'v'];
         if (tool) { sketch.setTool(tool); return; }
         if (k === 'f') v.fit();
         return;

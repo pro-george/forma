@@ -96,6 +96,7 @@ export function dispatch(id: ActionId, arg?: string): void {
     case 'sk.arc': sk.setTool('arc'); return;
     case 'sk.polygon': sk.setTool('polygon'); return;
     case 'sk.trim': sk.setTool('trim'); return;
+    case 'sk.dim': sk.setTool('dim'); return;
     case 'sk.finish': sk.finish(); return;
     case 'sk.exit': sk.cancel(); return;
     case 'sk.lookat': sk.lookAt(); return;

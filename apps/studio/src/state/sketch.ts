@@ -5,7 +5,7 @@
  * numbers, selection.
  */
 import { create } from 'zustand';
-import { addFeature, addToCombine, combine as combineDoc, featureById, makeFeature, removeFeatures, sk, sketchToProfiles, endpoints, tessellate, type FeatureOf, type FormaDocument, type Sketch, type SketchEntity, type Transform, type Vec2 } from '@forma/core';
+import { addFeature, addToCombine, combine as combineDoc, featureById, makeFeature, removeFeatures, sk, sketchToProfiles, endpoints, tessellate, solveSketch, tryAddConstraint, pruneConstraints, measure, constraintId, evalParams, evalExpr, isParamName, type Constraint, type PointRef, type DimensionSpec, type FeatureOf, type FormaDocument, type Sketch, type SketchEntity, type Transform, type Vec2 } from '@forma/core';
 import * as THREE from 'three';
 import { useStore } from './store';
 import { useViewStore } from './view';
@@ -15,7 +15,11 @@ import { infer, lineLineIntersection, lineCircleIntersections, type Guide } from
 import { planeTransform } from './plane';
 export { planeTransform };
 
-export type SketchTool = 'select' | 'line' | 'rect' | 'circle' | 'arc' | 'polygon' | 'trim';
+export type SketchTool = 'select' | 'line' | 'rect' | 'circle' | 'arc' | 'polygon' | 'trim' | 'dim';
+/** a picked sketch element: an entity, or one of its points */
+export interface SketchPick { id: string; pt?: PointRef['pt'] }
+/** an inline dimension being typed: a new one from `spec`, or an existing constraint `id` */
+export interface DimEdit { id?: string; spec?: DimensionSpec; value: string; at: Vec2 }
 
 export interface SnapResult { p: Vec2; kind: 'grid' | 'point' | 'axis' | 'free'; ref?: Vec2; guides: Guide[] }
 export type RectMode = 'corner' | 'center';
@@ -32,6 +36,12 @@ interface SketchState {
     /** rectangle: the first typed dimension (width) once Enter locked it; the next typed value is the height */
     typedW: string | null;
     selected: string | null;
+    /** the sketch selection (Select / Dimension tools): entities and points, Multi / Ctrl adds */
+    picks: SketchPick[];
+    /** a selected constraint glyph or dimension (Delete removes it) */
+    selectedConstraint: string | null;
+    /** inline dimension editor */
+    dimEdit: DimEdit | null;
     /** closed region index under the cursor (Select tool) */
     hoverRegion: number | null;
     hoverVertex: Vec2 | null;
@@ -79,6 +89,22 @@ interface SketchState {
   enter(): void;
   escape(): void;
   select(id: string | null): void;
+  /** pick an entity or a point (Select / Dimension tools); `add` keeps the current picks */
+  pick(p: SketchPick | null, add: boolean): void;
+  selectConstraint(id: string | null): void;
+  /** constraints that can be added to the current picks, in Materializr's Add Constraint order */
+  constraintOptions(): { kind: Constraint['kind']; label: string }[];
+  /** add a constraint of `kind` to the current picks; dimensions open the inline editor first */
+  addConstraint(kind: Constraint['kind']): void;
+  /** open the inline editor on an existing dimension */
+  editDimension(id: string, at: Vec2): void;
+  setDimValue(v: string): void;
+  /** commit the inline editor: a number, an expression, or `name = expr` (creates a parameter) */
+  commitDim(): void;
+  cancelDim(): void;
+  removeConstraint(id: string): void;
+  /** solve the sketch as it is now (for colouring and the dof readout) */
+  solved(): ReturnType<typeof solveSketch> | null;
   deleteSelected(): void;
   /** Set the length of the selected line (moves its end point) or the radius of the selected circle/arc. */
   setSelectedSize(v: number): void;
@@ -108,8 +134,32 @@ function currentSketch(featureId: string): Sketch {
   return f && f.type === 'extrude' && f.sketch ? f.sketch : { entities: [], constraints: [] };
 }
 
-function writeSketch(featureId: string, entities: SketchEntity[], undoable: boolean) {
-  useStore.getState().patchFeature(featureId, { sketch: { entities } } as Partial<FeatureOf<'extrude'>>, { undoable });
+function writeSketch(featureId: string, entities: SketchEntity[], undoable: boolean, constraints?: Constraint[]) {
+  const cur = currentSketch(featureId);
+  const next = pruneConstraints({ entities, constraints: constraints ?? cur.constraints ?? [] });
+  useStore.getState().patchFeature(featureId, { sketch: next } as Partial<FeatureOf<'extrude'>>, { undoable });
+}
+
+/** Parameter values of the document, for dimension expressions. */
+function scopeOf(): Record<string, number> { return evalParams(useStore.getState().doc.params ?? []).scope; }
+
+/** Solve the sketch with the given entities and write it; on a conflict the entities are written as they are and the user is told once. */
+function solveAndWrite(featureId: string, entities: SketchEntity[], undoable: boolean, hold?: { p: PointRef; at: Vec2 }, constraints?: Constraint[]) {
+  const cur = currentSketch(featureId);
+  const sketch: Sketch = { entities, constraints: constraints ?? cur.constraints ?? [] };
+  if (!(sketch.constraints?.length) && !hold) { writeSketch(featureId, entities, undoable, sketch.constraints); return; }
+  const r = solveSketch(sketch, { hold, scope: scopeOf() });
+  writeSketch(featureId, r.status === 'solved' ? r.entities : entities, undoable, sketch.constraints);
+}
+
+/** Entities an inference guide implies a constraint for (SolidCraft's inference adds the matching constraint). */
+function guideConstraint(guide: { kind: string } | undefined, line: SketchEntity, ref?: string): Constraint | null {
+  if (!guide) return null;
+  if (guide.kind === 'horizontal') return { id: constraintId(), kind: 'horizontal', l: line.id };
+  if (guide.kind === 'vertical') return { id: constraintId(), kind: 'vertical', l: line.id };
+  if (guide.kind === 'parallel' && ref) return { id: constraintId(), kind: 'parallel', a: line.id, b: ref };
+  if (guide.kind === 'perpendicular' && ref) return { id: constraintId(), kind: 'perpendicular', a: line.id, b: ref };
+  return null;
 }
 
 /** All snap-worthy points in the sketch: endpoints, centres, midpoints. */
@@ -153,10 +203,16 @@ function withTypedLength(anchor: Vec2, p: Vec2, typed: string): Vec2 {
 
 export const useSketch = create<SketchState>((set, get) => {
   const upd = (patch: Partial<NonNullable<SketchState['active']>>) => { const a = get().active; if (a) set({ active: { ...a, ...patch } }); };
-  const commitEntities = (add: SketchEntity[]) => {
+  /** add entities and, with them, the constraints they come with (auto H/V, typed dimensions); refused constraints are simply dropped */
+  const commitEntities = (add: SketchEntity[], cons: Constraint[] = []) => {
     const a = get().active!;
-    writeSketch(a.featureId, [...currentSketch(a.featureId).entities, ...add], true);
+    const cur = currentSketch(a.featureId);
+    let sketch: Sketch = { entities: [...cur.entities, ...add], constraints: cur.constraints ?? [] };
+    const scope = scopeOf();
+    for (const c of cons) { const r = tryAddConstraint(sketch, c, scope); if (r.ok) sketch = r.sketch; }
+    writeSketch(a.featureId, sketch.entities, true, sketch.constraints);
   };
+  const typedNumber = (t: string) => { const v = parseFloat(t); return Number.isFinite(v) && v > 0 ? v : null; };
   return {
     active: null,
     start: (featureId) => {
@@ -170,7 +226,7 @@ export const useSketch = create<SketchState>((set, get) => {
         writeSketch(featureId, entities, true);
       }
       st.select([featureId]);
-      set({ active: { featureId, tool: 'line', draft: [], cursor: null, snap: null, typed: '', typedW: null, selected: null, hoverRegion: null, hoverVertex: null, dragVertex: null, docAtEntry: useStore.getState().doc } });
+      set({ active: { featureId, tool: 'line', draft: [], cursor: null, snap: null, typed: '', typedW: null, selected: null, picks: [], selectedConstraint: null, dimEdit: null, hoverRegion: null, hoverVertex: null, dragVertex: null, docAtEntry: useStore.getState().doc } });
       useSel.getState().clear();
       // callers that know the plane align the camera themselves (createAndStartOn / startOnFace); editing an existing sketch looks at its plane
       if (!get().host && !get().aligning) get().lookAt();
@@ -267,7 +323,7 @@ export const useSketch = create<SketchState>((set, get) => {
       st.setDoc(addFeature(st.doc, f));
       get().start(f.id);
     },
-    setTool: (tool) => { upd({ tool, draft: [], typed: '', typedW: null }); if (tool !== 'select') useSel.getState().clear(); },
+    setTool: (tool) => { upd({ tool, draft: [], typed: '', typedW: null, picks: [], selectedConstraint: null, dimEdit: null }); if (tool !== 'select') useSel.getState().clear(); },
     move: (local, mods) => {
       const a = get().active; if (!a) return;
       const sketch = currentSketch(a.featureId);
@@ -298,7 +354,14 @@ export const useSketch = create<SketchState>((set, get) => {
           if (!anchor) { upd({ draft: [p], typed: '' }); return; }
           if (Math.hypot(p[0] - anchor[0], p[1] - anchor[1]) < 0.01) return;
           const closes = a.draft.length >= 2 && Math.hypot(p[0] - a.draft[0]![0], p[1] - a.draft[0]![1]) < 0.01;
-          commitEntities([sk.line(anchor, p)]);
+          const line = sk.line(anchor, p);
+          const snap = computeSnap(local, sketch, anchor, mods, a.draft.length >= 3 ? [a.draft[0]!] : []);
+          const cons: Constraint[] = [];
+          const g = guideConstraint(snap.guides.find((x) => ['horizontal', 'vertical', 'parallel', 'perpendicular'].includes(x.kind)), line, (snap.guides.find((x) => x.kind === 'parallel' || x.kind === 'perpendicular') as { ref?: string } | undefined)?.ref);
+          if (g) cons.push(g);
+          const L = typedNumber(a.typed);
+          if (L !== null) cons.push({ id: constraintId(), kind: 'length', l: line.id, value: L });
+          commitEntities([line], cons);
           upd({ draft: closes ? [] : [...a.draft, p], typed: '' });
           return;
         }
@@ -306,7 +369,16 @@ export const useSketch = create<SketchState>((set, get) => {
           if (!anchor) { upd({ draft: [p], typed: '', typedW: null }); return; }
           const corners = rectCorners(anchor, p, get().rectMode, a.typedW, a.typed);
           if (!corners) return;
-          commitEntities(sk.rect(corners[0], corners[1]));
+          const r = sk.rect(corners[0], corners[1]);
+          const [bot, rgt, top, lft] = r as [SketchEntity, SketchEntity, SketchEntity, SketchEntity];
+          const cons: Constraint[] = [
+            { id: constraintId(), kind: 'horizontal', l: bot.id }, { id: constraintId(), kind: 'horizontal', l: top.id },
+            { id: constraintId(), kind: 'vertical', l: rgt.id }, { id: constraintId(), kind: 'vertical', l: lft.id },
+          ];
+          const W = typedNumber(a.typedW ?? ''), H = typedNumber(a.typed);
+          if (a.typedW !== null && W !== null) cons.push({ id: constraintId(), kind: 'length', l: bot.id, value: W });
+          if (a.typedW !== null && H !== null) cons.push({ id: constraintId(), kind: 'length', l: rgt.id, value: H });
+          commitEntities(r, cons);
           upd({ draft: [], typed: '', typedW: null });
           return;
         }
@@ -314,7 +386,9 @@ export const useSketch = create<SketchState>((set, get) => {
           if (!anchor) { upd({ draft: [p], typed: '' }); return; }
           const c = circleFrom(anchor, p, get().circleMode, a.typed);
           if (!c) return;
-          commitEntities([sk.circle(c.center, round2(c.radius))]);
+          const circle = sk.circle(c.center, round2(c.radius));
+          const D = typedNumber(a.typed);
+          commitEntities([circle], D !== null ? [{ id: constraintId(), kind: 'diameter', c: circle.id, value: D }] : []);
           upd({ draft: [], typed: '' });
           return;
         }
@@ -379,14 +453,150 @@ export const useSketch = create<SketchState>((set, get) => {
     },
     escape: () => {
       const a = get().active; if (!a) return;
+      if (a.dimEdit) { upd({ dimEdit: null }); return; }
       if (a.typed) { upd({ typed: '' }); return; }
       if (a.typedW !== null) { upd({ typedW: null }); return; }
       if (a.draft.length) { upd({ draft: [], typed: '', typedW: null }); return; }
-      if (a.selected) { upd({ selected: null }); return; }
+      if (a.selected || a.picks.length || a.selectedConstraint) { upd({ selected: null, picks: [], selectedConstraint: null }); return; }
       if (useSel.getState().regions.length) { useSel.getState().clear(); return; }
       get().finish();
     },
-    select: (id) => upd({ selected: id }),
+    select: (id) => upd({ selected: id, picks: id ? [{ id }] : [], selectedConstraint: null }),
+    pick: (p, add) => {
+      const a = get().active; if (!a) return;
+      if (!p) { upd({ picks: [], selected: null, selectedConstraint: null }); return; }
+      const same = (x: SketchPick) => x.id === p.id && (x.pt ?? null) === (p.pt ?? null);
+      const picks = add ? (a.picks.some(same) ? a.picks.filter((x) => !same(x)) : [...a.picks, p]) : [p];
+      upd({ picks, selected: picks.length === 1 && !picks[0]!.pt ? picks[0]!.id : null, selectedConstraint: null });
+    },
+    selectConstraint: (id) => upd({ selectedConstraint: id, picks: [], selected: null }),
+    constraintOptions: () => {
+      const a = get().active; if (!a) return [];
+      const sketch = currentSketch(a.featureId);
+      const byId = new Map(sketch.entities.map((e) => [e.id, e]));
+      const picks = a.picks.filter((p) => byId.has(p.id));
+      const pts = picks.filter((p) => p.pt);
+      const ents = picks.filter((p) => !p.pt);
+      const lines = ents.filter((p) => byId.get(p.id)!.type === 'line');
+      const curves = ents.filter((p) => byId.get(p.id)!.type !== 'line');
+      const out: { kind: Constraint['kind']; label: string }[] = [];
+      if (lines.length >= 1 && ents.length === lines.length && pts.length === 0) { out.push({ kind: 'horizontal', label: 'Horizontal' }, { kind: 'vertical', label: 'Vertical' }); }
+      if (pts.length === 2 && ents.length === 0) { out.push({ kind: 'coincident', label: 'Coincident' }, { kind: 'distance', label: 'Distance…' }); }
+      if (pts.length === 1 && curves.length === 1) out.push({ kind: 'pointOnCurve', label: 'Point on curve' });
+      if (pts.length === 1 && lines.length === 1) out.push({ kind: 'midpoint', label: 'Midpoint' }, { kind: 'pointOnCurve', label: 'Point on line' });
+      if (lines.length === 2 && ents.length === 2 && pts.length === 0) out.push({ kind: 'parallel', label: 'Parallel' }, { kind: 'perpendicular', label: 'Perpendicular' }, { kind: 'equal', label: 'Equal length' }, { kind: 'angle', label: 'Angle…' });
+      if (lines.length === 1 && ents.length === 1 && pts.length === 0) out.push({ kind: 'length', label: 'Length…' });
+      if (pts.length === 1 && ents.length === 0) out.push({ kind: 'fix', label: 'Fix Position' });
+      if (curves.length === 1 && ents.length === 1 && pts.length === 0) out.push({ kind: 'radius', label: 'Radius…' }, { kind: 'diameter', label: 'Diameter…' });
+      if (lines.length === 1 && curves.length === 1) out.push({ kind: 'tangent', label: 'Tangent (curve + line)' });
+      if (curves.length === 2 && ents.length === 2) out.push({ kind: 'concentric', label: 'Concentric' }, { kind: 'equal', label: 'Equal radius' }, { kind: 'tangent', label: 'Tangent' });
+      return out;
+    },
+    addConstraint: (kind) => {
+      const a = get().active; if (!a) return;
+      const sketch = currentSketch(a.featureId);
+      const byId = new Map(sketch.entities.map((e) => [e.id, e]));
+      const picks = a.picks.filter((p) => byId.has(p.id));
+      const pts = picks.filter((p) => p.pt).map((p) => ({ id: p.id, pt: p.pt! }));
+      const ents = picks.filter((p) => !p.pt).map((p) => p.id);
+      const lines = ents.filter((id) => byId.get(id)!.type === 'line');
+      const curves = ents.filter((id) => byId.get(id)!.type !== 'line');
+      const st = useStore.getState();
+      const build = (): Constraint[] | DimensionSpec | null => {
+        const id = constraintId();
+        switch (kind) {
+          case 'horizontal': case 'vertical': return lines.map((l) => ({ id: constraintId(), kind, l }));
+          case 'coincident': return pts.length === 2 ? [{ id, kind, p: pts[0]!, q: pts[1]! }] : null;
+          case 'pointOnCurve': return pts[0] && ents[0] ? [{ id, kind, p: pts[0], c: ents[0] }] : null;
+          case 'midpoint': return pts[0] && lines[0] ? [{ id, kind, p: pts[0], l: lines[0] }] : null;
+          case 'parallel': case 'perpendicular': return lines.length === 2 ? [{ id, kind, a: lines[0]!, b: lines[1]! }] : null;
+          case 'equal': return lines.length === 2 ? [{ id, kind, a: lines[0]!, b: lines[1]! }] : curves.length === 2 ? [{ id, kind, a: curves[0]!, b: curves[1]! }] : null;
+          case 'tangent': return lines[0] && curves[0] ? [{ id, kind, a: lines[0], b: curves[0] }] : curves.length === 2 ? [{ id, kind, a: curves[0]!, b: curves[1]! }] : null;
+          case 'concentric': return curves.length === 2 ? [{ id, kind, a: curves[0]!, b: curves[1]! }] : null;
+          case 'fix': return pts[0] ? [{ id, kind, p: pts[0] }] : null;
+          case 'distance': return pts.length === 2 ? { kind, p: pts[0]!, q: pts[1]! } : null;
+          case 'distanceX': return pts.length === 2 ? { kind, p: pts[0]!, q: pts[1]! } : null;
+          case 'distanceY': return pts.length === 2 ? { kind, p: pts[0]!, q: pts[1]! } : null;
+          case 'length': return lines[0] ? { kind, l: lines[0] } : null;
+          case 'radius': return curves[0] ? { kind, c: curves[0] } : null;
+          case 'diameter': return curves[0] ? { kind, c: curves[0] } : null;
+          case 'angle': return lines.length === 2 ? { kind, a: lines[0]!, b: lines[1]! } : null;
+        }
+      };
+      const b = build();
+      if (!b) { st.toast('Pick the elements this constraint needs first.'); return; }
+      if (!Array.isArray(b)) {
+        // a dimension: open the inline editor with the measured value
+        const v = measure(sketch, b);
+        if (v === null) return;
+        const at = a.cursor ?? [0, 0];
+        upd({ dimEdit: { spec: b, value: String(Math.round(Math.abs(v) * 100) / 100), at } });
+        return;
+      }
+      let cur: Sketch = sketch;
+      const scope = scopeOf();
+      for (const c of b) { const r = tryAddConstraint(cur, c, scope); if (!r.ok) { st.toast(r.reason); return; } cur = r.sketch; }
+      writeSketch(a.featureId, cur.entities, true, cur.constraints);
+      upd({ picks: [], selected: null });
+    },
+    editDimension: (id, at) => {
+      const a = get().active; if (!a) return;
+      const c = (currentSketch(a.featureId).constraints ?? []).find((x) => x.id === id);
+      if (!c || !('value' in c)) return;
+      upd({ dimEdit: { id, value: c.expr ?? String(c.value), at }, selectedConstraint: id, picks: [], selected: null });
+    },
+    setDimValue: (value) => { const a = get().active; if (a?.dimEdit) upd({ dimEdit: { ...a.dimEdit, value } }); },
+    commitDim: () => {
+      const a = get().active; if (!a || !a.dimEdit) return;
+      const st = useStore.getState();
+      let text = a.dimEdit.value.trim();
+      // `name = expr` creates (or updates) a parameter and binds the dimension to it — only once the dimension is accepted
+      let expr: string | undefined;
+      let newParams: NonNullable<FormaDocument['params']> | null = null;
+      const m = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/.exec(text);
+      if (m) {
+        const name = m[1]!, body = m[2]!;
+        if (!isParamName(name)) { st.toast(`"${name}" can't be a parameter name.`); return; }
+        const params = [...(st.doc.params ?? [])];
+        const i = params.findIndex((p) => p.name === name);
+        try { evalExpr(body, evalParams(params.filter((p) => p.name !== name)).scope); } catch (e) { st.toast(`Parameter: ${(e as Error).message}`); return; }
+        if (i >= 0) params[i] = { ...params[i]!, expr: body }; else params.push({ name, expr: body, kind: 'length' });
+        newParams = params; expr = name; text = name;
+      }
+      const scope = newParams ? evalParams(newParams).scope : scopeOf();
+      let value: number;
+      try { value = evalExpr(text, scope); } catch (e) { st.toast(`Dimension: ${(e as Error).message}`); return; }
+      if (!/^[-+]?[0-9.]+$/.test(text)) expr = text; // anything but a plain number stays an expression
+      if (a.dimEdit.spec && a.dimEdit.spec.kind !== 'angle' && value <= 0) { st.toast('A dimension must be greater than 0.'); return; }
+      const sketch = currentSketch(a.featureId);
+      let out: Sketch;
+      if (a.dimEdit.id) {
+        const cons = (sketch.constraints ?? []).map((c) => (c.id === a.dimEdit!.id && 'value' in c ? { ...c, value, expr } : c));
+        const r = solveSketch({ entities: sketch.entities, constraints: cons }, { scope });
+        if (r.status === 'failed') { st.toast("Can't reach that value with the other constraints."); return; }
+        out = { entities: r.entities, constraints: cons };
+      } else if (a.dimEdit.spec) {
+        const c = { ...a.dimEdit.spec, id: constraintId(), value, expr } as Constraint;
+        const r = tryAddConstraint(sketch, c, scope);
+        if (!r.ok) { st.toast(r.reason); return; }
+        out = r.sketch;
+      } else return;
+      if (newParams) st.setDoc({ ...st.doc, params: newParams }, { undoable: true });
+      writeSketch(a.featureId, out.entities, true, out.constraints);
+      upd({ dimEdit: null, picks: [], selected: null, selectedConstraint: null });
+    },
+    cancelDim: () => upd({ dimEdit: null }),
+    removeConstraint: (id) => {
+      const a = get().active; if (!a) return;
+      const sketch = currentSketch(a.featureId);
+      writeSketch(a.featureId, sketch.entities, true, (sketch.constraints ?? []).filter((c) => c.id !== id));
+      upd({ selectedConstraint: null });
+    },
+    solved: () => {
+      const a = get().active; if (!a) return null;
+      const sketch = currentSketch(a.featureId);
+      return solveSketch(sketch, { scope: scopeOf() });
+    },
     setSelectedSize: (v) => {
       const a = get().active; if (!a || !a.selected || !(v > 0)) return;
       const entities = currentSketch(a.featureId).entities.map((e) => {
@@ -398,7 +608,7 @@ export const useSketch = create<SketchState>((set, get) => {
         if (e.type === 'circle' || e.type === 'arc') return { ...e, radius: round2(v) };
         return e;
       });
-      writeSketch(a.featureId, entities, true);
+      solveAndWrite(a.featureId, entities, true);
     },
     nudgeSelected: (dx, dy) => {
       const a = get().active; if (!a || !a.selected) return;
@@ -422,9 +632,13 @@ export const useSketch = create<SketchState>((set, get) => {
       writeSketch(a.featureId, entities, true);
     },
     deleteSelected: () => {
-      const a = get().active; if (!a || !a.selected) return;
-      writeSketch(a.featureId, currentSketch(a.featureId).entities.filter((e) => e.id !== a.selected), true);
-      upd({ selected: null });
+      const a = get().active; if (!a) return;
+      if (a.selectedConstraint) { get().removeConstraint(a.selectedConstraint); return; }
+      const ids = new Set(a.picks.filter((p) => !p.pt).map((p) => p.id));
+      if (a.selected) ids.add(a.selected);
+      if (!ids.size) return;
+      writeSketch(a.featureId, currentSketch(a.featureId).entities.filter((e) => !ids.has(e.id)), true);
+      upd({ selected: null, picks: [] });
     },
     beginVertexDrag: (local) => {
       const a = get().active; if (!a) return false;
@@ -451,11 +665,22 @@ export const useSketch = create<SketchState>((set, get) => {
       const others: Sketch = { entities: sketch.entities.filter((e) => !ids.includes(e.id)), constraints: [] };
       const target = computeSnap(local, others, null, mods, [], ids).p;
       const same = (p: Vec2) => Math.hypot(p[0] - from[0], p[1] - from[1]) < 0.01;
+      // the dragged point as a handle: the solver holds it at the target and the constraints do the rest
+      let handle: PointRef | null = null;
+      for (const e of sketch.entities) {
+        if (!ids.includes(e.id)) continue;
+        if (e.type === 'line') { if (same(e.a)) { handle = { id: e.id, pt: 'a' }; break; } if (same(e.b)) { handle = { id: e.id, pt: 'b' }; break; } }
+        else if (same(e.center)) { handle = { id: e.id, pt: 'c' }; break; }
+      }
+      if (handle) {
+        const r = solveSketch(sketch, { hold: { p: handle, at: target }, scope: scopeOf() });
+        if (r.status === 'solved') { writeSketch(a.featureId, r.entities, false); upd({ dragVertex: { from: target, ids }, cursor: local }); }
+        return;
+      }
       const entities = sketch.entities.map((e): SketchEntity => {
         if (!ids.includes(e.id)) return e;
         if (e.type === 'line') return { ...e, a: same(e.a) ? target : e.a, b: same(e.b) ? target : e.b };
         if (e.type === 'circle') return same(e.center) ? { ...e, center: target } : e;
-        // arc: move the whole arc if its centre matched, otherwise keep (endpoint editing of arcs comes with constraints)
         return e;
       });
       writeSketch(a.featureId, entities, false);
