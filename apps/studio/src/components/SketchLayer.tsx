@@ -123,6 +123,7 @@ export function SketchLayer({ colors }: { colors: Colors }) {
         onPointerDown={(e) => {
           if (e.button !== 0) return;
           const l = localOf(e); reportScale(l);
+          if (e.nativeEvent.pointerType === 'touch') api.move(l, mods(e)); // a tap has no hover before it: give the state a cursor
           if (active.tool === 'select') { if (api.beginVertexDrag(l)) e.stopPropagation(); return; }
           // touch: a press that turns into a drag draws the shape in one gesture (press = first point, release = second)
           if (e.nativeEvent.pointerType === 'touch' && !active.draft.length && ['line', 'rect', 'circle', 'polygon'].includes(active.tool)) press.current = { local: l, x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };

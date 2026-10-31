@@ -364,8 +364,14 @@ export const useSketch = create<SketchState>((set, get) => {
       const a = get().active; if (!a) return;
       // rectangle: the first Enter locks the width, the second (with a height typed) commits
       if (a.tool === 'rect' && a.typed && a.draft.length && a.typedW === null) { upd({ typedW: a.typed, typed: '' }); return; }
-      // Enter with a typed value: place the next point along the current cursor direction (length, diameter, size)
-      if (a.typed && a.cursor && a.draft.length) { get().click(a.cursor, { shift: false, alt: false }); return; }
+      // Enter with a typed value: place the next point along the current cursor direction (length, diameter, size);
+      // with no pointer position yet (touch), build towards +X / +Y from the anchor
+      if (a.typed && a.draft.length) {
+        const anchor = a.draft[a.draft.length - 1]!;
+        const cur = a.cursor && Math.hypot(a.cursor[0] - anchor[0], a.cursor[1] - anchor[1]) > 0.01 ? a.cursor : ([anchor[0] + 10, anchor[1] + 10] as Vec2);
+        get().click(cur, { shift: false, alt: true });
+        return;
+      }
       if (a.draft.length) { upd({ draft: [], typed: '' }); return; }
       get().finish();
     },
