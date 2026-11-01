@@ -1,7 +1,7 @@
 {
-  "name": "SolidCraft",
-  "short_name": "SolidCraft",
-  "description": "Open-source parametric CAD built in Rust.",
+  "name": "Forma",
+  "short_name": "Forma",
+  "description": "Forma: parametric 3D modeling for printing. Built on SolidCraft.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

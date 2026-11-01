@@ -1,4 +1,30 @@
-# SolidCraft: instructions for agents
+# Forma: instructions for agents
+
+Forma is George's parametric 3D modeler for printing. Since 2026-11 its foundation is a fork of
+SolidCraft (tangency-labs/solidcraft, MIT OR Apache-2.0): the Rust engine, kernel, sketch solver,
+egui UI and web build below are SolidCraft's, and SolidCraft's own rules further down still apply
+to that code. Forma-specific facts first:
+
+- `main` is the SolidCraft fork plus Forma's additions; `upstream` is tangency-labs/solidcraft, merged
+  in from time to time, so keep Forma changes small, local and commented, and never rewrite upstream
+  files wholesale when a hook or a new module would do.
+- `legacy-ts/` holds the earlier TypeScript Forma (Manifold mesh kernel, the Materializr-style
+  im-touch studio, a sketch constraint solver, Bambu Studio / AMS 3MF export with per-part extruder
+  slots, parametric ready-made parts such as the relief vase) and Artea Studio (studio.artea.ro's
+  lampshade configurator). Its full history is on the `forma-ts` branch. Port features from it onto
+  the Rust engine one at a time; do not develop new features there, except Artea Studio.
+- Deploy: `.github/workflows/pages.yml` builds `apps/solidcraft-web` with trunk at `/forma/` and
+  Artea Studio at `/`, and publishes `gh-pages` under studio.artea.ro. Upstream's other workflows
+  (release, packaging, bots) are removed on purpose.
+- Branding so far: only the web shell's title, meta and manifest say Forma; crates, binaries and
+  in-app strings still say SolidCraft until the rebranding subject is taken up.
+- Forma's own standing rules: no prices anywhere in Forma; 3MF for Bambu Studio must carry per-part
+  extruder slots (see `legacy-ts/packages/core/src/export/threemf.ts` for the proven layout); units
+  are mm, Z up.
+
+---
+
+# SolidCraft: instructions for agents (upstream rules, apply to the Rust code)
 
 SolidCraft is a clean-room, pure-Rust parametric 3D CAD app (sketch solver, feature timeline, B-rep kernel, an egui UI that agents drive). This file is a router: the hard rules, then the skill to read for your task. Humans: CONTRIBUTING.md.
 

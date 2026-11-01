@@ -1,3 +1,9 @@
+> **Forma** — this repository is Forma, George's parametric 3D modeler for printing, built on a fork of
+> [SolidCraft](https://github.com/tangency-labs/solidcraft). The web app is served at
+> [studio.artea.ro/forma](https://studio.artea.ro/forma/). The earlier TypeScript Forma lives in
+> [`legacy-ts/`](legacy-ts/) and on the `forma-ts` branch while its features are ported. Everything
+> below is SolidCraft's own README.
+
 <p align="center">
   <img src="assets/icons/app/linux/exports/hicolor/256x256/apps/io.tangencylabs.solidcraft.png" width="96" height="96" alt="SolidCraft" />
 </p>
