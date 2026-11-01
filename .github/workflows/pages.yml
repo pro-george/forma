@@ -6,7 +6,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, main-sc]
     paths-ignore: ["tests/**", "docs/**", "examples/**", "packaging/**", "**/*.md"]
   workflow_dispatch:
 
