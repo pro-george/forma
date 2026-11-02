@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Forma</title>
+  <meta name="description" content="Forma: parametric 3D modeling for printing, in your browser. Built on SolidCraft.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Forma">
+  <meta property="og:title" content="Forma: model in your browser">
+  <meta property="og:description" content="Forma: parametric 3D modeling for printing, in your browser. Built on SolidCraft.">
+  <meta property="og:url" content="https://studio.artea.ro/forma/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Forma: model in your browser">
+  <meta name="twitter:description" content="Forma: parametric 3D modeling for printing, in your browser. Built on SolidCraft.">
+  
+<script type="module">
+import init, * as bindings from '/forma/solidcraft-web-17d7481de4fdeb6f.js';
+const wasm = await init({ module_or_path: '/forma/solidcraft-web-17d7481de4fdeb6f_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+  
+  
+  
+  
+  
+  
+  <link rel="stylesheet" href="/forma/loading-fa23566dd89fa92b.css" integrity="sha384-euwKh4irKhe2/jloPXvLM24Jyb1hGwXpW8te2IFuClbPEShB7WM0y+ZiFiHMDnKJ"/>
+  
+  <!-- Installable as an app (manifest.webmanifest); the icons are the Linux exports of the app mark. -->
+  <meta name="theme-color" content="#343840">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/32x32/io.tangencylabs.solidcraft.png">
+  <link rel="apple-touch-icon" href="icons/256x256/io.tangencylabs.solidcraft.png">
+  
+  
+  
+  
+<link rel="modulepreload" href="/forma/solidcraft-web-17d7481de4fdeb6f.js" crossorigin="anonymous" integrity="sha384-QynPhHbKPMPlNQr65l8ZycrEWXxW66L9TVMNR3eDG4ux7dABX1d9bqOeKUkwhWYj"><link rel="preload" href="/forma/solidcraft-web-17d7481de4fdeb6f_bg.wasm" crossorigin="anonymous" integrity="sha384-FUTeeAIpkcrCCXw7c3+pNtXM69RZNRZ8OZ7hrwUMzEx6Q7zqUo2qqNXP5eRwpLUq" as="fetch" type="application/wasm"></head>
+<body>
+  <canvas id="solidcraft_canvas"></canvas>
+  <div id="solidcraft_loading" role="status"><img src="loading-logo.svg" alt=""><span class="sr-only">Loading Forma&hellip;</span></div>
+  <script>
+    // Offline use and updates (sw.js; written into release builds by `cargo xtask web-offline`).
+    if ("serviceWorker" in navigator) {
+      addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    }
+    // Install as an app: the browser's offer can come before the app runs, so it is kept here for
+    // the app's File ▸ Install app… item (src/install.rs). Installed, the browser makes no more offers.
+    addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); window.solidcraftInstall = e; });
+    addEventListener("appinstalled", () => { window.solidcraftInstall = null; });
+  </script>
+</body>
+</html>
