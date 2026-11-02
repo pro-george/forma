@@ -63,6 +63,11 @@ jobs:
           mkdir -p site/forma
           cp -r legacy-ts/apps/artea-studio/dist/. site/
           cp -r dist/web/. site/forma/
+          # Forma's ready-made designs, opened with ?open=/forma/designs/<name>.sc
+          mkdir -p site/forma/designs
+          for d in examples/forma/*/; do
+            n=$(basename "$d"); [ -f "$d/$n.sc" ] && cp "$d/$n.sc" "site/forma/designs/$n.sc"
+          done
           touch site/.nojekyll
       - uses: peaceiris/actions-gh-pages@v4
         with:
