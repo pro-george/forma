@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 710" width="1200" height="710" font-family="Inter,Helvetica,Arial,sans-serif" font-size="14">
+<rect width="1200" height="710" fill="#fbfaf7"/>
+<defs><pattern id="h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#6b5a3e" stroke-width="1"/></pattern></defs>
+<polygon points="710.0,600.0 720.0,600.0 720.0,594.0 754.0,594.0 754.0,600.0 970.0,600.0 850.0,200.0 724.0,200.0 724.0,172.0 732.0,172.0 694.0,140.0 688.0,140.0 688.0,152.0 684.0,156.0 684.0,164.0 708.0,188.0 708.0,598.0" fill="#d9d2c3" stroke="#1b1b1b" stroke-width="1.6" stroke-linejoin="round"/>
+<polyline points="974.6,600.0 854.6,200.0" fill="none" stroke="#8a5a2b" stroke-width="1.2" stroke-dasharray="4 3"/>
+<polygon points="490.0,600.0 480.0,600.0 480.0,594.0 446.0,594.0 446.0,600.0 230.0,600.0 350.0,200.0 476.0,200.0 476.0,172.0 468.0,172.0 506.0,140.0 512.0,140.0 512.0,152.0 516.0,156.0 516.0,164.0 492.0,188.0 492.0,598.0" fill="#d9d2c3" stroke="#1b1b1b" stroke-width="1.6" stroke-linejoin="round"/>
+<polyline points="225.4,600.0 345.4,200.0" fill="none" stroke="#8a5a2b" stroke-width="1.2" stroke-dasharray="4 3"/>
+<polygon points="724.0,200.0 732.0,200.0 732.0,172.0 724.0,172.0" fill="url(#h)" stroke="#1b1b1b" stroke-width="1.2" stroke-linejoin="round"/>
+<path d="M769.0,600.0 L769.0,588.7 A14.0,14.0 0 1 1 791.0,588.7 L791.0,600.0 Z" fill="#fbfaf7" stroke="#1b1b1b" stroke-width="1.2"/>
+<line x1="600.0" y1="632.0" x2="600.0" y2="108.0" stroke="#999" stroke-dasharray="8 4 2 4"/>
+<line x1="230.0" y1="688.0" x2="970.0" y2="688.0" stroke="#2b5d8a" stroke-width="1"/><line x1="230.0" y1="684.0" x2="230.0" y2="692.0" stroke="#2b5d8a"/><line x1="970.0" y1="684.0" x2="970.0" y2="692.0" stroke="#2b5d8a"/><text x="600.0" y="682.0" text-anchor="middle" fill="#2b5d8a">D_bottom 185 at the rib valleys · Ø187.4 over the ridges</text>
+<line x1="350.0" y1="112.0" x2="850.0" y2="112.0" stroke="#2b5d8a" stroke-width="1"/><line x1="350.0" y1="108.0" x2="350.0" y2="116.0" stroke="#2b5d8a"/><line x1="850.0" y1="108.0" x2="850.0" y2="116.0" stroke="#2b5d8a"/><text x="600.0" y="106.0" text-anchor="middle" fill="#2b5d8a">D_top 125</text>
+<line x1="492.0" y1="400.0" x2="708.0" y2="400.0" stroke="#2b5d8a" stroke-width="1"/><line x1="492.0" y1="396.0" x2="492.0" y2="404.0" stroke="#2b5d8a"/><line x1="708.0" y1="396.0" x2="708.0" y2="404.0" stroke="#2b5d8a"/><text x="600.0" y="394.0" text-anchor="middle" fill="#2b5d8a">bore Ø54 (0.5 chamfer at the bottom)</text>
+<line x1="1090.0" y1="600.0" x2="1090.0" y2="200.0" stroke="#2b5d8a" stroke-width="1"/><line x1="1086.0" y1="600.0" x2="1094.0" y2="600.0" stroke="#2b5d8a"/><line x1="1086.0" y1="200.0" x2="1094.0" y2="200.0" stroke="#2b5d8a"/><text x="1098.0" y="405.0" fill="#2b5d8a">H = 100</text>
+<line x1="892.0" y1="200.0" x2="892.0" y2="140.0" stroke="#2b5d8a" stroke-width="1"/><line x1="888.0" y1="200.0" x2="896.0" y2="200.0" stroke="#2b5d8a"/><line x1="888.0" y1="140.0" x2="896.0" y2="140.0" stroke="#2b5d8a"/><text x="900.0" y="175.0" fill="#2b5d8a">neck_h 15</text>
+<line x1="796.0" y1="200.0" x2="796.0" y2="172.0" stroke="#2b5d8a" stroke-width="1"/><line x1="792.0" y1="200.0" x2="800.0" y2="200.0" stroke="#2b5d8a"/><line x1="792.0" y1="172.0" x2="800.0" y2="172.0" stroke="#2b5d8a"/><text x="804.0" y="191.0" fill="#2b5d8a">cap_z 7</text>
+<text x="600.0" y="62" text-anchor="middle" fill="#333">cap Ø66 → Ø47 · top bore Ø44 × 3 deep · Ø42 · 45° countersink Ø42 → Ø54 from z = H+3 to H+9</text>
+<text x="422.0" y="574.0" text-anchor="end" fill="#555">bottom pocket Ø60–Ø77 × 1.5 deep</text>
+<text x="246.0" y="352.0" fill="#8a5a2b">97 ribs · w 2.1 · h 1.05 · R0.55 shoulders (dashed = ridge line)</text>
+<text x="444.0" y="192.0" text-anchor="end" fill="#333">4 bayonet lugs Ø62 → Ø66 (hatched),</text>
+<text x="444.0" y="210.0" text-anchor="end" fill="#333">steps 5° / 30° / 55° at z = H, H+3, H+4.5</text>
+<text x="780.0" y="636.0" text-anchor="middle" fill="#555">cable channel Ø7 at z 5, slot 5.5 to the bottom (runs along +Y)</text>
+<text x="20" y="30" font-size="18" font-weight="600" fill="#1b1b1b">KUMO Base · Cone Wide · D125 — section through the axis, H = 100 (mm)</text>
+</svg>

@@ -1,0 +1,1084 @@
+{
+ "about": {
+  "design": "KUMO Base Cone Wide D125 \u2014 parametric rebuild for Forma (SolidCraft engine)",
+  "replay": "open studio.artea.ro/forma, DevTools console: for (const c of cmds) await solidcraft.execute(c.command, c.params)",
+  "units": "mm, Z up",
+  "note": "the rib union (97 bodies) and the lug pattern each take a few minutes in the browser"
+ },
+ "commands": [
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "H",
+    "expression": "100 mm",
+    "comment": "Cone height \u2014 the family is H50\u2026H175",
+    "favorite": true
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "D_bottom",
+    "expression": "185 mm",
+    "comment": "Bottom diameter of the cone, measured at the rib valleys",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "D_top",
+    "expression": "125 mm",
+    "comment": "Top diameter of the cone at the rib valleys (the D125 in the name)",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "bore",
+    "expression": "54 mm",
+    "comment": "Through bore",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "bore_chamfer",
+    "expression": "0.5 mm",
+    "comment": "Chamfer at the bottom of the bore",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "neck_d",
+    "expression": "62 mm",
+    "comment": "Neck cylinder diameter (the bayonet lugs sit on it)",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "cap_d",
+    "expression": "66 mm",
+    "comment": "Cap diameter where the cone of the cap starts",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "cap_top_d",
+    "expression": "47 mm",
+    "comment": "Cap diameter at the very top",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "cap_z",
+    "expression": "7 mm",
+    "comment": "Height of the neck cylinder above the cone top (the cap underside)",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "neck_h",
+    "expression": "15 mm",
+    "comment": "Total height of neck + cap above the cone",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "hole_top",
+    "expression": "42 mm",
+    "comment": "Bore through the cap",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "top_bore",
+    "expression": "44 mm",
+    "comment": "Wider bore at the very top",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "top_bore_depth",
+    "expression": "3 mm",
+    "comment": "Depth of the wider top bore",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "cs_start",
+    "expression": "3 mm",
+    "comment": "The 45\u00b0 countersink from the bore to the cap bore starts this far above the cone top",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "cs_depth",
+    "expression": "6 mm",
+    "comment": "Height of the 45\u00b0 countersink (bore \u2212 hole_top) / 2",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "ribs",
+    "expression": "97",
+    "comment": "Number of ribs around the cone",
+    "favorite": false,
+    "unit": ""
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "rib_w",
+    "expression": "2.1 mm",
+    "comment": "Rib width",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "rib_h",
+    "expression": "1.05 mm",
+    "comment": "Rib height, measured square to the cone surface",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "rib_r",
+    "expression": "0.55 mm",
+    "comment": "Rib shoulder radius",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "rib_bite",
+    "expression": "0.5 mm",
+    "comment": "How far the rib reaches into the cone, for a clean union",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "pocket_d1",
+    "expression": "60 mm",
+    "comment": "Bottom pocket inner diameter",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "pocket_d2",
+    "expression": "77 mm",
+    "comment": "Bottom pocket outer diameter",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "pocket_depth",
+    "expression": "1.5 mm",
+    "comment": "Bottom pocket depth",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "chan_d",
+    "expression": "7 mm",
+    "comment": "Cable channel diameter (round part)",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "chan_z",
+    "expression": "5 mm",
+    "comment": "Height of the channel axis above the bottom",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "chan_slot",
+    "expression": "5.5 mm",
+    "comment": "Width of the slot that opens the channel to the bottom",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "lug_t",
+    "expression": "2 mm",
+    "comment": "Bayonet lug thickness (neck_d/2 \u2192 cap_d/2)",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "lugs",
+    "expression": "4",
+    "comment": "Bayonet lugs",
+    "favorite": false,
+    "unit": ""
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "lug_a1",
+    "expression": "5 deg",
+    "comment": "Lug width at the bottom step",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "lug_a2",
+    "expression": "30 deg",
+    "comment": "Lug width at the middle step",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "lug_a3",
+    "expression": "55 deg",
+    "comment": "Lug width at the top step",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "lug_z2",
+    "expression": "3 mm",
+    "comment": "Middle step starts this far above the cone top",
+    "favorite": false
+   }
+  },
+  {
+   "command": "parameters.add",
+   "params": {
+    "name": "lug_z3",
+    "expression": "4.5 mm",
+    "comment": "Top step starts this far above the cone top",
+    "favorite": false
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "YZ"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "closed": true,
+    "infer": false,
+    "points": [
+     [
+      "bore / 2 + bore_chamfer",
+      "0"
+     ],
+     [
+      "D_bottom / 2",
+      "0"
+     ],
+     [
+      "D_top / 2",
+      "H"
+     ],
+     [
+      "neck_d / 2",
+      "H"
+     ],
+     [
+      "neck_d / 2",
+      "H + cap_z"
+     ],
+     [
+      "cap_d / 2",
+      "H + cap_z"
+     ],
+     [
+      "cap_top_d / 2",
+      "H + neck_h"
+     ],
+     [
+      "top_bore / 2",
+      "H + neck_h"
+     ],
+     [
+      "top_bore / 2",
+      "H + neck_h - top_bore_depth"
+     ],
+     [
+      "hole_top / 2",
+      "H + neck_h - top_bore_depth - (top_bore - hole_top) / 2"
+     ],
+     [
+      "hole_top / 2",
+      "H + cs_start + cs_depth"
+     ],
+     [
+      "bore / 2",
+      "H + cs_start"
+     ],
+     [
+      "bore / 2",
+      "bore_chamfer"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.revolve",
+   "params": {
+    "axis": "y",
+    "body_name": "Base"
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "YZ"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "points": [
+     [
+      "D_bottom / 2",
+      "0"
+     ],
+     [
+      "D_top / 2",
+      "H"
+     ]
+    ],
+    "infer": false
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "construct.plane.along_path",
+   "params": {
+    "path": {
+     "sketch": "Sketch2",
+     "curve": "l1"
+    },
+    "t": 0,
+    "name": "RibPlane"
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "RibPlane"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "points": [
+     [
+      0,
+      0
+     ],
+     [
+      5,
+      0
+     ]
+    ],
+    "infer": false,
+    "construction": true
+   }
+  },
+  {
+   "command": "sketch.delete",
+   "params": {
+    "entities": [
+     "l1"
+    ]
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "infer": false,
+    "points": [
+     [
+      "-rib_w / 2",
+      "-rib_bite"
+     ],
+     [
+      "rib_w / 2",
+      "-rib_bite"
+     ],
+     [
+      "rib_w / 2",
+      "rib_h - rib_r"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.arc.center_point",
+   "params": {
+    "center": [
+     "rib_w / 2 - rib_r",
+     "rib_h - rib_r"
+    ],
+    "start": [
+     "rib_w / 2",
+     "rib_h - rib_r"
+    ],
+    "end": [
+     "rib_w / 2 - rib_r",
+     "rib_h"
+    ]
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "infer": false,
+    "points": [
+     [
+      "rib_w / 2 - rib_r",
+      "rib_h"
+     ],
+     [
+      "-rib_w / 2 + rib_r",
+      "rib_h"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.arc.center_point",
+   "params": {
+    "center": [
+     "-rib_w / 2 + rib_r",
+     "rib_h - rib_r"
+    ],
+    "start": [
+     "-rib_w / 2 + rib_r",
+     "rib_h"
+    ],
+    "end": [
+     "-rib_w / 2",
+     "rib_h - rib_r"
+    ]
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "infer": false,
+    "points": [
+     [
+      "-rib_w / 2",
+      "rib_h - rib_r"
+     ],
+     [
+      "-rib_w / 2",
+      "-rib_bite"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.sweep",
+   "params": {
+    "sketch": "Sketch3",
+    "path_sketch": "Sketch2",
+    "path": [
+     "l1"
+    ],
+    "orientation": "perpendicular",
+    "body_name": "Rib"
+   }
+  },
+  {
+   "command": "solid.pattern.circular",
+   "params": {
+    "bodies": [
+     "Rib"
+    ],
+    "axis": "Z",
+    "count": "ribs"
+   }
+  },
+  {
+   "command": "solid.combine",
+   "params": {
+    "target": "Base",
+    "tools": [
+     "Rib",
+     "Rib (2)",
+     "Rib (3)",
+     "Rib (4)",
+     "Rib (5)",
+     "Rib (6)",
+     "Rib (7)",
+     "Rib (8)",
+     "Rib (9)",
+     "Rib (10)",
+     "Rib (11)",
+     "Rib (12)",
+     "Rib (13)",
+     "Rib (14)",
+     "Rib (15)",
+     "Rib (16)",
+     "Rib (17)",
+     "Rib (18)",
+     "Rib (19)",
+     "Rib (20)",
+     "Rib (21)",
+     "Rib (22)",
+     "Rib (23)",
+     "Rib (24)",
+     "Rib (25)",
+     "Rib (26)",
+     "Rib (27)",
+     "Rib (28)",
+     "Rib (29)",
+     "Rib (30)",
+     "Rib (31)",
+     "Rib (32)",
+     "Rib (33)",
+     "Rib (34)",
+     "Rib (35)",
+     "Rib (36)",
+     "Rib (37)",
+     "Rib (38)",
+     "Rib (39)",
+     "Rib (40)",
+     "Rib (41)",
+     "Rib (42)",
+     "Rib (43)",
+     "Rib (44)",
+     "Rib (45)",
+     "Rib (46)",
+     "Rib (47)",
+     "Rib (48)",
+     "Rib (49)",
+     "Rib (50)",
+     "Rib (51)",
+     "Rib (52)",
+     "Rib (53)",
+     "Rib (54)",
+     "Rib (55)",
+     "Rib (56)",
+     "Rib (57)",
+     "Rib (58)",
+     "Rib (59)",
+     "Rib (60)",
+     "Rib (61)",
+     "Rib (62)",
+     "Rib (63)",
+     "Rib (64)",
+     "Rib (65)",
+     "Rib (66)",
+     "Rib (67)",
+     "Rib (68)",
+     "Rib (69)",
+     "Rib (70)",
+     "Rib (71)",
+     "Rib (72)",
+     "Rib (73)",
+     "Rib (74)",
+     "Rib (75)",
+     "Rib (76)",
+     "Rib (77)",
+     "Rib (78)",
+     "Rib (79)",
+     "Rib (80)",
+     "Rib (81)",
+     "Rib (82)",
+     "Rib (83)",
+     "Rib (84)",
+     "Rib (85)",
+     "Rib (86)",
+     "Rib (87)",
+     "Rib (88)",
+     "Rib (89)",
+     "Rib (90)",
+     "Rib (91)",
+     "Rib (92)",
+     "Rib (93)",
+     "Rib (94)",
+     "Rib (95)",
+     "Rib (96)",
+     "Rib (97)"
+    ],
+    "operation": "join"
+   }
+  },
+  {
+   "command": "construct.plane.offset",
+   "params": {
+    "base": "XY",
+    "offset": "H",
+    "name": "LugAPlane"
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "LugAPlane"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "infer": false,
+    "points": [
+     [
+      "neck_d / 2 - 0.3 mm",
+      "0"
+     ],
+     [
+      "cap_d / 2",
+      "0"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.arc.center_point",
+   "params": {
+    "center": [
+     0,
+     0
+    ],
+    "start": [
+     "cap_d / 2",
+     "0"
+    ],
+    "end": [
+     "cap_d / 2 * cos(lug_a1)",
+     "cap_d / 2 * sin(lug_a1)"
+    ]
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "infer": false,
+    "points": [
+     [
+      "cap_d / 2 * cos(lug_a1)",
+      "cap_d / 2 * sin(lug_a1)"
+     ],
+     [
+      "(neck_d / 2 - 0.3 mm) * cos(lug_a1)",
+      "(neck_d / 2 - 0.3 mm) * sin(lug_a1)"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.arc.center_point",
+   "params": {
+    "center": [
+     0,
+     0
+    ],
+    "start": [
+     "(neck_d / 2 - 0.3 mm) * cos(lug_a1)",
+     "(neck_d / 2 - 0.3 mm) * sin(lug_a1)"
+    ],
+    "end": [
+     "neck_d / 2 - 0.3 mm",
+     "0"
+    ],
+    "clockwise": true
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "distance": "cap_z",
+    "operation": "join",
+    "targets": [
+     "Base"
+    ]
+   }
+  },
+  {
+   "command": "construct.plane.offset",
+   "params": {
+    "base": "XY",
+    "offset": "H + lug_z2",
+    "name": "LugBPlane"
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "LugBPlane"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "infer": false,
+    "points": [
+     [
+      "neck_d / 2 - 0.3 mm",
+      "0"
+     ],
+     [
+      "cap_d / 2",
+      "0"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.arc.center_point",
+   "params": {
+    "center": [
+     0,
+     0
+    ],
+    "start": [
+     "cap_d / 2",
+     "0"
+    ],
+    "end": [
+     "cap_d / 2 * cos(lug_a2)",
+     "cap_d / 2 * sin(lug_a2)"
+    ]
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "infer": false,
+    "points": [
+     [
+      "cap_d / 2 * cos(lug_a2)",
+      "cap_d / 2 * sin(lug_a2)"
+     ],
+     [
+      "(neck_d / 2 - 0.3 mm) * cos(lug_a2)",
+      "(neck_d / 2 - 0.3 mm) * sin(lug_a2)"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.arc.center_point",
+   "params": {
+    "center": [
+     0,
+     0
+    ],
+    "start": [
+     "(neck_d / 2 - 0.3 mm) * cos(lug_a2)",
+     "(neck_d / 2 - 0.3 mm) * sin(lug_a2)"
+    ],
+    "end": [
+     "neck_d / 2 - 0.3 mm",
+     "0"
+    ],
+    "clockwise": true
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "distance": "cap_z - lug_z2",
+    "operation": "join",
+    "targets": [
+     "Base"
+    ]
+   }
+  },
+  {
+   "command": "construct.plane.offset",
+   "params": {
+    "base": "XY",
+    "offset": "H + lug_z3",
+    "name": "LugCPlane"
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "LugCPlane"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "infer": false,
+    "points": [
+     [
+      "neck_d / 2 - 0.3 mm",
+      "0"
+     ],
+     [
+      "cap_d / 2",
+      "0"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.arc.center_point",
+   "params": {
+    "center": [
+     0,
+     0
+    ],
+    "start": [
+     "cap_d / 2",
+     "0"
+    ],
+    "end": [
+     "cap_d / 2 * cos(lug_a3)",
+     "cap_d / 2 * sin(lug_a3)"
+    ]
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "infer": false,
+    "points": [
+     [
+      "cap_d / 2 * cos(lug_a3)",
+      "cap_d / 2 * sin(lug_a3)"
+     ],
+     [
+      "(neck_d / 2 - 0.3 mm) * cos(lug_a3)",
+      "(neck_d / 2 - 0.3 mm) * sin(lug_a3)"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.arc.center_point",
+   "params": {
+    "center": [
+     0,
+     0
+    ],
+    "start": [
+     "(neck_d / 2 - 0.3 mm) * cos(lug_a3)",
+     "(neck_d / 2 - 0.3 mm) * sin(lug_a3)"
+    ],
+    "end": [
+     "neck_d / 2 - 0.3 mm",
+     "0"
+    ],
+    "clockwise": true
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "distance": "cap_z - lug_z3",
+    "operation": "join",
+    "targets": [
+     "Base"
+    ]
+   }
+  },
+  {
+   "command": "solid.pattern.circular",
+   "params": {
+    "features": [
+     "Extrude1",
+     "Extrude2",
+     "Extrude3"
+    ],
+    "axis": "Z",
+    "count": "lugs"
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "XY"
+   }
+  },
+  {
+   "command": "sketch.circle.center",
+   "params": {
+    "center": [
+     0,
+     0
+    ],
+    "diameter": "pocket_d1"
+   }
+  },
+  {
+   "command": "sketch.circle.center",
+   "params": {
+    "center": [
+     0,
+     0
+    ],
+    "diameter": "pocket_d2"
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "distance": "pocket_depth",
+    "operation": "cut",
+    "targets": [
+     "Base"
+    ]
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "XZ"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "infer": false,
+    "points": [
+     [
+      "-chan_slot / 2",
+      "1 mm"
+     ],
+     [
+      "chan_slot / 2",
+      "1 mm"
+     ],
+     [
+      "chan_slot / 2",
+      "-(chan_z - sqrt((chan_d / 2)^2 - (chan_slot / 2)^2))"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.arc.center_point",
+   "params": {
+    "center": [
+     "0",
+     "-chan_z"
+    ],
+    "start": [
+     "chan_slot / 2",
+     "-(chan_z - sqrt((chan_d / 2)^2 - (chan_slot / 2)^2))"
+    ],
+    "end": [
+     "-chan_slot / 2",
+     "-(chan_z - sqrt((chan_d / 2)^2 - (chan_slot / 2)^2))"
+    ],
+    "clockwise": true
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "infer": false,
+    "points": [
+     [
+      "-chan_slot / 2",
+      "-(chan_z - sqrt((chan_d / 2)^2 - (chan_slot / 2)^2))"
+     ],
+     [
+      "-chan_slot / 2",
+      "1 mm"
+     ]
+    ]
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "distance": "D_bottom / 2 + 5 mm",
+    "operation": "cut",
+    "targets": [
+     "Base"
+    ]
+   }
+  }
+ ]
+}
