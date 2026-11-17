@@ -1,13 +1,18 @@
-//! SolidCraft's built-in themes: the theme files in `themes/`, embedded at build time (`build.rs`),
-//! for the kit's theme files (`solidcraft_ui_kit::theme_files`). Their per-tab surfaces (`tabs`) are
-//! keyed by SolidCraft's tab names; under a host whose tab table lacks one, that tab's surfaces are
-//! left out and the theme loads.
+//! The theme files shipped with Forma (`themes/*.json`), embedded at build time.
 
-// `BUILTIN`, `(id, JSON text)` sorted by id.
 include!(concat!(env!("OUT_DIR"), "/builtin_themes.rs"));
 
-/// Install [`BUILTIN`] as the kit's built-in themes, once per process, before preferences are read
-/// or the first frame; later calls find them installed.
-pub fn install() {
-    solidcraft_ui_kit::theme_files::install_builtin(BUILTIN);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_built_in_theme_reads_and_they_are_sorted() {
+        let themes = solidcraft_ui_kit::theme_files::read_builtin(BUILTIN).expect("every shipped theme file is valid");
+        assert_eq!(themes.len(), BUILTIN.len());
+        assert!(BUILTIN.windows(2).all(|pair| pair[0].0 < pair[1].0), "source entries are sorted by id");
+        for id in ["artea", "artea-night"] {
+            assert!(BUILTIN.iter().any(|(theme, _)| *theme == id), "{id} ships");
+        }
+    }
 }

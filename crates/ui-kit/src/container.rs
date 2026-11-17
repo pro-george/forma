@@ -163,13 +163,13 @@ pub trait BackingTooltipExt: Sized {
     fn backing_on_hover_text(self, text: impl Into<WidgetText>) -> Self;
     fn backing_on_disabled_hover_text(self, text: impl Into<WidgetText>) -> Self;
     fn backing_on_hover_text_at_pointer(self, text: impl Into<WidgetText>) -> Self;
-    /// The tooltip opens beside `beside` (left of it, else right), not over the widget: for a row of
-    /// a list that must stay readable while one of its rows is hovered.
-    fn backing_on_hover_text_beside(self, beside: egui::Rect, text: impl Into<WidgetText>) -> Self;
     fn backing_show_tooltip_ui(&self, body: impl FnOnce(&mut egui::Ui));
     fn backing_show_tooltip_text(&self, text: impl Into<WidgetText>);
-    /// A feature's status tooltip ([`crate::StatusTip`]), given to a screen reader as plain text.
-    fn backing_on_hover_status(self, tip: &crate::StatusTip) -> Self;
+    /// A failed or warned item's tooltip ([`crate::StatusTip`]).
+    fn backing_on_hover_status(self, status: &crate::StatusTip) -> Self;
+    /// A text tooltip that opens beside `panel` (on the side with more room) at the widget's
+    /// height, so it covers none of the panel's rows.
+    fn backing_on_hover_text_beside(self, panel: egui::Rect, text: impl Into<WidgetText>) -> Self;
 }
 
 /// What egui's `on_hover_text` does besides showing the tip: a widget that has an accessibility
@@ -216,12 +216,6 @@ impl BackingTooltipExt for egui::Response {
         show_backing_tooltip(self.id, egui::Tooltip::for_enabled(&self).at_pointer().gap(12.0), body);
         self
     }
-    fn backing_on_hover_status(self, tip: &crate::StatusTip) -> Self {
-        if self.ctx.has_accesskit_node(self.id) {
-            describe_for_accessibility(&self, &tip.plain());
-        }
-        self.backing_on_hover_ui(|ui| tip.show(ui))
-    }
     fn backing_on_hover_text(self, text: impl Into<WidgetText>) -> Self {
         let text = text.into();
         describe_for_accessibility(&self, text.text());
@@ -244,15 +238,18 @@ impl BackingTooltipExt for egui::Response {
             ui.label(text);
         })
     }
-    fn backing_on_hover_text_beside(self, beside: egui::Rect, text: impl Into<WidgetText>) -> Self {
+    fn backing_on_hover_status(self, status: &crate::StatusTip) -> Self {
+        describe_for_accessibility(&self, &status.plain());
+        self.backing_on_hover_ui(|ui| status.show(ui))
+    }
+    fn backing_on_hover_text_beside(self, panel: egui::Rect, text: impl Into<WidgetText>) -> Self {
         let text = text.into();
         describe_for_accessibility(&self, text.text());
-        let mut tip = egui::Tooltip::for_enabled(&self).gap(6.0);
-        tip.popup = tip.popup.anchor(beside).align(egui::RectAlign::LEFT_END).align_alternatives(&[
-            egui::RectAlign::LEFT_START,
-            egui::RectAlign::RIGHT_END,
-            egui::RectAlign::RIGHT_START,
-        ]);
+        let screen = self.ctx.content_rect();
+        let right = screen.right() - panel.right() >= panel.left() - screen.left();
+        let anchor = egui::Rect::from_min_max(egui::pos2(panel.left(), self.rect.top()), egui::pos2(panel.right(), self.rect.bottom()));
+        let mut tip = egui::Tooltip::for_enabled(&self);
+        tip.popup = tip.popup.anchor(anchor).align(if right { egui::RectAlign::RIGHT_START } else { egui::RectAlign::LEFT_START });
         show_backing_tooltip(self.id, tip, |ui| {
             ui.set_max_width(ui.spacing().tooltip_width);
             ui.label(text);

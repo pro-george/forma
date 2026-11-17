@@ -122,7 +122,7 @@ pub(super) struct Figure {
 }
 
 /// The twelve colours a theme thumbnail is drawn with: ground, bar and side panel, muted marks,
-/// accent, the window face's top and bottom, grid, box top, box outline, box left, box right
+/// accent, the window face's top and bottom, grid, cube top, cube outline, cube left, cube right
 /// and the thumbnail's border. A colour may carry alpha (a glass theme's panels).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ThemeSample {
@@ -363,6 +363,10 @@ pub fn paint_navigation_axes(p: &Painter, rect: Rect, axes: &[NavigatorAxis]) {
     }
 }
 
+pub fn paint_navigation_cube(p: &Painter, rect: Rect) {
+    paint_with_tokens(p, rect, &super::preferences_figure_data::NAVIGATOR_CUBE, None, None, &Tokens::get(), Palette::Navigator);
+}
+
 /// A generic body (a hexagonal prism) in the navigator palette: the user's own body stands in its place.
 pub fn paint_navigation_custom(p: &Painter, rect: Rect) {
     let Some((p, scale)) = navigation_canvas(p, rect) else { return };
@@ -518,7 +522,7 @@ fn draw(p: &Painter, ctx: &Ctx, op: &Op, clip: Option<&[Pos2]>) {
             // The board's captions are 6.5 to 7.5 units: too small to read at card size, so they
             // are drawn a third larger (never under 8 points). The SVG's `y` is the baseline, which
             // sits about 0.36 em below the middle of a line of digits and capitals.
-            // Longer captions sit in tight pills and on box faces, so they are drawn slightly smaller than the board (egui's monospace face is wider than the board's).
+            // Longer captions sit in tight pills and on cube faces, so they are drawn slightly smaller than the board (egui's monospace face is wider than the board's).
             let grow = match s.chars().count() {
                 0..=4 => 1.2,
                 5..=6 => 0.9,

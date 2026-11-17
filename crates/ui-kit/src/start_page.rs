@@ -4,7 +4,7 @@
 //! returns the entry chosen this frame, which the host runs. Nothing here knows the app.
 //!
 //! Tiles and samples take a host [`Icon`] (a kit icon name, a texture or the host's painter);
-//! menu entries do too. Thumbnails are textures the host made.
+//! menu entries take a kit icon name. Thumbnails are textures the host made.
 
 use std::borrow::Cow;
 
@@ -108,7 +108,8 @@ pub struct Recent<'a, A> {
     pub path: Label<'a>,
     pub when: Label<'a>,
     pub kind: Label<'a>,
-    /// What hovering the row says about the file's signing provenance, when it has any.
+    /// What is known of who signed the file, for a signed one: a shield after its kind, with
+    /// these words as its hover text.
     pub security: Option<Label<'a>>,
     pub thumbnail: Option<(egui::TextureId, egui::Vec2)>,
     /// No picture could be made: a dimmed placeholder rather than a loading one.
@@ -120,7 +121,8 @@ pub struct Recent<'a, A> {
 
 pub struct MenuEntry<'a, A> {
     pub label: Label<'a>,
-    pub icon: Icon<'a>,
+    /// A kit icon name: the menu row is a `crate::MenuItem`, which takes a host `Icon` with #13379.
+    pub icon: &'a str,
     pub chosen: A,
 }
 
@@ -306,10 +308,22 @@ fn start_content<A>(ui: &mut egui::Ui, id: &str, start: Start<'_, A>, chosen: &m
                         workspace: &row.kind,
                         thumbnail: row.thumbnail,
                         thumbnail_failed: row.thumbnail_failed,
-                        security: row.security.as_deref(),
                     },
                 );
                 publish(&row_id, &response);
+                // A signed file says who signed it: a shield at the row's end, the words on hover.
+                let response = match row.security.as_deref() {
+                    Some(security) => {
+                        let t = Tokens::get();
+                        let shield = egui::Rect::from_center_size(
+                            egui::pos2(response.rect.right() - t.space_12, response.rect.top() + t.space_12),
+                            egui::vec2(t.space_12, t.space_12),
+                        );
+                        crate::icons::paint_ink(ui.painter(), shield, "shield", t.form_success);
+                        crate::BackingTooltipExt::backing_on_hover_text(response, security)
+                    }
+                    None => response,
+                };
                 let mut menu = row.menu.into_iter().map(Some).collect::<Vec<_>>();
                 crate::Menu::context(&response, |ui| {
                     for entry in &mut menu {
@@ -439,8 +453,8 @@ mod tests {
                         thumbnail_failed: false,
                         chosen: Picked::Recent(i),
                         menu: vec![
-                            MenuEntry { label: "Remove from list".into(), icon: "delete".into(), chosen: Picked::Forget(i) },
-                            MenuEntry { label: "Show in folder".into(), icon: "folder".into(), chosen: Picked::ShowInFolder(i) },
+                            MenuEntry { label: "Remove from list".into(), icon: "delete", chosen: Picked::Forget(i) },
+                            MenuEntry { label: "Show in folder".into(), icon: "folder", chosen: Picked::ShowInFolder(i) },
                         ],
                     })
                     .collect(),

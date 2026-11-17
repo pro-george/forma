@@ -1,20 +1,21 @@
-//! Compiles SolidCraft's look into tables: the icon masters, colour roles, accents and aliases
-//! (`icons/design`) and the built-in theme files (`themes`). Every path is inside this crate.
+//! Compiles Forma's look into the crate: the icon masters with their palette and aliases
+//! (`icons/design`) and the built-in theme files (`themes`). Adapted from the build script of
+//! SolidCraft's interface crate at its last MIT OR Apache-2.0 nightly (v0.40.0-nightly.20261110).
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    if let Err(e) = icon_data() {
-        eprintln!("icon data: {e}");
-        std::process::exit(1);
-    }
     if let Err(e) = builtin_themes() {
         eprintln!("themes: {e}");
+        std::process::exit(1);
+    }
+    if let Err(e) = icon_data() {
+        eprintln!("icon data: {e}");
         std::process::exit(1);
     }
 }
 
 /// `icons/design`: the SVG masters, `palette.toml` (every colour role in light and dark,
-/// and the accents) and `aliases.toml`, compiled into `$OUT_DIR/icon_data.rs` for `icons.rs`.
+/// and the accents) and `aliases.toml`, compiled into `$OUT_DIR/icon_data.rs` for `src/icons.rs`.
 /// A missing hex, a role an accent does not know or an alias to a missing master fails the build.
 fn icon_data() -> Result<(), String> {
     use std::fmt::Write as _;
@@ -41,8 +42,8 @@ fn icon_data() -> Result<(), String> {
         darks.push(rgb(&d));
         light_hex.push(hex(role.get("source").or_else(|| role.get("light")), &format!("role {name} source"))?);
     }
-    let _ = writeln!(out, "pub const ROLE_SOURCE_HEX: &[&str] = &{:?};", light_hex);
-    let _ = writeln!(out, "pub const PALETTE: [&[[u8; 3]]; 2] = [&[{}], &[{}]];", lights.join(", "), darks.join(", "));
+    let _ = writeln!(out, "pub(crate) const ROLE_SOURCE_HEX: &[&str] = &{:?};", light_hex);
+    let _ = writeln!(out, "pub(crate) const PALETTE: [&[[u8; 3]]; 2] = [&[{}], &[{}]];", lights.join(", "), darks.join(", "));
     let mut accent_names = Vec::new();
     let mut accents = Vec::new();
     if let Some(table) = palette.get("accents").and_then(toml::Value::as_table) {
@@ -65,7 +66,7 @@ fn icon_data() -> Result<(), String> {
         }
     }
     let _ = writeln!(out, "pub const ACCENT_NAMES: &[&str] = &{:?};", accent_names);
-    let _ = writeln!(out, "pub const ACCENTS: &[&[(usize, [u8; 3], [u8; 3])]] = &[{}];", accents.join(", "));
+    let _ = writeln!(out, "pub(crate) const ACCENTS: &[&[(usize, [u8; 3], [u8; 3])]] = &[{}];", accents.join(", "));
     let mut variants = Vec::new();
     if let Some(groups) = palette.get("variants").and_then(toml::Value::as_table) {
         for (vision, group) in groups {
@@ -104,7 +105,7 @@ fn icon_data() -> Result<(), String> {
             svgs.push(format!("({id:?}, {fam:?}, include_str!({:?}))", abs.display().to_string()));
         }
     }
-    let _ = writeln!(out, "pub const MASTERS: &[(&str, &str, &str)] = &[{}];", svgs.join(", "));
+    let _ = writeln!(out, "pub(crate) static SVGS: &[(&str, &str, &str)] = &[{}];", svgs.join(", "));
     let aliases = table("aliases.toml")?;
     let mut al = Vec::new();
     if let Some(t) = aliases.get("alias").and_then(toml::Value::as_table) {
@@ -126,7 +127,7 @@ fn icon_data() -> Result<(), String> {
             al.push(format!("({alias:?}, {master:?}, {accent:?})"));
         }
     }
-    let _ = writeln!(out, "pub const ALIASES: &[(&str, &str, &str)] = &[{}];", al.join(", "));
+    let _ = writeln!(out, "pub(crate) const ALIASES: &[(&str, &str, &str)] = &[{}];", al.join(", "));
     if let Some(t) = aliases.get("alias").and_then(toml::Value::as_table) {
         ids.extend(t.keys().cloned());
     }
@@ -145,7 +146,7 @@ fn icon_data() -> Result<(), String> {
         }
     }
     let defaults: Vec<_> = defaults.iter().map(|(id, accent)| format!("({id:?}, {accent:?})")).collect();
-    let _ = writeln!(out, "pub const ICON_ACCENTS: &[(&str, &str)] = &[{}];", defaults.join(", "));
+    let _ = writeln!(out, "pub(crate) const ICON_ACCENTS: &[(&str, &str)] = &[{}];", defaults.join(", "));
     let dest = std::path::Path::new(&std::env::var("OUT_DIR").map_err(|e| e.to_string())?).join("icon_data.rs");
     std::fs::write(dest, out).map_err(|e| e.to_string())
 }
@@ -164,7 +165,7 @@ fn builtin_themes() -> Result<(), String> {
         }
     }
     files.sort_by(|a, b| a.file_stem().cmp(&b.file_stem()));
-    let mut out = String::from("/// The theme files shipped with SolidCraft.\npub const BUILTIN: &[(&str, &str)] = &[\n");
+    let mut out = String::from("/// The theme files shipped with Forma, sorted by id.\npub const BUILTIN: &[(&str, &str)] = &[\n");
     for path in files {
         let id = path.file_stem().and_then(|s| s.to_str()).ok_or("theme file name is not UTF-8")?;
         let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;

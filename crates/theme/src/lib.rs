@@ -1074,7 +1074,7 @@ pub struct Tokens {
     pub origin_plane_hover: Color32,
     pub origin_point: Color32,
     /// The X, Y and Z colours, one set for every axis drawn (#976): the origin axes, the view
-    /// triad, the navigator's triad, the Move gizmo, a 3D sketch point's triad, joint
+    /// triad, the navigation cube's triad, the Move gizmo, a 3D sketch point's triad, joint
     /// origins, measured distances along the axes and the headless picture's origin axes.
     pub axis_x: Color32,
     pub axis_y: Color32,
@@ -1086,9 +1086,6 @@ pub struct Tokens {
     // ---- bodies and live previews ----
     pub body: Color32,
     pub body_edge: Color32,
-    /// Isoparm lines drawn on a surface: lighter than its edges, so they read as the surface's
-    /// flow, not its boundary.
-    pub isoparm: Color32,
     /// Command manipulators (direction arrows, handles).
     pub manipulator: Color32,
     /// Allowed assembly motion, separate from the selected face's blue.
@@ -1103,11 +1100,11 @@ pub struct Tokens {
     pub preview_sketch: Color32,
     /// Removed material in a feature preview (translucent).
     pub preview_cut: Color32,
-    /// Navigator faces, outline and labels.
+    /// Navigation cube faces, outline and labels.
     pub navigator_face: Color32,
     pub navigator_border: Color32,
     pub navigator_text: Color32,
-    /// Light blue hover fill, readable on the pale navigator in either theme.
+    /// Light blue hover fill, readable on the pale cube in either theme.
     pub navigator_hover: Color32,
     // ---- viewport ----
     /// Viewport background (top and bottom of the gradient; equal for a flat fill).
@@ -1181,11 +1178,11 @@ pub struct Tokens {
     pub figure_highlight: Color32,
     /// Neutral shadow cast by a model in a Preferences figure, independent of theme polarity.
     pub figure_shadow: Color32,
-    /// Top face of the Preferences figure box.
+    /// Top face of the Preferences figure cube.
     pub figure_face_top: Color32,
-    /// Left face of the Preferences figure box.
+    /// Left face of the Preferences figure cube.
     pub figure_face_left: Color32,
-    /// Right face of the Preferences figure box.
+    /// Right face of the Preferences figure cube.
     pub figure_face_right: Color32,
     /// Paper, panels and pads drawn inside Preferences figures.
     pub figure_card: Color32,
@@ -1428,7 +1425,7 @@ impl Tokens {
 
     /// These tokens with the colours drawn in the 3D view taken from `view`: the background and
     /// grid, bodies, selection and hover, the origin and construction geometry, previews, sketches
-    /// and their dimensions and glyphs, the navigator and triads, box selection and the
+    /// and their dimensions and glyphs, the navigation cube and triads, box selection and the
     /// analysis colours. The window keeps its own: panels, dialogs, menus, and the chips and cards
     /// over the view (`overlay` with its text, icons and borders).
     pub fn with_viewport(self, view: Tokens) -> Tokens {
@@ -1455,7 +1452,6 @@ impl Tokens {
             construction_geom: view.construction_geom,
             body: view.body,
             body_edge: view.body_edge,
-            isoparm: view.isoparm,
             manipulator: view.manipulator,
             joint_manipulator: view.joint_manipulator,
             joint_axis: view.joint_axis,
@@ -1540,7 +1536,7 @@ impl Tokens {
         t
     }
 
-    /// Fade idle navigator colours into the viewport while retaining opaque facets.
+    /// Fade idle cube colours into the viewport while retaining opaque facets.
     pub fn navigator(self, active: bool) -> Tokens {
         if active {
             return self;
@@ -1635,20 +1631,6 @@ pub fn panel_motion_ease(progress: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// A surface's isoparms show on its faces less than its edges do, and stay visible against the
-    /// view's background (seen at the sheet's silhouette), on both bases.
-    #[test]
-    fn isoparms_are_lighter_than_edges_and_visible_on_the_background() {
-        for t in [Tokens::light(), Tokens::dark()] {
-            let (iso, edge) = (contrast_ratio(t.isoparm, t.body), contrast_ratio(t.body_edge, t.body));
-            assert!(iso >= 1.5 && iso < edge, "isoparm {iso:.2} against edge {edge:.2} on the body");
-            for background in [t.viewport_top, t.viewport_bottom] {
-                let ratio = contrast_ratio(t.isoparm, background);
-                assert!(ratio >= 1.5, "isoparm {ratio:.2} on the viewport background {background:?}");
-            }
-        }
-    }
 
     #[test]
     fn panel_motion_is_bounded_and_reduced_or_invalid_inputs_finish_immediately() {
@@ -1949,7 +1931,7 @@ mod tests {
                 // The two sides differ, so the checks below tell them apart.
                 assert_ne!((w.viewport_top, w.panel), (v.viewport_top, v.panel));
                 // The view's: background and grid, bodies, selection and hover, sketches with their
-                // dimensions and glyphs, the origin, the navigator and triads, box selection, analysis.
+                // dimensions and glyphs, the origin, the cube and triads, box selection, analysis.
                 assert_eq!((t.viewport_top, t.viewport_bottom, t.grid, t.grid_major), (v.viewport_top, v.viewport_bottom, v.grid, v.grid_major));
                 assert_eq!(
                     (t.body, t.body_edge, t.body_selected, t.sel_face, t.sel_edge, t.hover_edge),

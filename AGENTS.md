@@ -1,23 +1,43 @@
 # Forma: instructions for agents
 
-Forma is George's parametric 3D modeler for printing. Since 2026-11 its foundation is a fork of
-SolidCraft (tangency-labs/solidcraft, MIT OR Apache-2.0): the Rust engine, kernel, sketch solver,
-egui UI and web build below are SolidCraft's, and SolidCraft's own rules further down still apply
-to that code. Forma-specific facts first:
+Forma is George's parametric 3D modeler for printing. Its foundation is a fork of SolidCraft
+(tangency-labs/solidcraft): the Rust engine, the solidcore kernel, the sketch solver, the egui
+interface code and the web build below are SolidCraft's under MIT OR Apache-2.0, and SolidCraft's
+own rules further down still apply to that code. Forma-specific facts first:
 
-- `main` is the SolidCraft fork plus Forma's additions; `upstream` is tangency-labs/solidcraft, merged
-  in from time to time, so keep Forma changes small, local and commented, and never rewrite upstream
-  files wholesale when a hook or a new module would do.
+- **Licence line, never crossed.** On 2026-11-10 SolidCraft placed its UI kit (`crates/ui-kit`), look
+  (`crates/look`: icons, glyphs, fonts, themes), theme tokens (`crates/theme`), name, logo and app
+  icon under a separate Brand and Interface Licence. Forma carries none of that. Its three crates
+  at those paths are its own, grown from SolidCraft's last MIT/Apache release before that date
+  (`v0.40.0-nightly.20261110.117.1`). When the interface crate (`crates/ui-egui`, still MIT/Apache)
+  needs something the kit lacks, write it from the call sites. **Never read, copy or consult
+  upstream's versions of those three crates, `assets/branding` or `assets/icons/app` after that
+  nightly**, in the working tree or in git history. Each crate's README says the same.
+- Merging upstream: `scripts/forma-merge-upstream.sh <tag>`, which keeps those paths and
+  upstream's workflows out. Then build, and fill the kit's gaps as above. Keep Forma's edits to
+  upstream files small, local and marked with a `Forma:` comment, so merges stay clean.
+- Branches: `forma-next` is the SolidCraft v0.43.0 fork with Forma's kit, look and brand; `main-sc`
+  is the earlier v0.29.0 fork that the live site was built from; `upstream` is the remote for
+  tangency-labs/solidcraft.
+- Brand: the product is **Forma**. Its identity comes from Artea (floral white `#f5eee6`, dark slate
+  grey `#30321d`, lime `#d5e8b8`, terracotta `#b5642a`): the `artea` theme is the default, with
+  `artea-night` for dark; the interface face is Hanken Grotesk (OFL), since Artea's PP Mori is a
+  commercial face that cannot ship in a public repository; the mark is the F in `crates/look`.
+  The interface crate's build script replaces "SolidCraft" with "Forma" in every message catalog,
+  so catalogs stay upstream's files. Crate, binary and command names still say `solidcraft`.
+  Reports and update checks point at pro-george/forma, never upstream.
 - `legacy-ts/` holds the earlier TypeScript Forma (Manifold mesh kernel, the Materializr-style
   im-touch studio, a sketch constraint solver, Bambu Studio / AMS 3MF export with per-part extruder
   slots, parametric ready-made parts such as the relief vase) and Artea Studio (studio.artea.ro's
   lampshade configurator). Its full history is on the `forma-ts` branch. Port features from it onto
   the Rust engine one at a time; do not develop new features there, except Artea Studio.
 - Deploy: `.github/workflows/pages.yml` builds `apps/solidcraft-web` with trunk at `/forma/` and
-  Artea Studio at `/`, and publishes `gh-pages` under studio.artea.ro. Upstream's other workflows
-  (release, packaging, bots) are removed on purpose.
-- Branding so far: only the web shell's title, meta and manifest say Forma; crates, binaries and
-  in-app strings still say SolidCraft until the rebranding subject is taken up.
+  Artea Studio at `/`, copies `examples/forma/<name>/<name>.sc` to `/forma/designs/`, and publishes
+  `gh-pages` under studio.artea.ro. Upstream's other workflows are removed on purpose.
+- Upstream's tests of the kit's inner workings (`crates/ui-kit/src/*_tests.rs` and the interface
+  crate's tests that name kit handles) were written against upstream's kit: some no longer
+  compile or pass against Forma's. Fix or retire them as the kit is worked on; do not bend the
+  kit to a test that only pinned upstream's pixels.
 - Forma's own standing rules: no prices anywhere in Forma; 3MF for Bambu Studio must carry per-part
   extruder slots (see `legacy-ts/packages/core/src/export/threemf.ts` for the proven layout); units
   are mm, Z up.

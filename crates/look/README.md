@@ -1,31 +1,29 @@
-# solidcraft-look
+# Forma's look
 
-SolidCraft's look, ready to install into the UI kit (`solidcraft-ui-kit`), which ships no artwork,
-faces or themes of its own. SolidCraft installs it from here, and so can any other host that wants
-the same look: one copy of each piece.
+Forma's icon masters and their colour roles (`icons/`), code-drawn glyphs and brand mark
+(`src/glyphs.rs`, `src/compass.rs`, `src/pointer.rs`), interface faces (`fonts/`) and built-in
+themes (`themes/`), compiled into one crate the app installs into the UI kit at startup
+(`solidcraft_look::install_tables`).
 
-| Item | What it is |
-|---|---|
-| `install(ctx)` | Everything: `install_tables()` and `fonts::install(ctx)`. Call it before the first frame and in every test context |
-| `install_tables()` | The process-wide parts: the icon set, the glyphs and the built-in themes |
-| `icons::DATA`, `icons::SET`, `icons::install()` | The icon masters (`icons/design/svg`), colour roles, accents, default accents and aliases (`palette.toml`, `aliases.toml`), compiled by `build.rs`; the set over them; installing it |
-| `glyphs::GLYPHS`, `glyphs::install()` | The code-drawn glyphs (transport, caption, badges, pin, cross, breadcrumb, compass ends, agent pointer, brand mark), with `compass` and `pointer` |
-| `fonts::definitions()`, `fonts::apply(ctx, defs)`, `fonts::install(ctx)`, `fonts::PLEX_SANS`, `fonts::PLEX_MONO` | IBM Plex Sans (four weights of one variable face) and Plex Mono bound to the kit's weight families, egui's faces after them and Hack last |
-| `themes::BUILTIN`, `themes::install()` | The built-in theme files (`themes/*.json`) |
+## Where this comes from, and its licence
 
-A host that draws SolidCraft's icons plus a few masters of its own installs
-`solidcraft_ui_kit::icons::IconSet::extended(solidcraft_look::icons::DATA, extension)` with
-`solidcraft_ui_kit::icons::install`, then the other parts (`glyphs::install`, `themes::install`,
-`fonts::install`). The extension's masters, aliases and default accents win a name both have.
+Everything in this crate is under **MIT OR Apache-2.0** (the fonts under the SIL Open Font
+License, see `ATTRIBUTION.md`). None of it comes from the crate of the same path that SolidCraft
+placed under its Brand and Interface Licence on 2026-11-10:
 
-The workspace tab table is the app's, not the look's. The accent ramps are in `solidcraft-theme`.
+- The icon masters, palette, aliases and tools, the control glyphs, the compass ends, the agent
+  pointer, the IBM Plex Mono face and the theme files other than Forma's come from SolidCraft's
+  last release published before that licence, `v0.40.0-nightly.20261110.117.1`, where they lived
+  under `assets/` and in the interface crate under MIT OR Apache-2.0.
+- Forma's own: the brand mark (`glyphs::brand_mark`), the `artea` and `artea-night` themes, the
+  choice of Hanken Grotesk as the interface face, and the code that puts the crate together.
 
-Licences: the code and artwork are MIT OR Apache-2.0; the IBM Plex faces are SIL OFL 1.1, with the
-licence text beside each (`fonts/*/OFL.txt`). Every file has a row in the repository's
-ATTRIBUTION.md. Read `icons/AGENTS.md` and `icons/STYLE_GUIDE.md` before icon work.
+Keep it that way: never copy from upstream's `crates/look`, `crates/ui-kit` or `crates/theme`
+after that nightly, and never read them to see how something is done. `scripts/forma-merge-upstream.sh`
+keeps upstream's later versions of these three folders out of a merge.
 
-## Licence
+## The mark
 
-This crate is part of SolidCraft's brand and interface, under the SolidCraft Brand and Interface
-Licence ([LICENSE](LICENSE)). Use it as part of SolidCraft; using it in another program or product
-needs the maintainers' written permission first.
+An F on a grid 76 wide and 100 tall: a stem (x 0..24), a top arm (y 0..24), both with round ends,
+and a dot of radius 13 centred at (51, 51) for the middle arm. `assets/icons/app/shared/source/app_icon.rs`
+draws the application icon from the same numbers.

@@ -1,5 +1,5 @@
-//! The view compass's axis ends: SolidCraft's [`Glyphs::axis_tip`](solidcraft_ui_kit::icons::glyphs::Glyphs::axis_tip)
-//! and its pointer target.
+//! The view compass's axis ends (from SolidCraft's last MIT OR Apache-2.0 nightly). Camera
+//! projection and picking stay with the UI widgets.
 use egui::{Pos2, Stroke, pos2};
 use solidcraft_theme::Tokens;
 

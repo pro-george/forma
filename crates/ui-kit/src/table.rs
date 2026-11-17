@@ -267,8 +267,7 @@ impl Table<'_> {
         response
     }
 
-    /// The last, slim button line. Clicking asks the owner to insert a regular draft row. It is
-    /// drawn as a normal button (solid border, body ink, hover highlight), not a placeholder.
+    /// The last, slim dashed line. Clicking asks the owner to insert a regular draft row.
     pub fn add_prompt(&mut self, ui: &mut Ui, label: &str, tooltip: &str) -> Response {
         let t = Tokens::get();
         if self.rows == 0 && !self.empty_shown {
@@ -276,7 +275,26 @@ impl Table<'_> {
             self.empty_shown = true;
         }
         let (rect, response) = ui.allocate_exact_size(vec2(self.width(), row_height() - t.space_4), egui::Sense::click());
-        paint_icon_button(ui, rect, &response, solidcraft_ui_text::tr_label(label), false);
+        let stroke = t.control_border_stroke(t.control_border);
+        let mut outline = Vec::new();
+        egui::epaint::tessellator::path::rounded_rectangle(
+            &mut outline,
+            egui::epaint::RoundedRect::new(rect.shrink(stroke.width * 0.5), f32::from(t.control_radius)),
+        );
+        if let Some(first) = outline.first().copied() {
+            outline.push(first);
+        }
+        ui.painter().add(egui::Shape::dashed_line(&outline, stroke, t.space_4, t.space_3));
+        let icon = egui::Rect::from_center_size(egui::pos2(rect.left() + t.space_16, rect.center().y), vec2(t.space_14, t.space_14));
+        crate::icons::paint_ink(ui.painter(), icon, "plus", t.form_dim);
+        super::text::paint_text(
+            ui,
+            egui::Rect::from_min_max(egui::pos2(icon.right() + t.space_6, rect.top()), rect.max),
+            solidcraft_ui_text::tr_label(label),
+            egui::FontId::proportional(t.font_label),
+            t.form_dim,
+            false,
+        );
         response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), solidcraft_ui_text::tr_label(label)));
         solidcraft_ui_registry::publish_handle(&format!("dialog:table:{}:add", self.id), rect.center());
         solidcraft_ui_registry::publish_rect(&format!("dialog:table:{}:add", self.id), rect);
@@ -494,33 +512,20 @@ pub fn bin_button(ui: &mut Ui, tooltip: &str) -> Response {
     response
 }
 
-/// A button with a leading plus: the kit's normal fill, border, ink and hover highlight.
-/// Tokens: control_radius, space_6/14/16, font_label, control_fill/border, form_ink, hover.
-fn paint_icon_button(ui: &Ui, rect: egui::Rect, response: &Response, label: &str, centred: bool) {
+/// Last header cell opens the unchanged column menu. Hover brackets indicate insertion. The
+/// menu holds a filter field, so a click inside it (into the field) keeps it open: entries
+/// close it themselves when picked.
+pub fn plus_header<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> Option<R> {
     let t = Tokens::get();
-    let (fill, ink, stroke) = super::actions::normal_button_look(ui, response);
-    ui.painter().rect(rect, t.control_radius, fill, stroke, egui::StrokeKind::Inside);
-    t.button_bevel(ui, response, false);
-    let font = egui::FontId::proportional(t.font_label);
-    let text_width = ui.painter().layout_no_wrap(label.to_owned(), font.clone(), ink).size().x.ceil();
-    let content = t.space_14 + t.space_6 + text_width;
-    let left = if centred { rect.center().x - content / 2.0 } else { rect.left() + t.space_16 };
-    let icon = egui::Rect::from_center_size(egui::pos2(left + t.space_14 / 2.0, rect.center().y), vec2(t.space_14, t.space_14));
-    crate::icons::paint_ink(ui.painter(), icon, "plus", ink);
-    super::text::paint_text(ui, egui::Rect::from_min_max(egui::pos2(icon.right() + t.space_6, rect.top()), rect.max), label, font, ink, false);
-}
-
-/// The Configuration Table's "+ Add column" button, above the table. It opens the column menu
-/// (a filter field and the choices), which stays open for a click inside it; entries close it.
-pub fn add_column_button<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> Option<R> {
-    let t = Tokens::get();
-    let label = solidcraft_ui_text::tr_label("Add column");
-    let font = egui::FontId::proportional(t.font_label);
-    let width = ui.painter().layout_no_wrap(label.to_owned(), font, t.form_ink).size().x.ceil() + t.space_16 * 2.0 + t.space_14 + t.space_6;
-    let (rect, response) = ui.allocate_exact_size(vec2(width, t.control_height), egui::Sense::click());
-    paint_icon_button(ui, rect, &response, label, true);
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), label));
-    let response = response.on_hover_cursor(egui::CursorIcon::PointingHand).backing_on_hover_text(solidcraft_ui_text::tr_label("Add Column"));
+    let rect = egui::Rect::from_center_size(ui.max_rect().center(), vec2(t.form_close_size - t.space_4, t.form_close_size - t.space_4));
+    let response = super::actions::icon_button_colored(ui, rect, "plus", "Add Column", Some(t.form_dim));
+    if response.hovered() {
+        ui.painter().rect_filled(rect, t.control_radius, t.selected_bg);
+        crate::icons::paint_ink(ui.painter(), rect.shrink(t.form_icon_inset), "plus", t.form_primary);
+        for x in [rect.left() - t.form_gap_y, rect.right() + t.form_gap_y] {
+            ui.painter().vline(x, rect.y_range(), egui::Stroke::new(t.space_2, t.form_primary));
+        }
+    }
     solidcraft_ui_registry::publish_handle("dialog:menu:Add Column", rect.center());
     solidcraft_ui_registry::publish_rect("dialog:menu:Add Column", rect);
     let popup = Container::new(ui.ctx(), Surface::Popup).menu(&response).close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
@@ -548,3 +553,88 @@ pub fn active_pill(ui: &mut Ui) {
 #[cfg(test)]
 #[path = "table_tests.rs"]
 mod tests;
+
+/// A key that moves between the cells of a table being edited.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CellKey {
+    /// Enter: the cell below, in the same column.
+    Down,
+    /// Shift+Enter: the cell above.
+    Up,
+    /// Tab: the next cell, and Shift+Tab: the one before.
+    Next,
+    Previous,
+}
+
+/// The key pressed this pass that moves on from a cell whose editor is `focused`. The keys are
+/// read, not taken: the cell's own handling of Enter still sees it.
+pub fn cell_key(ui: &egui::Ui, focused: bool) -> Option<CellKey> {
+    if !focused {
+        return None;
+    }
+    ui.input(|i| {
+        let shift = i.modifiers.shift;
+        if i.key_pressed(egui::Key::Enter) {
+            Some(if shift { CellKey::Up } else { CellKey::Down })
+        } else if i.key_pressed(egui::Key::Tab) {
+            Some(if shift { CellKey::Previous } else { CellKey::Next })
+        } else {
+            None
+        }
+    })
+}
+
+/// The cell the keyboard is on its way to: its row and column, and the pass it was asked on.
+#[derive(Clone, Debug)]
+struct Landing {
+    row: String,
+    column: String,
+    asked: u64,
+}
+
+/// Ask for the cell (`row`, `column`) of the table that keeps its state at `cells` to take the
+/// keyboard: its editor gets the focus with its text selected the next time it is drawn
+/// ([`landing`]).
+pub fn land_in_cell(ctx: &egui::Context, cells: egui::Id, row: &str, column: &str) {
+    let asked = ctx.cumulative_pass_nr();
+    ctx.data_mut(|data| data.insert_temp(cells, Landing { row: row.to_owned(), column: column.to_owned(), asked }));
+    ctx.request_repaint();
+}
+
+/// Whether the keyboard is on its way to a cell of `row`: the table builds such a row even where
+/// it would skip it as out of sight.
+pub fn landing_in_row(ctx: &egui::Context, cells: egui::Id, row: &str) -> bool {
+    ctx.data(|data| data.get_temp::<Landing>(cells)).is_some_and(|landing| landing.row == row)
+}
+
+/// Call for every cell editor as it is drawn, with its `response` and its `text`: the cell the
+/// keyboard was sent to ([`land_in_cell`]) takes the focus, its text selected. Returns whether
+/// this cell took it in this pass, so the key that sent it here is not read again as this cell's.
+pub fn landing(ui: &egui::Ui, cells: egui::Id, row: &str, column: &str, response: &egui::Response, text: &str) -> bool {
+    let ctx = ui.ctx();
+    let Some(landing) = ctx.data(|data| data.get_temp::<Landing>(cells)).filter(|landing| landing.row == row && landing.column == column) else {
+        return false;
+    };
+    response.request_focus();
+    if let Some(mut state) = egui::TextEdit::load_state(ctx, response.id) {
+        let end = text.chars().count();
+        state.cursor.set_char_range(Some(egui::text::CCursorRange::two(egui::text::CCursor::new(0), egui::text::CCursor::new(end))));
+        state.store(ctx, response.id);
+    }
+    // The request stands until the cell has the focus (it may be drawn a pass after it was
+    // asked for), and never longer than a few passes for a cell that cannot take it.
+    if response.has_focus() || ctx.cumulative_pass_nr() > landing.asked + 4 {
+        ctx.data_mut(|data| data.remove::<Landing>(cells));
+    } else {
+        ctx.request_repaint();
+    }
+    true
+}
+
+/// Keep Tab for the table while the cell editor `response` has the focus: egui does not move the
+/// focus on, the table does ([`cell_key`], [`land_in_cell`]).
+pub fn keep_tab_in_cell(ui: &egui::Ui, response: &egui::Response) {
+    if response.has_focus() {
+        ui.memory_mut(|memory| memory.set_focus_lock_filter(response.id, egui::EventFilter { tab: true, ..Default::default() }));
+    }
+}

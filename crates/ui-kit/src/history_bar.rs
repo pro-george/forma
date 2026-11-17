@@ -1,5 +1,5 @@
-//! The History strip: a row of step
-//! chips with the history marker between them. The app describes each step as plain data
+//! The History bar as a component: a strip of step chips with the history marker between them
+//! (its title and the History controls belong to the panel that hosts it). The app describes each step as plain data
 //! ([`Step`]) in the order the bar shows them, draws chips of its own between them through
 //! [`Strip::chip`] and [`Strip::inline`] (its [`Contents`]), and runs the [`Action`]s the bar
 //! returns. The bar keeps only which chip, or the marker, is being dragged, and reads nothing of
@@ -17,7 +17,7 @@ use solidcraft_theme::{TabAccent, Tokens};
 #[derive(Clone, Copy, Debug)]
 pub struct Handles<'a> {
     pub marker: &'a str,
-    /// Each step's chip, as this followed by the step's label.
+    /// Each step's chip, as this followed by the step's label (or its [`Step::handle`]).
     pub step: &'a str,
 }
 
@@ -35,8 +35,7 @@ pub struct Bar<'a> {
     pub steps: usize,
     /// The floating card, which also dots the last step before the marker.
     pub floating: bool,
-    /// Steps can be dragged to a new place ([`Action::Reorder`]). Off for a history whose steps
-    /// have no order to change: a step then senses clicks only, with no drag and no drop.
+    /// Steps can be dragged to another slot. Without it only the marker moves.
     pub reorder: bool,
     pub handles: Handles<'a>,
 }
@@ -56,11 +55,9 @@ pub struct Step<'a> {
     pub warning: bool,
     /// Draw the icon in this one colour instead of its artwork.
     pub ink: Option<egui::Color32>,
-    /// The hover text, written only while it shows: its name and type, its error and warning,
-    /// then the rest (#8834).
+    /// The hover text, written only while it shows.
     pub tip: &'a dyn Fn() -> crate::StatusTip,
-    /// Its handle's name ([`Handles::step`] followed by the label) when the app keeps it ready,
-    /// so a long bar publishes its steps without building their names every frame; `None` builds it.
+    /// The name the chip is published under, where labels repeat; the label otherwise.
     pub handle: Option<&'a std::sync::Arc<str>>,
 }
 
@@ -79,17 +76,31 @@ pub struct StepState {
 /// What the user chose on the bar this frame, in the order it happened.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Action {
-    /// The marker dropped in a slot. `before` distinguishes either side of its current slot.
-    Seek { slot: usize, before: bool },
+    /// The marker dropped in `slot`; `before` says on which side of the marker, at the marker's
+    /// own slot.
+    Seek {
+        slot: usize,
+        before: bool,
+    },
     /// A click on a step, with the modifiers held.
-    Select { step: u64, modifiers: egui::Modifiers },
+    Select {
+        step: u64,
+        modifiers: egui::Modifiers,
+    },
     /// A double click on a step.
     Edit(u64),
     /// A step's menu, opened at `at`; the app shows its own items in its own menu. A host
     /// without a menu system can draw its items with `crate::Menu` at `at`.
-    Menu { step: u64, at: Pos2 },
+    Menu {
+        step: u64,
+        at: Pos2,
+    },
     /// A step dropped in `slot`; `before` as for [`Action::Seek`].
-    Reorder { step: u64, slot: usize, before: bool },
+    Reorder {
+        step: u64,
+        slot: usize,
+        before: bool,
+    },
 }
 
 /// What the app draws in the strip.
@@ -116,12 +127,6 @@ enum Drag {
     Step(u64),
 }
 
-#[cfg(test)]
-thread_local! {
-    /// How many times steps out of view read the focus and the open popups.
-    static QUIET_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
-
 /// The strip being laid out, left to right.
 pub struct Strip<'u, 'b> {
     ui: &'u mut egui::Ui,
@@ -139,10 +144,6 @@ pub struct Strip<'u, 'b> {
     hovered: Option<u64>,
     edit: Option<u64>,
     actions: Vec<Action>,
-    /// The focused widget and whether a popup is open, as last read for steps out of view: a run
-    /// of them reads both once, not twice per step. Forgotten by whatever adds or interacts with a
-    /// widget (a step in view, the app's chips, its `ui`), which can move the focus or open one.
-    quiet: Option<(Option<egui::Id>, bool)>,
 }
 
 /// Draws the steps in `rect`, scrolled sideways (`scroll` keeps its own scroll offset), the bar's
@@ -179,14 +180,13 @@ fn lay_out(ui: &mut egui::Ui, bar: Bar, rect: Rect, contents: &mut dyn Contents)
         bar,
         rect,
         x,
-        xs: Vec::with_capacity(bar.steps),
+        xs: Vec::new(),
         marker_rect: None,
         trays: Vec::new(),
         drag,
         hovered: None,
         edit: None,
         actions: Vec::new(),
-        quiet: None,
     };
     contents.entries(&mut strip);
     let Strip { ui, painter: p, x: end, xs, mut marker_rect, mut drag, hovered, edit, mut actions, .. } = strip;
@@ -194,12 +194,10 @@ fn lay_out(ui: &mut egui::Ui, bar: Bar, rect: Rect, contents: &mut dyn Contents)
     if marker >= bar.steps && marker_rect.is_none() {
         marker_rect = Some(marker_at(rect, end));
     }
-    // The history marker: drag it to roll the model back or forward, by its rect and a little
-    // either side of it.
-    let grab = marker_rect.map(|mr| mr.expand2(vec2(3.0, 0.0)));
-    if let (Some(mr), Some(grab)) = (marker_rect, grab) {
+    // The history marker: drag it to roll the model back or forward.
+    if let Some(mr) = marker_rect {
         solidcraft_ui_registry::publish_rect(bar.handles.marker, mr);
-        let resp = ui.interact(grab, ui.scope_id().with("tl_marker"), Sense::drag());
+        let resp = ui.interact(mr.expand2(vec2(3.0, 0.0)), ui.scope_id().with("tl_marker"), Sense::drag());
         if resp.drag_started() {
             drag = Some(Drag::Marker);
         }
@@ -210,12 +208,6 @@ fn lay_out(ui: &mut egui::Ui, bar: Bar, rect: Rect, contents: &mut dyn Contents)
         resp.backing_on_hover_text(bar.marker_tip);
     }
     let content_end = contents.trailing(ui, &p, end, rect);
-    // The marker after the last step is part of the strip: the scroll range reaches past it, with
-    // the room it is grabbed by, so a strip scrolled to its end shows it whole.
-    let content_end = match grab {
-        Some(grab) if marker >= bar.steps => content_end.max(grab.right()),
-        _ => content_end,
-    };
     // The scroll range follows the drawn content (the chips don't take layout space themselves).
     ui.allocate_exact_size(vec2((content_end - origin).max(0.0), rect.height()), Sense::hover());
     // Drag feedback, and the drop.
@@ -294,7 +286,6 @@ fn slot_at(xs: &[f32], end: f32, x: f32) -> usize {
 impl Strip<'_, '_> {
     /// The strip's ui, for what the app draws itself.
     pub fn ui(&mut self) -> &mut egui::Ui {
-        self.quiet = None;
         self.ui
     }
 
@@ -319,35 +310,22 @@ impl Strip<'_, '_> {
     /// drawn nor interactive; its slot still places the marker and drops. One being dragged or
     /// focused, or under an open menu, stays alive until that ends.
     pub fn step(&mut self, step: &Step) -> Rect {
+        let t = Tokens::get();
         if step.slot == self.bar.marker {
             self.marker_here();
         }
         self.xs.push(self.x);
         let br = Rect::from_min_size(pos2(self.x, self.rect.top() + 6.0), vec2(28.0, 28.0));
         self.x += 32.0;
-        match step.handle {
-            Some(name) => solidcraft_ui_registry::publish_shared_handle(name, br.center()),
-            None => solidcraft_ui_registry::publish_handle(&format!("{}{}", self.bar.handles.step, step.label), br.center()),
-        }
-        let dragged = self.drag == Some(Drag::Step(step.id));
-        // Out of view and not dragged, the chip is left out unless it has the focus or a popup is
-        // open; its id is worked out only to compare with a focused one.
-        if !self.ui.clip_rect().intersects(br) && !dragged {
-            let ui = &*self.ui;
-            let (focused, popup) = *self.quiet.get_or_insert_with(|| {
-                #[cfg(test)]
-                QUIET_READS.with(|reads| reads.set(reads.get() + 1));
-                (ui.memory(|m| m.focused()), egui::Popup::is_any_open(ui.ctx()))
-            });
-            if !popup && focused.is_none_or(|focused| focused != ui.scope_id().with(("feat", step.id))) {
-                return br;
-            }
-        }
-        self.quiet = None;
+        let published = step.handle.map_or(step.label, |handle| handle.as_ref());
+        solidcraft_ui_registry::publish_handle(&format!("{}{published}", self.bar.handles.step), br.center());
         let ui = &mut *self.ui;
         let chip_id = ui.scope_id().with(("feat", step.id));
-        let sense = if self.bar.reorder { Sense::click_and_drag() } else { Sense::click() };
-        let resp = ui.interact(br, chip_id, sense);
+        let dragged = self.drag == Some(Drag::Step(step.id));
+        if !ui.clip_rect().intersects(br) && !dragged && !ui.memory(|m| m.has_focus(chip_id)) && !egui::Popup::is_any_open(ui.ctx()) {
+            return br;
+        }
+        let resp = ui.interact(br, chip_id, Sense::click_and_drag());
         if resp.hovered() {
             self.hovered = Some(step.id);
         }
@@ -367,10 +345,9 @@ impl Strip<'_, '_> {
         }
         .paint(&self.painter, br, HistoryStyle::Bottom);
         if self.bar.floating && step.state.last_done {
-            let t = Tokens::get();
             self.painter.circle_filled(pos2(br.center().x, br.bottom() + t.space_3), t.space_2, self.bar.accent.color);
         }
-        if self.bar.reorder && resp.drag_started() {
+        if resp.drag_started() && self.bar.reorder {
             self.drag = Some(Drag::Step(step.id));
         }
         let resp = resp.backing_on_hover_ui(|ui| (step.tip)().show(ui));
@@ -392,7 +369,6 @@ impl Strip<'_, '_> {
     /// before it. An `open` one starts a tray `depth` deep, ended by [`Strip::end_tray`].
     /// Returns its rect.
     pub fn chip(&mut self, start: usize, end: usize, open: bool, depth: usize, draw: impl FnOnce(&mut egui::Ui, &Painter, Pos2) -> f32) -> Rect {
-        self.quiet = None;
         let marker = self.bar.marker;
         if start < end && start == marker {
             self.marker_here();
@@ -425,7 +401,6 @@ impl Strip<'_, '_> {
     /// Something of the app's own that takes no slot, drawn by `draw` from x in the bar's rect,
     /// returning where it ends.
     pub fn inline(&mut self, draw: impl FnOnce(&mut egui::Ui, &Painter, f32, Rect) -> f32) {
-        self.quiet = None;
         self.x = draw(self.ui, &self.painter, self.x, self.rect);
     }
 }

@@ -23,7 +23,7 @@ pub fn panel_host_container(ctx: &egui::Context, floating: bool) -> Container {
 
 /// The same adaptive frame supplies both paint and the content's safe clip.
 pub fn panel_host_frame(ctx: &egui::Context, floating: bool) -> egui::Frame {
-    panel_host_container(ctx, floating).frame(ctx, Tokens::get().toolbar, crate::frame::Side::Left).inner_margin(0).outer_margin(0)
+    panel_host_container(ctx, floating).frame(ctx, Tokens::get().panel, crate::frame::Side::Left).inner_margin(0).outer_margin(0)
 }
 
 pub fn panel_host_surface<R>(
@@ -114,19 +114,12 @@ pub fn panel_host_control_label_opacity(
         t.form_ink
     };
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(bounds));
-    let inset = if chrome.icon_only { t.space_2 } else { t.space_4 };
-    let paint_bounds = bounds.shrink2(egui::vec2(inset.min(bounds.width() / 2.0), inset.min(bounds.height() / 2.0)));
+    let paint_bounds = bounds.shrink2(egui::vec2(t.space_4.min(bounds.width() / 2.0), t.space_4.min(bounds.height() / 2.0)));
     if let Some(fill) = fill {
         if chrome.title {
             super::panel::panel_header_hover(&painter, paint_bounds);
         } else {
-            let radius = if chrome.icon_only {
-                // The button inset and header margin share the panel corner's center.
-                t.radius_lg.saturating_sub(t.space_4.round() as u8)
-            } else {
-                t.control_radius
-            };
-            painter.rect_filled(paint_bounds, radius, fill);
+            painter.rect_filled(paint_bounds, t.control_radius, fill);
         }
     }
     if response.has_focus() {
@@ -155,7 +148,7 @@ pub fn panel_host_control_label_opacity(
     let icon = chrome.icon.filter(|icon| !icon.is_empty());
     if let Some(icon) = icon {
         let extent = if chrome.icon_only {
-            (bounds.width().min(bounds.height()).min(t.control_height) - t.form_icon_inset * 2.0).max(0.0)
+            (bounds.width().min(bounds.height()) - t.form_icon_inset * 2.0).max(0.0)
         } else {
             t.form_icon_size.min(bounds.height()).min(text.width())
         };
@@ -213,14 +206,6 @@ pub fn panel_host_control_label_opacity(
 /// The same full-header affordance collapses and restores with one click.
 /// Reuse the existing chevron master, with the kit's vertical mirror helper.
 #[allow(clippy::too_many_arguments)]
-pub fn panel_expand_menu_icon(painter: &egui::Painter, rect: egui::Rect, opacity: f32) {
-    crate::icons::paint_ink(painter, rect, "chevron", Tokens::get().form_ink.gamma_multiply(opacity));
-}
-
-pub fn panel_collapse_menu_icon(painter: &egui::Painter, rect: egui::Rect, opacity: f32) {
-    crate::icons::paint_ink_flipped(painter, rect, "chevron", Tokens::get().form_ink.gamma_multiply(opacity));
-}
-
 pub fn panel_host_disclosure(
     ui: &mut egui::Ui,
     id: egui::Id,
@@ -250,7 +235,7 @@ pub fn panel_host_disclosure(
     ui.ctx().accesskit_node_builder(response.id, |node| node.set_expanded(!collapsed));
     let t = Tokens::get();
     let ink = if enabled { t.form_ink } else { t.form_dim };
-    let extent = (bounds.width().min(bounds.height()).min(t.control_height) - t.form_icon_inset * 2.0).max(0.0);
+    let extent = (bounds.width().min(bounds.height()) - t.form_icon_inset * 2.0).max(0.0);
     let icon = egui::Rect::from_center_size(bounds.center(), egui::vec2(extent, extent));
     let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(bounds));
     // Only the two existing glyphs blend. The response, expanded state and
@@ -436,47 +421,6 @@ pub fn panel_host_neighbour_preview(ui: &egui::Ui, bounds: egui::Rect, removed: 
     }
 }
 
-/// A panel tab uses the same chip and text treatment as a document tab.
-#[allow(clippy::too_many_arguments)]
-pub fn paint_panel_tab(ui: &egui::Ui, bounds: egui::Rect, label: &str, active: bool, lit: bool, incoming: bool, rtl: bool, label_opacity: f32) {
-    let t = Tokens::get();
-    let chip = bounds.shrink2(egui::vec2((t.space_2 / 2.0).min(bounds.width() / 2.0), t.space_4.min(bounds.height() / 2.0)));
-    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(chip));
-    crate::app_bar::tab_shape(&painter, &t, chip, active || incoming, lit);
-    if incoming {
-        painter.rect_stroke(chip, t.radius_md, t.control_border_stroke(t.form_primary), egui::StrokeKind::Inside);
-    }
-    let ink = t.app_bar_text.gamma_multiply(label_opacity * if active || lit || incoming { 1.0 } else { 0.7 });
-    let font = if active { crate::type_face::semibold(t.font_button) } else { egui::FontId::proportional(t.font_button) };
-    let mut text = chip.shrink2(egui::vec2(t.space_8.min(chip.width() / 2.0), 0.0));
-    if rtl {
-        let width = painter.layout_no_wrap(label.to_owned(), font.clone(), ink).size().x;
-        text.min.x = text.right() - width.min(text.width());
-    }
-    crate::paint_text(ui, text, label, font, ink, false);
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn panel_tab(
-    ui: &mut egui::Ui,
-    id: egui::Id,
-    bounds: egui::Rect,
-    label: &str,
-    active: bool,
-    enabled: bool,
-    rtl: bool,
-    label_opacity: f32,
-) -> egui::Response {
-    let enabled = enabled && ui.is_enabled();
-    let response = ui.interact(bounds, id, if enabled { egui::Sense::click_and_drag() } else { egui::Sense::hover() });
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, label));
-    if enabled && response.hovered() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
-    }
-    paint_panel_tab(ui, bounds, label, active, enabled && (response.hovered() || response.has_focus()), false, rtl, label_opacity);
-    response.backing_on_hover_text(label)
-}
-
 pub fn panel_host_tab_insertion(ui: &egui::Ui, bounds: egui::Rect, opacity: f32) {
     let painter =
         ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, ui.scope_id().with("panel_preview"))).with_clip_rect(ui.clip_rect());
@@ -504,4 +448,88 @@ pub fn panel_host_popup<R>(ui: &mut egui::Ui, id: egui::Id, bounds: egui::Rect, 
             body(&mut content)
         })
         .inner
+}
+
+/// One tab of a panel that holds several: its interactive target at `bounds`, drawn by
+/// [`paint_panel_tab`]. `opacity` fades one that is being moved elsewhere.
+#[allow(clippy::too_many_arguments)]
+pub fn panel_tab(
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    bounds: egui::Rect,
+    label: &str,
+    selected: bool,
+    enabled: bool,
+    rtl: bool,
+    opacity: f32,
+) -> egui::Response {
+    let enabled = enabled && ui.is_enabled();
+    let response = ui.interact(bounds, id, if enabled { egui::Sense::click_and_drag() } else { egui::Sense::hover() });
+    response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, enabled, selected, label));
+    let hovered = enabled && (response.hovered() || response.has_focus());
+    paint_panel_tab(ui, bounds, label, selected, hovered, response.dragged(), rtl, if enabled { opacity } else { opacity * 0.5 });
+    if response.has_focus() {
+        let t = Tokens::get();
+        ui.painter().rect_stroke(bounds.shrink(t.space_2), t.radius_sm, t.control_border_stroke(t.form_primary), egui::StrokeKind::Inside);
+    }
+    if hovered {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    response.backing_on_hover_text(label)
+}
+
+/// A panel tab's look, without interaction: its title, semibold with an accent line under it
+/// while `selected`, on the hover fill while `hovered` or `dragged`.
+#[allow(clippy::too_many_arguments)]
+pub fn paint_panel_tab(ui: &egui::Ui, bounds: egui::Rect, title: &str, selected: bool, hovered: bool, dragged: bool, rtl: bool, opacity: f32) {
+    let t = Tokens::get();
+    let painter = ui.painter().with_clip_rect(ui.clip_rect().intersect(bounds));
+    let inner = bounds.shrink2(egui::vec2(t.space_2.min(bounds.width() / 2.0), t.space_4.min(bounds.height() / 2.0)));
+    if dragged {
+        painter.rect_filled(inner, t.control_radius, t.selected_bg.gamma_multiply(opacity));
+    } else if hovered && !selected {
+        painter.rect_filled(inner, t.control_radius, t.hover.gamma_multiply(opacity));
+    }
+    let ink = if selected { t.form_ink } else { t.form_dim }.gamma_multiply(opacity);
+    let font = if selected { crate::type_face::semibold(t.font_label) } else { egui::FontId::proportional(t.font_label) };
+    let mut text = bounds.shrink2(egui::vec2(t.space_8.min(bounds.width() / 2.0), 0.0));
+    let width = painter.layout_no_wrap(title.to_owned(), font.clone(), ink).size().x.min(text.width());
+    if rtl {
+        text.min.x = text.right() - width;
+    }
+    super::text::paint_text(ui, text, title, font, ink, false);
+    if selected {
+        let accent = solidcraft_theme::TabAccent::current(ui.ctx());
+        let left = if rtl { text.right() - width } else { text.left() };
+        painter.hline(left..=(left + width), bounds.bottom() - t.space_3, egui::Stroke::new(2.0, accent.color.gamma_multiply(opacity)));
+    }
+}
+
+/// The menu picture for "collapse this panel": a panel outline with a chevron pointing up into
+/// its header. [`panel_expand_menu_icon`] points it down.
+pub fn panel_collapse_menu_icon(painter: &egui::Painter, rect: egui::Rect, opacity: f32) {
+    panel_fold_menu_icon(painter, rect, opacity, true);
+}
+
+/// The menu picture for "expand this panel".
+pub fn panel_expand_menu_icon(painter: &egui::Painter, rect: egui::Rect, opacity: f32) {
+    panel_fold_menu_icon(painter, rect, opacity, false);
+}
+
+fn panel_fold_menu_icon(painter: &egui::Painter, rect: egui::Rect, opacity: f32, up: bool) {
+    let t = Tokens::get();
+    let ink = t.form_ink.gamma_multiply(opacity);
+    let stroke = egui::Stroke::new(1.3, ink);
+    let side = rect.width().min(rect.height());
+    let frame = egui::Rect::from_center_size(rect.center(), egui::vec2(side * 0.86, side * 0.86));
+    painter.rect_stroke(frame, side * 0.14, stroke, egui::StrokeKind::Inside);
+    let header = frame.top() + frame.height() * 0.3;
+    painter.hline((frame.left() + 1.0)..=(frame.right() - 1.0), header, stroke);
+    let centre = egui::pos2(frame.center().x, (header + frame.bottom()) / 2.0);
+    let (half, rise) = (side * 0.17, side * 0.09);
+    let tip = if up { -rise } else { rise };
+    painter.add(egui::Shape::line(
+        vec![egui::pos2(centre.x - half, centre.y - tip), egui::pos2(centre.x, centre.y + tip), egui::pos2(centre.x + half, centre.y - tip)],
+        stroke,
+    ));
 }

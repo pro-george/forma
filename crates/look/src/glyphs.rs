@@ -1,9 +1,10 @@
-//! Collected glyph artwork. Caption geometry adapted from VectorCraft (MIT OR Apache-2.0).
-use egui::{Color32, Pos2, Rect, Stroke, Ui, pos2, vec2};
-use solidcraft_ui_kit::icons::glyphs::Glyphs;
+//! Forma's code-drawn glyphs: transport, window caption, badges, pin, cross, breadcrumb and the
+//! brand mark. The control glyphs come from SolidCraft's last MIT OR Apache-2.0 nightly
+//! (v0.40.0-nightly.20261110, caption geometry adapted there from VectorCraft, same licences);
+//! the brand mark is Forma's own.
 use solidcraft_ui_kit::window_chrome::Caption;
+use egui::{Color32, Pos2, Rect, Stroke, Ui, pos2, vec2};
 
-/// [`Glyphs::transport`]: a history transport mark centred on `c`.
 pub fn transport_glyph(p: &egui::Painter, c: egui::Pos2, what: &str, col: Color32) {
     let tri = |dir: f32, dx: f32| {
         let pts = vec![pos2(c.x + dx - 4.0 * dir, c.y - 5.0), pos2(c.x + dx + 4.0 * dir, c.y), pos2(c.x + dx - 4.0 * dir, c.y + 5.0)];
@@ -35,7 +36,6 @@ pub fn transport_glyph(p: &egui::Painter, c: egui::Pos2, what: &str, col: Color3
     }
 }
 
-/// [`Glyphs::caption`]: a window caption button's mark centred on `at`.
 pub fn paint_glyph(ui: &Ui, c: Caption, maximized: bool, at: egui::Pos2, s: Stroke) {
     let p = ui.painter();
     let g = Rect::from_center_size(at, vec2(10.0, 10.0));
@@ -59,7 +59,6 @@ pub fn paint_glyph(ui: &Ui, c: Caption, maximized: bool, at: egui::Pos2, s: Stro
     }
 }
 
-/// [`Glyphs::badge`]: the `lock` or `pin` status badge in `r`.
 pub fn badge(p: &egui::Painter, r: Rect, name: &str, c: Color32) {
     let s = Stroke::new(1.3, c);
     match name {
@@ -88,7 +87,6 @@ pub fn badge(p: &egui::Painter, r: Rect, name: &str, c: Color32) {
     }
 }
 
-/// [`Glyphs::pin`]: a pin in `r`, upright when `on`.
 pub fn pin_icon(p: &egui::Painter, r: Rect, on: bool, col: Color32) {
     let c = r.center();
     let (sin, cos) = if on { (0.0, 1.0) } else { std::f32::consts::FRAC_PI_4.sin_cos() };
@@ -114,84 +112,30 @@ pub fn breadcrumb(p: &egui::Painter, c: egui::Pos2, col: Color32) {
     p.line_segment([pos2(c.x + 1.5, c.y), pos2(c.x - 1.5, c.y + 3.0)], s);
 }
 
-/// The SolidCraft mark in its colours, 20 points high, centred on `c` (the application bar).
+/// Forma's mark in the theme's logo colours: an F made of a stem, a top arm and a dot for the
+/// middle arm. `c` is its centre; it is 20 points tall.
 pub fn brand_mark(p: &egui::Painter, c: Pos2) {
-    brand_mark_styled(p, c, 20.0, solidcraft_theme::Tokens::get().logo, true);
+    brand_mark_styled(p, c, 20.0, solidcraft_theme::Tokens::get().logo);
 }
 
-/// The same original mark as a single quiet silhouette, without face seams or outlines.
+/// The same mark in one ink, at any height.
 pub fn brand_mark_silhouette(p: &egui::Painter, c: Pos2, height: f32, ink: Color32) {
-    brand_mark_styled(p, c, height, [ink; 3], false);
+    brand_mark_styled(p, c, height, [ink; 3]);
 }
 
-fn brand_mark_styled(p: &egui::Painter, c: Pos2, height: f32, colours: [Color32; 3], edges: bool) {
-    let s = height / 412.217;
-    let m = |pts: &[(f32, f32)]| -> Vec<egui::Pos2> { pts.iter().map(|&(x, y)| pos2(c.x + (x - 178.5) * s, c.y + (y - 206.1) * s)).collect() };
-    // egui only fills convex shapes, so each face is a few overlapping convex pieces.
-    let face = |col: Color32, pts: &[(f32, f32)]| {
-        p.add(egui::Shape::convex_polygon(m(pts), col, Stroke::NONE));
-    };
-    // The faces are separated by gaps that show the application bar, not by white lines.
-    let [light, mid, dark] = colours;
-    let edge_col = solidcraft_theme::Tokens::get().app_bar;
-    face(light, &[(3.5, 105.9), (177.0, 5.8), (263.4, 55.6), (263.8, 156.0), (177.0, 406.4)]);
-    face(light, &[(177.0, 206.1), (263.8, 156.0), (350.5, 206.2), (350.5, 306.3), (177.0, 406.4)]);
-    face(mid, &[(3.5, 105.9), (177.0, 206.1), (177.0, 406.4)]);
-    face(mid, &[(3.5, 105.9), (3.5, 205.7), (90.3, 256.2), (177.0, 206.1)]);
-    face(mid, &[(177.0, 206.1), (90.3, 256.2), (90.0, 356.2), (177.0, 406.4)]);
-    face(dark, &[(264.1, 155.8), (177.0, 206.1), (177.0, 406.4), (263.8, 256.2)]);
-    face(dark, &[(263.8, 256.2), (350.5, 206.2), (350.5, 306.3), (177.0, 406.4)]);
-    face(dark, &[(177.0, 206.1), (177.0, 406.4), (350.5, 306.3)]);
-    face(dark, &[(263.8, 55.9), (263.8, 156.0), (177.1, 105.9)]);
-    if !edges {
-        return;
-    }
-    // The seams between the faces and around the mark, in the bar's colour, so they read as gaps.
-    let edge = Stroke::new(10.0 * s, edge_col);
-    let line = |pts: &[(f32, f32)]| {
-        p.add(egui::Shape::line(m(pts), edge));
-    };
-    line(&[(263.8, 55.9), (177.1, 105.9), (263.8, 156.0), (263.8, 256.2), (350.6, 206.1)]);
-    line(&[(5.0, 105.9), (178.5, 206.1), (178.5, 406.4)]);
-    line(&[(177.0, 206.1), (263.8, 156.0)]);
-    p.add(egui::Shape::closed_line(
-        m(&[
-            (178.5, 5.8),
-            (5.0, 105.9),
-            (5.0, 206.1),
-            (91.7, 256.2),
-            (91.7, 356.4),
-            (178.5, 406.4),
-            (352.0, 306.3),
-            (352.0, 206.1),
-            (265.2, 156.0),
-            (265.2, 55.9),
-        ]),
-        edge,
-    ));
+/// The mark on a 100-unit-tall grid, 76 wide: stem 0..24 × 0..100, arm 0..76 × 0..24 (both with
+/// round ends), dot of radius 13 centred at (51, 51). `colours` are stem, arm and dot.
+fn brand_mark_styled(p: &egui::Painter, c: Pos2, height: f32, colours: [Color32; 3]) {
+    let s = height / 100.0;
+    let at = |x: f32, y: f32| pos2(c.x + (x - 38.0) * s, c.y + (y - 50.0) * s);
+    let [stem, arm, dot] = colours;
+    let round = (12.0 * s).min(255.0);
+    p.rect_filled(Rect::from_min_max(at(0.0, 0.0), at(24.0, 100.0)), round, stem);
+    p.rect_filled(Rect::from_min_max(at(0.0, 0.0), at(76.0, 24.0)), round, arm);
+    p.circle_filled(at(51.0, 51.0), 13.0 * s, dot);
 }
 
-/// [`Glyphs::cross`]: a cross filling `r`.
 pub fn cross(p: &egui::Painter, r: Rect, s: Stroke) {
     p.line_segment([r.left_top(), r.right_bottom()], s);
     p.line_segment([r.right_top(), r.left_bottom()], s);
-}
-
-/// SolidCraft's code-drawn glyphs, as the kit draws them ([`solidcraft_ui_kit::icons::glyphs`]).
-pub static GLYPHS: Glyphs = Glyphs {
-    transport: transport_glyph,
-    caption: paint_glyph,
-    badge,
-    pin: pin_icon,
-    cross,
-    breadcrumb,
-    axis_tip: crate::compass::axis_tip_scaled,
-    axis_radius: crate::compass::AXIS_RADIUS,
-    pointer: crate::pointer::paint,
-    brand_mark: brand_mark_silhouette,
-};
-
-/// Make [`GLYPHS`] the glyphs the kit draws, once per process; calling it again does nothing.
-pub fn install() {
-    solidcraft_ui_kit::icons::glyphs::install(&GLYPHS);
 }

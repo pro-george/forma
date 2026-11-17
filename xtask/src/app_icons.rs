@@ -1,27 +1,20 @@
-//! Regenerate all exports of the shared app mark together. Packaging copies these files.
+//! Regenerate the exports of Forma's app icon together: the PNGs the web shell ships
+//! (`assets/icons/app/exports/forma-<size>.png`). The picture is drawn by
+//! `assets/icons/app/shared/source/app_icon.rs`, through `solidcraft-cli icon`.
 use std::path::Path;
 
-#[path = "../../assets/icons/app/shared/source/app_icon.rs"]
-mod app_icon;
-#[path = "../../assets/icons/app/shared/source/windows_ico.rs"]
-mod windows_ico;
+/// The sizes the web shell and its manifest name.
+const SIZES: [usize; 3] = [32, 256, 512];
 
 pub fn run(root: &Path) -> Result<(), String> {
     let stage = root.join("target/resources/app-icons");
     std::fs::create_dir_all(&stage).map_err(|e| e.to_string())?;
     let mut exports = Vec::new();
-    for size in [16, 24, 32, 48, 64, 128, 256, 512] {
+    for size in SIZES {
         let png = stage.join(format!("{size}.png"));
         draw(&png, size)?;
-        exports.push((png, format!("linux/exports/hicolor/{size}x{size}/apps/io.tangencylabs.solidcraft.png")));
+        exports.push((png, format!("exports/forma-{size}.png")));
     }
-    let installer = stage.join("solidcraft.ico");
-    draw(&installer, 256)?;
-    exports.push((installer, "windows/exports/solidcraft.ico".into()));
-    let executable = stage.join("solidcraft-executable.ico");
-    std::fs::write(&executable, windows_ico::encode().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-    exports.push((executable, "windows/exports/solidcraft-executable.ico".into()));
-
     // Finish generation before replacing any canonical exports.
     for (source, relative) in exports {
         let target = root.join("assets/icons/app").join(relative);

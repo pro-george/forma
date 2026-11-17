@@ -1,0 +1,277 @@
+{
+  "order": 11,
+  "provenance": "Forma's own dark theme, from the Artea identity: its night ground with floral white, lime and terracotta",
+  "base": "dark",
+  "colors": {
+    "accent": "#e3a877",
+    "accent_soft": "#4a3424",
+    "agent_busy": "#6daff7",
+    "agent_ok": "#89cf8e",
+    "app_bar": "#100c09",
+    "app_bar_hover": "#f5eee61a",
+    "app_bar_hover_button": "#f5eee622",
+    "app_bar_hover_strong": "#f5eee630",
+    "app_bar_hover_subtle": "#f5eee610",
+    "app_bar_icon": [
+      "#f5eee6",
+      "#857a6b",
+      "#e3a877"
+    ],
+    "app_bar_separator": "#4a3f33",
+    "app_bar_tab_active": "#2f261d",
+    "app_bar_text": "#f5eee6",
+    "axis_x": "#f85052",
+    "axis_y": "#89cf8e",
+    "axis_z": "#6daff7",
+    "bend_down": "#ab9acd",
+    "bend_up": "#89cf8e",
+    "body": "#8f8573",
+    "body_edge": "#f5eee6",
+    "body_selected": "#c9824f",
+    "border": "#33291f",
+    "box_crossing": "#89cf8e",
+    "box_window": "#6daff7",
+    "chip": "#e3a877",
+    "construction_geom": "#ceb687",
+    "construction_plane": "#ceb68740",
+    "continuity": [
+      "#89cf8e",
+      "#6daff7",
+      "#e6af2b",
+      "#f38bb7"
+    ],
+    "control_border": "#43382c",
+    "control_fill": "#2c241c",
+    "navigator_border": "#6b5f50",
+    "navigator_face": "#2c241c",
+    "navigator_hover": "#4b502e",
+    "navigator_text": "#f5eee6",
+    "dialog_bg": "#211a14",
+    "dialog_body": "#211a14",
+    "dialog_border": "#3b3127",
+    "dialog_footer": "#1b1510",
+    "dialog_label": "#f5eee6",
+    "dialog_rule": "#33291f",
+    "dimension": "#5fc4c0",
+    "dimension_driven": "#4f9895",
+    "error": "#f85052",
+    "field": "#1a140f",
+    "form_accent": "#e3a877",
+    "form_dim": "#a89e8e",
+    "form_error": "#ff6060",
+    "form_error_fill": "#37292b",
+    "form_fill": "#d5e8b8",
+    "form_ink": "#f5eee6",
+    "form_primary": "#d5e8b8",
+    "form_soft": "#33351f",
+    "form_success": "#89cf8e",
+    "form_success_fill": "#2c3631",
+    "form_tab_ink": "#d5e8b8",
+    "gizmo": [
+      "#ff6060",
+      "#98dfa2",
+      "#7abfff"
+    ],
+    "glyph_bg": "#2c241c",
+    "glyph_edge": "#43382c",
+    "glyph_text": "#b9af9f",
+    "grid": "#231c15",
+    "grid_major": "#30271e",
+    "heading_bg": "#2a221a",
+    "hover": "#30271e",
+    "hover_edge": "#fffaf2",
+    "hover_edge_halo": "#16110d",
+    "hover_profile": "#f5eee622",
+    "hover_profile_edge": "#e6dccd",
+    "icon": "#e6dccd",
+    "icon_fill": "#4a3f33",
+    "icons.access": [
+      "#89cf8e",
+      "#f85052"
+    ],
+    "icons.agent": "#aba3ff",
+    "icons.axes": [
+      "#f85052",
+      "#89cf8e",
+      "#6daff7"
+    ],
+    "icons.curvature": [
+      "#6daff7",
+      "#89cf8e",
+      "#f85052"
+    ],
+    "icons.draft": [
+      "#89cf8e",
+      "#e6af2b"
+    ],
+    "icons.floor": "#4b4238",
+    "icons.fold": "#8a7b68",
+    "icons.folder": "#ceb687",
+    "icons.glint": "#fdfcfca0",
+    "icons.highlight": "#e4e1dd",
+    "icons.interference": "#f85052",
+    "icons.marker_halo": "#1b181496",
+    "icons.paint": [
+      "#f85052",
+      "#6daff7",
+      "#e6af2b"
+    ],
+    "icons.plane": "#dcc9a0",
+    "icons.sheet": "#a2bedb",
+    "icons.sheet_2": "#8fb0d2",
+    "icons.sheet_light": "#dcd8d3",
+    "icons.sheet_line": "#6daff7",
+    "icons.sky": "#a2bedb",
+    "icons.stripe": "#1b1814",
+    "icons.warning": "#e6af2b",
+    "interference": "#f85052",
+    "logo": [
+      "#f5eee6",
+      "#f5eee6",
+      "#e3a877"
+    ],
+    "manipulator": "#7abfff",
+    "mesh_accent": "#cfc152",
+    "mesh_fill": "#cfc152",
+    "mesh_ink": "#cfc152",
+    "mesh_soft": "#363624",
+    "on_accent": "#1c1309",
+    "origin_plane": "#9d928538",
+    "origin_plane_edge": "#9d9285c8",
+    "origin_plane_hover": "#6daff770",
+    "origin_point": "#e6dccd",
+    "overlay": "#211a14eb",
+    "panel": "#211a14",
+    "panel_header": "#2a221a",
+    "preview_add": "#4c78a7",
+    "preview_cut": "#f850526e",
+    "preview_new": "#e6af2b",
+    "preview_sketch": "#8eca96",
+    "profile_fill": "#6daff71c",
+    "render_accent": "#f38bb7",
+    "render_fill": "#f38bb7",
+    "render_ink": "#f38bb7",
+    "render_soft": "#3d2c36",
+    "rubber_band": "#7abfff",
+    "section_cap": "#ceb687",
+    "sel_edge": "#e3a877",
+    "sel_edge_rim": "#7a4b28",
+    "sel_face": "#c9824f",
+    "sel_profile": "#e3a877a0",
+    "sel_profile_edge": "#e3a877",
+    "sel_vertex": "#e3a877",
+    "selected_bg": "#3b3f25",
+    "selected_ink": "#eef6dc",
+    "sheet_fill": "#6daff7",
+    "sheet_ink": "#6daff7",
+    "sheet_soft": "#253242",
+    "sketch": "#6daff7",
+    "sketch_accent": "#8eca96",
+    "sketch_centerline": "#e6dccd",
+    "sketch_construction": "#ceb687",
+    "sketch_fixed": "#fffaf2",
+    "sketch_ink": "#8eca96",
+    "sketch_locked": "#89cf8e",
+    "sketch_lost": "#f85052",
+    "sketch_point": "#fffaf2",
+    "sketch_point_free": "#6daff7",
+    "sketch_projected": "#998cb3",
+    "sketch_soft": "#2b3730",
+    "subheading_bg": "#251d16",
+    "surface_accent": "#ceb687",
+    "surface_fill": "#ceb687",
+    "surface_ink": "#ceb687",
+    "surface_soft": "#36342e",
+    "tab_on_fill_dark": "#16110d",
+    "text": "#f5eee6",
+    "text_dim": "#b9af9f",
+    "timeline": "#211a14",
+    "timeline_item": "#2a221a",
+    "timeline_item_error": "#552f31",
+    "timeline_marker": "#e3a877",
+    "toolbar": "#211a14",
+    "triad": [
+      "#f85052",
+      "#89cf8e",
+      "#6daff7"
+    ],
+    "viewport_bottom": "#120e0a",
+    "viewport_top": "#1c1611",
+    "warning": "#e6af2b"
+  },
+  "format": "solidcraft-theme/1",
+  "name": "Artea Night",
+  "radii": {
+    "radius_sm": 8,
+    "radius_md": 12,
+    "radius_lg": 16,
+    "radius_xl": 22,
+    "control_radius": 12,
+    "sketch_mode_radius": 14
+  },
+  "borders": {
+    "primary": {
+      "width": 1,
+      "color": "#4a3f33"
+    },
+    "secondary": {
+      "width": 1,
+      "color": "#3b3127"
+    },
+    "tertiary": {
+      "width": 1,
+      "color": "#30271e"
+    },
+    "container": {
+      "width": 1,
+      "color": "#43382c"
+    },
+    "control": {
+      "width": 1,
+      "color": "#4a3f33"
+    }
+  },
+  "icon_palette": {
+    "ink": "#f5eee6",
+    "line": "#e6dccd",
+    "passive-1": "#c5bdae",
+    "passive-2": "#9a9283",
+    "passive-3": "#6f6859",
+    "guide": "#a6a093",
+    "solid": [
+      "#a0d7fb",
+      "#65bdf3",
+      "#4aa3d8"
+    ],
+    "surface": [
+      "#fcc28e",
+      "#dea572",
+      "#c38c59"
+    ],
+    "mesh": [
+      "#e8cd7d",
+      "#cab060",
+      "#b19747"
+    ],
+    "form": [
+      "#d5c4fd",
+      "#b9a7df",
+      "#a08fc4"
+    ],
+    "sketch": [
+      "#b0dbc0",
+      "#94bea4",
+      "#7ba58b"
+    ],
+    "constraint": [
+      "#febbb9",
+      "#fb8e8d",
+      "#e57071"
+    ],
+    "construction": [
+      "#fcc28e",
+      "#dea572",
+      "#c38c59"
+    ]
+  }
+}

@@ -24,8 +24,10 @@ fades) stays in the app: it resolves `Tokens` and hands them to this crate.
 | `contrast_ratio`, `composite`, `panel_surface_fill`, ... | WCAG contrast checks on token pairs |
 | `icon_strokes` | The primary strokes the tokens share with SolidCraft's icon artwork |
 
-## Licence
+## Where this comes from, and its licence
 
-This crate is part of SolidCraft's brand and interface, under the SolidCraft Brand and Interface
-Licence ([LICENSE](LICENSE)). Use it as part of SolidCraft; using it in another program or product
-needs the maintainers' written permission first.
+This crate is **MIT OR Apache-2.0**. It is SolidCraft's `crates/theme` as published in
+`v0.40.0-nightly.20261110.117.1`, the last release before SolidCraft placed this path under its
+Brand and Interface Licence, with Forma's own additions since (written from how the interface
+crate calls them, never from upstream's later code). Never copy from or consult upstream's later
+versions of this crate; `scripts/forma-merge-upstream.sh` keeps them out of a merge.

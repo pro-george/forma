@@ -842,14 +842,29 @@ pub(super) fn rounded_perimeter(r: Rect, radius: f32) -> Vec<Pos2> {
         .collect()
 }
 
+pub use super::preferences_figure_data::{
+    paint_browser_card, paint_browser_column, paint_history_bottom, paint_history_in_browser, paint_history_left, paint_history_under_browser,
+};
+
 #[derive(Clone, Copy)]
 pub struct LayoutPreview {
     pub compact: bool,
     pub labels: bool,
+    /// History is listed in the Browser instead of having a bar of its own along the bottom.
     pub history_in_browser: bool,
 }
 
-/// A schematic of window styling, toolbar labels and History visibility.
+impl LayoutPreview {
+    /// Where the specimen draws History: 0 for its bar along the bottom, 3 for in the Browser
+    /// (1 and 2, a rail at the left and a card under the Browser, are layouts no preference
+    /// chooses now).
+    pub(super) fn history(self) -> usize {
+        if self.history_in_browser { 3 } else { 0 }
+    }
+}
+
+/// One live shell specimen follows workspace, toolbar, panel and dialog placement choices;
+/// `note` is the host's hover text for it.
 pub fn layout_preview(ui: &mut Ui, state: LayoutPreview, note: &str) {
     super::preferences_figures::paint_layout(ui, state, note);
 }

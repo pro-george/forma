@@ -1,26 +1,23 @@
-//! The view toast: a one-message card over the view's free part, for a hint, a result, a refusal
-//! or work in progress. Its text is led by a dot (red for an error) or a spinner; below the text,
-//! a wrapping row of kit buttons; a close (×) at the top right, with a ring that shrinks over the
-//! time left of a toast that goes by itself. It sits at the bottom centre of the free part, as wide
-//! as its text, or in a column at its bottom right, every toast [`WIDTH`] wide, with its buttons
-//! placed as the dialogs place theirs. Everything comes from the caller's plain data and
-//! `solidcraft_theme::Tokens`; the toast returns what was clicked and where it drew.
+//! The view toast: a short message in a card over the 3D view, led by a dot or a spinner, with
+//! buttons under its text, a close (×) and a countdown ring around it for a toast that goes by
+//! itself. The host says where toasts may go and stacks them; this draws one.
+//!
+//! Ported from the toast painter of SolidCraft's interface crate at its last MIT OR Apache-2.0
+//! nightly (v0.40.0-nightly.20261110), where it lived beside the 3D view.
+
 use crate::BackingTooltipExt as _;
-use crate::{Container, Surface};
 use egui::{Pos2, Rect, Sense, Stroke, pos2, vec2};
 use solidcraft_theme::Tokens;
 
-/// Every toast's width in the corner column: room for three buttons on one row; longer text wraps.
+/// Every toast's width in the corner stack: room for three buttons on one row; longer text wraps.
 pub const WIDTH: f32 = 360.0;
 
-/// Where a toast goes in the free part it is given.
+/// Where the toasts go: one column in the view's bottom corner, each [`WIDTH`] wide with its
+/// buttons trailing, or the bottom centre, each as wide as its text.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Place {
-    /// At the bottom right, every toast [`WIDTH`] wide (or the room there is), its buttons as in
-    /// the dialogs: right-aligned, dismissals first and the main action right-most.
     #[default]
     Corner,
-    /// At the bottom centre, each as wide as its text, up to 440 points.
     Centre,
 }
 
@@ -31,39 +28,6 @@ pub enum Action {
     Primary,
     Secondary,
     Dismiss,
-}
-
-/// What leads a toast's text: a dot (red when `true`, for an error) or a spinner.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Lead {
-    Dot(bool),
-    Spinner,
-}
-
-/// What a toast has besides its text and buttons.
-#[derive(Clone, Copy, Default)]
-pub struct Extras<'a> {
-    /// A close (×) in its top-right corner, published as this control-channel handle
-    /// (`toast:<name>:close`). Every toast the user may close has one, in place of a Close button.
-    pub close: Option<&'a str>,
-    /// For a toast that goes by itself: the share of its time left (1 to 0) and its whole time in
-    /// seconds, drawn as a thin ring around the × that shrinks over its time.
-    pub countdown: Option<(f32, f64)>,
-    /// Hover texts of the buttons, by index; an empty one has none.
-    pub tips: &'a [&'a str],
-    /// The whole card answers a click, under its buttons and ×, with this hover text.
-    pub card_hint: Option<&'a str>,
-}
-
-/// A toast as drawn: its card, which button was clicked, if any, where each button and the × are
-/// (for handles), and whether the × or the card itself was clicked.
-pub struct Shown {
-    pub rect: Rect,
-    pub clicked: Option<usize>,
-    pub buttons: Vec<Rect>,
-    pub close: Option<Rect>,
-    pub closed: bool,
-    pub card_clicked: bool,
 }
 
 /// Where each button of a toast goes, relative to the row's top left: `buttons` are (width, kind) in
@@ -97,7 +61,7 @@ pub fn action_spots(buttons: &[(f32, Action)], row_width: f32, gap: f32, height:
     spots
 }
 
-/// The corner column's buttons, as the dialogs place theirs: right-aligned, dismissals first, then
+/// The corner stack's buttons, as the dialogs place theirs: right-aligned, dismissals first, then
 /// the alternative, then the main action right-most. Rows fill from the main action leftwards; a
 /// button that doesn't fit starts a row above, so the row with the main action is the bottom one.
 /// Positions are relative to the rows' top left, within `row_width`.
@@ -148,6 +112,40 @@ fn button_key(label: &str, kind: Action) -> egui::Id {
 /// The width a toast button with this text and kind was last drawn at, if it has been drawn.
 fn button_width(ctx: &egui::Context, label: &str, kind: Action) -> Option<f32> {
     ctx.data(|data| data.get_temp::<f32>(button_key(label, kind))).filter(|width| width.is_finite() && *width > 0.0)
+}
+
+/// What leads a toast's text: a dot (red for an error) or a spinner.
+/// What leads a toast's text: a dot (red for an error) or a spinner while something runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Lead {
+    Dot(bool),
+    Spinner,
+}
+
+/// What a toast has besides its text and buttons (#7971).
+#[derive(Clone, Copy, Default)]
+pub struct Extras<'a> {
+    /// A close (×) in its top-right corner, published as this control-channel handle
+    /// (`toast:<name>:close`). Every toast the user may close has one, in place of a Close button.
+    pub close: Option<&'a str>,
+    /// For a toast that goes by itself: the share of its time left (1 to 0) and its whole time in
+    /// seconds, drawn as a thin ring around the × that shrinks over its time.
+    pub countdown: Option<(f32, f64)>,
+    /// Hover texts of the buttons, by index; an empty one has none.
+    pub tips: &'a [&'a str],
+    /// The whole card answers a click, under its buttons and ×, with this hover text.
+    pub card_hint: Option<&'a str>,
+}
+
+/// A toast as drawn: its card, which button was clicked, if any, where each button and the × are
+/// (for handles), and whether the × or the card itself was clicked.
+pub struct Shown {
+    pub rect: Rect,
+    pub clicked: Option<usize>,
+    pub buttons: Vec<Rect>,
+    pub close: Option<Rect>,
+    pub closed: bool,
+    pub card_clicked: bool,
 }
 
 /// The share of a countdown of `lifetime` seconds left at `now` when it started at `since`: 1 when
@@ -211,37 +209,42 @@ fn close_button(ui: &egui::Ui, rect: Rect, id: egui::Id, left: Option<f32>) -> e
     response.backing_on_hover_text(label)
 }
 
-/// The toast: its text in a card at the bottom of `free` (`place` says where), led by `lead`, and,
-/// below the text, a wrapping row of buttons (`actions`, kit buttons), with what `extras` adds (a
-/// close (×) at the top right with its countdown ring, hover texts, a click on the card). Returns
-/// the card, which button was clicked, if any, and where each button is (for handles); `None`
-/// where `free` has no room for it. The buttons and the × are not live while input is blocked
-/// ([`crate::input_blocked`]); none is laid outside the card, whose width is bounded by `free`.
-pub fn show(ui: &egui::Ui, free: Rect, place: Place, text: String, lead: Lead, actions: &[(&str, Action)], extras: Extras<'_>) -> Option<Shown> {
+/// The one toast painter: its text in a card at the bottom centre of `free`, led by a dot or a
+/// spinner, and, below the text, a wrapping row of buttons (`actions`, kit buttons), with what
+/// `extras` adds (a close (×) at the top right with its countdown ring, hover texts, a click on the
+/// card). Returns the card, which button was clicked, if any, and where each button is (for
+/// handles). With no actions and no extras the card is exactly the status and computing toast it
+/// always was. The buttons and the × are not live while an issue report holds CAD input; none is
+/// laid outside the card, whose width is bounded by `free`.
+pub fn show(
+    ui: &egui::Ui,
+    free: Rect,
+    place: Place,
+    text: String,
+    lead: Lead,
+    actions: &[(&str, Action)],
+    extras: Extras<'_>,
+) -> Option<Shown> {
     // Rects no screen has are rejected too: the corner layout anchors to `free`'s right edge.
     if !free.is_finite() || !free.is_positive() || free.width() <= 40.0 || free.max.x.abs().max(free.max.y.abs()) > 1.0e7 {
         return None;
     }
     let t = Tokens::get();
     let corner = place == Place::Corner;
-    // The lead (dot or spinner) is centred in the first `space_14` of a `2 × space_14` column, the
-    // text follows it and `space_12` closes the right side; `space_8` above and below.
-    let inset = vec2(2.0 * t.space_14, t.space_8);
-    let padding = vec2(inset.x + t.space_12, 2.0 * inset.y);
     let painter = ui.painter().with_clip_rect(free);
-    // In the corner every toast is `WIDTH` wide (or the room there is); at the centre each is as
-    // wide as its text, up to 440 points.
-    let wrap = if corner { (WIDTH.min(free.width()) - padding.x).max(0.0) } else { (free.width() - padding.x).min(440.0) };
+    // In the corner every toast is `WIDTH` wide (or the room there is); at the centre each
+    // is as wide as its text, up to 440 points.
+    let wrap = if corner { (WIDTH.min(free.width()) - 40.0).max(0.0) } else { (free.width() - 40.0).min(440.0) };
     // The × keeps the top-right corner: the text stops short of its ring.
     let radius = close_radius();
-    let close_room = if extras.close.is_some() { 2.0 * radius + t.space_4 + t.space_8 - t.space_12 } else { 0.0 };
+    let close_room = if extras.close.is_some() { 2.0 * radius + t.space_4 + t.space_8 - 12.0 } else { 0.0 };
     let galley = painter.layout(text, crate::type_face::medium(t.font_label), t.text, (wrap - close_room).max(0.0));
     // The buttons: each as wide as its text and a margin, in rows no wider than the text may be.
     let gap = t.space_8;
     let button_height = crate::row_height();
-    let row_width = if corner { wrap } else { (free.width() - padding.x).clamp(0.0, 440.0) };
-    // Each button's width as the kit drew it: the same text, font and padding, measured from the
-    // button itself. Before a button was ever drawn, an estimate stands in for one frame.
+    let row_width = if corner { wrap } else { (free.width() - 40.0).clamp(0.0, 440.0) };
+    // Each button's width as the kit drew it (#7971): the same text, font and padding, measured
+    // from the button itself. Before a button was ever drawn, an estimate stands in for one frame.
     let sizes: Vec<(f32, Action)> = actions
         .iter()
         .map(|(label, kind)| {
@@ -252,15 +255,18 @@ pub fn show(ui: &egui::Ui, free: Rect, place: Place, text: String, lead: Lead, a
             (width.min(row_width), *kind)
         })
         .collect();
-    let spots =
-        if corner { action_spots_trailing(&sizes, row_width, gap, button_height) } else { action_spots(&sizes, row_width, gap, button_height) };
+    let spots = if corner {
+        action_spots_trailing(&sizes, row_width, gap, button_height)
+    } else {
+        action_spots(&sizes, row_width, gap, button_height)
+    };
     let widest = spots.iter().map(|spot| spot.right()).fold(0.0, f32::max);
     let y = spots.iter().map(|spot| spot.top()).fold(0.0, f32::max);
     let actions_height = if spots.is_empty() { 0.0 } else { y + button_height + gap };
     let content = vec2((galley.size().x + close_room).max(widest), galley.size().y + actions_height);
-    let mut size = content + padding;
+    let mut size = content + vec2(40.0, 16.0);
     if corner {
-        size.x = row_width + padding.x;
+        size.x = row_width + 40.0;
     }
     if extras.close.is_some() {
         size.y = size.y.max(2.0 * radius + 12.0);
@@ -273,17 +279,17 @@ pub fn show(ui: &egui::Ui, free: Rect, place: Place, text: String, lead: Lead, a
     if !r.is_finite() {
         return None;
     }
-    let frame = Container::new(ui.ctx(), Surface::Toast).frame(ui.ctx(), t.panel, crate::frame::Side::Left);
-    Container::paint_frame(ui.painter(), frame, r.shrink(frame.stroke.width));
-    let dot = pos2(r.left() + t.space_14, r.center().y.min(r.top() + inset.y + galley.size().y / 2.0));
+    let frame = crate::Container::new(ui.ctx(), crate::Surface::Toast).frame(ui.ctx(), t.panel, crate::frame::Side::Left);
+    crate::Container::paint_frame(ui.painter(), frame, r.shrink(frame.stroke.width));
+    let dot = pos2(r.left() + 14.0, r.center().y.min(r.top() + 8.0 + galley.size().y / 2.0));
     match lead {
-        Lead::Spinner => egui::Spinner::new().size(t.space_12).color(t.text).paint_at(ui, Rect::from_center_size(dot, vec2(t.space_12, t.space_12))),
+        Lead::Spinner => egui::Spinner::new().size(12.0).color(t.text).paint_at(ui, Rect::from_center_size(dot, vec2(12.0, 12.0))),
         Lead::Dot(error) => drop(painter.circle_filled(dot, 3.0, if error { t.error } else { t.text })),
     }
-    let text_top = r.min + inset;
+    let text_top = r.min + vec2(28.0, 8.0);
     painter.galley(text_top, galley.clone(), t.text);
-    // The card's own click goes first, so its buttons and × (added after it) take theirs. With
-    // input blocked it is dead too, so a click on the dead × doesn't fall through to it.
+    // The card's own click goes first, so its buttons and × (added after it) take theirs. Behind an
+    // issue report it is dead too, so a click on the dead × doesn't fall through to it.
     let blocked = crate::input_blocked();
     let card_clicked = extras.card_hint.is_some_and(|hint| {
         let sense = if blocked { Sense::hover() } else { Sense::click() };
@@ -294,13 +300,13 @@ pub fn show(ui: &egui::Ui, free: Rect, place: Place, text: String, lead: Lead, a
     let origin = text_top + vec2(0.0, galley.size().y + gap);
     for (index, ((label, kind), spot)) in actions.iter().zip(&spots).enumerate() {
         let at = spot.translate(origin.to_vec2());
-        // A UI of its own on the caller's layer, so the toast needs no `&mut Ui`. It has the
+        // A UI of its own on the viewport's layer, so the toast needs no `&mut Ui`. It has the
         // row's width, so a button is never squeezed into a spot laid out for a smaller one and
         // its measured width is its own.
         let room = Rect::from_min_size(at.min, vec2(row_width.max(at.width()), at.height()));
         let mut button_ui = egui::Ui::new(
             ui.ctx().clone(),
-            egui::Id::unique(("sc_toast_action", extras.close, label, index)),
+            egui::Id::unique(("sc_toast_action", index)),
             egui::UiBuilder::new().layer_id(ui.layer_id()).max_rect(room).layout(egui::Layout::left_to_right(egui::Align::Center)),
         );
         button_ui.set_clip_rect(button_ui.clip_rect().intersect(r));
@@ -358,6 +364,3 @@ pub fn show(ui: &egui::Ui, free: Rect, place: Place, text: String, lead: Lead, a
     Some(Shown { rect: r, clicked, buttons, close, closed, card_clicked })
 }
 
-#[cfg(test)]
-#[path = "toast_tests.rs"]
-mod tests;

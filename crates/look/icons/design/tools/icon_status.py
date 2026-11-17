@@ -8,13 +8,13 @@
 --resolve ID... Clear feedback after an intentional redraw; protect newer notes manually
 --out FILE      Self-contained static review page (default target/icon-status.html)
 
-Read crates/look/icons/STYLE_GUIDE.md before editing artwork. SVGs are authoritative.
+Read assets/icons/ui/STYLE_GUIDE.md before editing artwork. SVGs are authoritative.
 Every discovered non-final icon is Open; artwork, source and runtime requests are discovery sources.
 """
 import sys, os, re, glob, html, json, hashlib, collections, tomllib, uuid, datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-D = os.path.dirname(HERE)                       # .../crates/look/icons/design
+D = os.path.dirname(HERE)                       # .../assets/icons/ui/design
 ROOT = os.path.abspath(os.path.join(D, '..', '..', '..', '..'))
 REVIEW = D + '/review.json'
 REQUESTS = os.path.join(ROOT, 'target', 'codex-icon-review', 'inbox')
@@ -113,7 +113,7 @@ def scan():
     runtime = requested_icons()
     for name in runtime:
         uses[name].append('ui:runtime audit')
-    mk = ROOT + '/crates/ui-egui/src/icons/markers.rs'
+    mk = ROOT + '/assets/icons/ui/source/markers.rs'
     if os.path.exists(mk):
         for name in re.findall(r'=> "(c_[a-z_]+)"', open(mk, encoding='utf-8').read()): uses[name].append('ui:sketch constraint glyph')
     def alias_of(n):

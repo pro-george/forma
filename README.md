@@ -287,11 +287,12 @@ MIT OR Apache-2.0, at your option. Developed under the
 [clean-room contribution rules](AGENTS.md); third-party code and assets retain their
 documented licences and attribution.
 
-SolidCraft's brand and interface are licensed separately, under
-[LICENSE-BRAND](LICENSE-BRAND): the UI kit, the look (interface icons, glyphs, built-in themes),
-the theme's design tokens and palettes, and the SolidCraft name, logo and app icon. Use them freely
-as part of SolidCraft. Using them in another program or product needs the maintainers' written
-permission first.
+Forma carries none of what SolidCraft licenses separately as its brand and interface (its UI kit,
+look, theme tokens, name, logo and app icon, under SolidCraft's Brand and Interface Licence since
+2026-11-10). The crates at `crates/ui-kit`, `crates/look` and `crates/theme` here are Forma's own,
+MIT OR Apache-2.0, grown from SolidCraft's last release published before that date; each crate's
+README says where it comes from. The name SolidCraft and its logo are SolidCraft's: Forma uses the
+name only to say what it is built on.
 
 SolidCraft is independent. Behaviour is designed from public documentation, general CAD
 conventions and user feedback. Reference tests use analytic values and open-source tools.

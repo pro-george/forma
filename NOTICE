@@ -3,14 +3,19 @@ Copyright (c) 2026 SolidCraft contributors.
 Licensed under the MIT License or the Apache License, Version 2.0, at your option
 (LICENSE-MIT, LICENSE-APACHE).
 
+Forma
+
+This repository is Forma, built on a fork of SolidCraft. Forma's additions are
+Copyright (c) 2026 George / Pro Creative, under the same MIT OR Apache-2.0 terms.
+
 Brand and interface
 
-SolidCraft's brand and interface are not under MIT OR Apache-2.0. The UI kit (crates/ui-kit), the
-look (crates/look: the interface icons, glyphs and built-in themes), the theme (crates/theme: the
-design tokens and palettes), and the SolidCraft name, logo, app icon and brand kit are under the
-SolidCraft Brand and Interface Licence (LICENSE-BRAND). They may be used, changed and contributed
-to as part of SolidCraft; using them in anything else needs the maintainers' written permission.
-Third-party fonts in those folders keep their own licences.
+Since 2026-11-10 SolidCraft licenses its UI kit, look, theme tokens, name, logo, app icon and brand
+kit separately (the SolidCraft Brand and Interface Licence). This repository carries none of that
+material. The UI kit (crates/ui-kit), the look (crates/look) and the theme (crates/theme) here are
+Forma's own, under MIT OR Apache-2.0: they start from SolidCraft v0.40.0-nightly.20261110.117.1, the
+last release published under MIT OR Apache-2.0 alone, and continue with Forma's own code. Forma's
+name, mark, app icon and Artea themes are Forma's. Third-party fonts keep their own licences.
 
 Third-party material
 

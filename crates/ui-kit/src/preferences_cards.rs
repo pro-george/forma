@@ -1,5 +1,5 @@
 //! The controls the redesigned Preferences pages share: picture cards, toggle tiles, preset cards,
-//! the help icon and the carousel. Sizes follow `docs/design/preferences/measurements.md`;
+//! the hover-help icon and the carousel. Sizes follow `docs/design/preferences/measurements.md`;
 //! every colour comes from `Tokens`. A card sizes to the width its container gives it and its
 //! figure keeps the figure's aspect ratio.
 use super::{metrics::dimension, preferences::centred_text};
@@ -370,32 +370,19 @@ pub fn preset_card(
     if enabled { response.on_hover_cursor(egui::CursorIcon::PointingHand) } else { response }
 }
 
-/// The (i) icon after a label: shows `text` as a tooltip on hover, and in a popover after a click,
-/// Enter or Space, so a click, a touch or the keyboard reaches it too. Assistive technology reads
-/// the same text. A click on the icon or outside the popover, or Escape, closes the popover.
+/// The (i) icon after a label: shows `text` as a tooltip and tells assistive technology the same.
 pub fn help_icon(ui: &mut Ui, text: &str) -> Response {
     let t = Tokens::get();
     let size = t.space_12 + 1.0;
-    let (rect, response) = ui.allocate_exact_size(vec2(size, size), Sense::click());
-    let popover = super::Container::new(ui.ctx(), super::Surface::Popup)
-        .menu(&response)
-        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-        .width(ui.spacing().tooltip_width);
-    let open = popover.is_open();
-    let ink = if open || response.hovered() || response.has_focus() { t.form_ink } else { t.form_dim };
+    let (rect, response) = ui.allocate_exact_size(vec2(size, size), Sense::hover());
+    let ink = if response.hovered() { t.form_ink } else { t.form_dim };
     let p = ui.painter();
     p.circle_stroke(rect.center(), size * 0.5 - 0.5, Stroke::new(1.0, ink));
     p.circle_filled(pos2(rect.center().x, rect.top() + size * 0.3), 0.9, ink);
     p.line_segment([pos2(rect.center().x, rect.top() + size * 0.46), pos2(rect.center().x, rect.bottom() - size * 0.24)], Stroke::new(1.2, ink));
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), text));
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, ui.is_enabled(), text));
     solidcraft_ui_registry::publish_target("prefs:help_icon", rect);
-    popover.show(|ui| {
-        let label = ui.label(text);
-        solidcraft_ui_registry::publish_rect("prefs:help_icon:popover", label.rect);
-    });
-    let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
-    // The popover already shows the text; a tooltip on top of it would say it twice.
-    if open { response } else { response.backing_on_hover_text(text) }
+    response.backing_on_hover_text(text)
 }
 
 /// The host's text on a plugin card: its folder action and the enable check's name.
@@ -404,7 +391,9 @@ pub struct PluginCardLabels<'a> {
     pub enabled: &'a str,
 }
 
-/// Inert plugin metadata displayed by the host's card.
+/// What a plugin card says of its plugin: the key its parts are published under, and the name,
+/// version and description shown.
+#[derive(Clone, Copy, Debug)]
 pub struct PluginCardContent<'a> {
     pub key: &'a str,
     pub name: &'a str,
@@ -423,17 +412,18 @@ pub fn settings_plugin_card(
     labels: &PluginCardLabels<'_>,
 ) -> egui::InnerResponse<(Response, Response)> {
     let card = settings_plugin_card_with_actions(ui, PluginCardContent { key, name, version, description }, enabled, labels, |_| ());
-    egui::InnerResponse { inner: card.inner.0, response: card.response }
+    egui::InnerResponse::new(card.inner.0, card.response)
 }
 
-/// Installed plugin card with host-owned actions inside its existing frame.
-/// The returned pair contains the folder/check responses and the host action result.
+/// [`settings_plugin_card`] with the host's own actions (Remove…) in a row under the card's
+/// content, inside its frame. Returns the folder action and the enable check, and what `actions`
+/// returned.
 pub fn settings_plugin_card_with_actions<R>(
     ui: &mut Ui,
     content: PluginCardContent<'_>,
     enabled: &mut bool,
     labels: &PluginCardLabels<'_>,
-    host_actions: impl FnOnce(&mut Ui) -> R,
+    actions: impl FnOnce(&mut Ui) -> R,
 ) -> egui::InnerResponse<((Response, Response), R)> {
     let PluginCardContent { key, name, version, description } = content;
     let t = Tokens::get();
@@ -501,6 +491,8 @@ pub fn settings_plugin_card_with_actions<R>(
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
         }
         let check = super::checkbox_at(ui, check_rect, &format!("{name}: {}", labels.enabled), enabled);
-        ((folder, check), host_actions(ui))
+        // The host's actions keep their full strength on a disabled plugin's faded card.
+        let extra = ui.horizontal(|ui| actions(ui)).inner;
+        ((folder, check), extra)
     })
 }
