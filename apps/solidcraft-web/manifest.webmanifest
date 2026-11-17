@@ -5,12 +5,12 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#e8ebf0",
-  "theme_color": "#343840",
+  "background_color": "#f5eee6",
+  "theme_color": "#30321d",
   "categories": ["productivity", "utilities"],
   "icons": [
-    { "src": "icons/32x32/io.tangencylabs.solidcraft.png", "sizes": "32x32", "type": "image/png" },
-    { "src": "icons/256x256/io.tangencylabs.solidcraft.png", "sizes": "256x256", "type": "image/png" },
-    { "src": "icons/512x512/io.tangencylabs.solidcraft.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "icons/forma-32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "icons/forma-256.png", "sizes": "256x256", "type": "image/png" },
+    { "src": "icons/forma-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }

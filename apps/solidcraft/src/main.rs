@@ -989,7 +989,7 @@ fn http_call(url: &str, timeout: std::time::Duration) -> Result<ureq::http::Resp
 /// The per-user settings folder: eframe's storage (`app.ron`) and the anti-aliasing preference.
 fn settings_dir() -> Result<Option<std::path::PathBuf>, String> {
     let selected = std::env::var_os("SOLIDCRAFT_SETTINGS_DIR");
-    startup::settings_directory(selected.as_deref(), eframe::storage_dir("SolidCraft"))
+    startup::settings_directory(selected.as_deref(), eframe::storage_dir("Forma") /* Forma: its own settings folder */)
 }
 
 /// The anti-aliasing preference, kept next to eframe's storage (it is needed before the
@@ -1130,7 +1130,7 @@ fn app_viewport(custom_titlebar: bool) -> Result<egui::ViewportBuilder, eframe::
     #[cfg(not(target_os = "macos"))]
     let icon =
         egui::IconData { rgba: app_icon::rgba(64).map_err(|e| eframe::Error::AppCreation(std::io::Error::other(e).into()))?, width: 64, height: 64 };
-    Ok(solidcraft_ui_egui::window_chrome::viewport("SolidCraft", APP_ID, custom_titlebar).with_icon(icon))
+    Ok(solidcraft_ui_egui::window_chrome::viewport("Forma", APP_ID, custom_titlebar).with_icon(icon))
 }
 
 /// The window's app id: it names the desktop entry, so it is the packages' reverse-DNS id.
@@ -1150,7 +1150,7 @@ impl Drop for DriverClient {
 
 fn main() -> eframe::Result {
     #[cfg(target_os = "macos")]
-    objc2_foundation::NSProcessInfo::processInfo().setProcessName(objc2_foundation::ns_string!("SolidCraft"));
+    objc2_foundation::NSProcessInfo::processInfo().setProcessName(objc2_foundation::ns_string!("Forma"));
     mark("main");
     solidcraft_ui_egui::i18n::install();
     solidcraft_look::install_tables();

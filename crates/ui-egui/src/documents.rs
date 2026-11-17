@@ -1381,9 +1381,10 @@ impl WindowTitle {
         Some(match name {
             Some(name) => {
                 let name = solidcraft_ui_text::Locale::for_language(language).given_name(name);
-                format!("{name}{} — SolidCraft", if dirty { " *" } else { "" })
+                // Forma: the window title names the product.
+                format!("{name}{} — Forma", if dirty { " *" } else { "" })
             }
-            None => "SolidCraft".into(),
+            None => "Forma".into(),
         })
     }
 }

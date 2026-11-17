@@ -86,6 +86,18 @@ fn merged_locales() -> Result<(), String> {
     }
     let out = std::path::Path::new(&std::env::var("OUT_DIR").map_err(|e| e.to_string())?).join("locales");
     std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
+    // Forma: the product is called Forma in every message. The catalogs stay upstream's files
+    // (their ids too, which may be English sentences naming SolidCraft), so merges stay clean;
+    // only the text shown changes here.
+    for catalog in catalogs.values_mut() {
+        for text in catalog.values_mut() {
+            if let Value::String(text) = text
+                && text.contains("SolidCraft")
+            {
+                *text = text.replace("SolidCraft", "Forma");
+            }
+        }
+    }
     for (id, catalog) in catalogs {
         let text = serde_json::to_string(&catalog).map_err(|e| e.to_string())?;
         std::fs::write(out.join(format!("{id}.json")), text).map_err(|e| e.to_string())?;

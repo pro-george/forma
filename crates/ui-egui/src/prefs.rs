@@ -1091,9 +1091,9 @@ preference_settings! {
     dialog_first_letter_buttons: bool = false, PAGE_GENERAL => check_id("prefs.dialog_first_letter_buttons");
     /// The Donate button (Ko-fi) at the status bar's right end. The button's × turns it off; the Help
     /// menu, About and the start page keep their link.
-    show_donate_button: bool = true, PAGE_GENERAL => check_id("prefs.show_donate_button");
+    show_donate_button: bool = false /* Forma: upstream's pill, off by default */, PAGE_GENERAL => check_id("prefs.show_donate_button");
     /// The Discord button at the status bar's right end; the × on it turns it off.
-    show_discord_button: bool = true, PAGE_GENERAL => check_id("prefs.show_discord_button");
+    show_discord_button: bool = false /* Forma: upstream's pill, off by default */, PAGE_GENERAL => check_id("prefs.show_discord_button");
     /// View orientation widget: original signed axes (default) or a custom body.
     navigator_style: NavigatorStyle = NavigatorStyle::default(), PAGE_NAVIGATION;
     /// The custom view gizmo's colours: the theme's (themed) or the body's own (modeled).
@@ -1333,7 +1333,8 @@ preference_settings! {
     joint_rotation_fine: f64 = 0.1, PAGE_TOOLS;
     /// `dark`, `light` or `system` (follow the operating system), or a theme file's id: a
     /// built-in one (`gruvbox-dark`, …) or one of `custom_themes` (#2255).
-    theme: String = "dark".into(), PAGE_APPEARANCE;
+    // Forma: starts on its own theme (crates/look/themes/artea.json); upstream starts on "dark".
+    theme: String = "artea".into(), PAGE_APPEARANCE;
     /// A picture behind the model in place of the view's background; empty for none.
     background_image: String = String::new(), PAGE_APPEARANCE;
     /// Theme used when the operating system is light; unknown ids resolve to Light.

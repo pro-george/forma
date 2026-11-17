@@ -126,7 +126,7 @@ impl<T> Starting<T> {
             }
             let painter = ui.painter();
             let c = rect.center();
-            painter.text(c - vec2(0.0, 28.0), Align2::CENTER_BOTTOM, "SolidCraft", FontId::proportional(t.font_display), t.text);
+            painter.text(c - vec2(0.0, 28.0), Align2::CENTER_BOTTOM, "Forma", FontId::proportional(t.font_display), t.text); // Forma: the product name.
             // Steps done of all of them; a step that runs long holds the bar where it is.
             let bar = egui::Rect::from_center_size(c, vec2(240.0, 4.0));
             painter.rect_filled(bar, 2.0, t.border);

@@ -218,6 +218,12 @@ fn about(app: &mut SolveApp, ctx: &egui::Context) {
                 solidcraft_ui_text::tr_label("Open-source parametric 3D CAD in Rust. Licensed MIT OR Apache-2.0."),
                 ui_kit::Text::Note("description"),
             );
+            // Forma: credit the engine it is built on (not translated: it names another product).
+            ui_kit::text(
+                ui,
+                "Forma is built on SolidCraft, the open-source CAD engine by Tangency Labs (MIT OR Apache-2.0).",
+                ui_kit::Text::Note("built_on"),
+            );
             ui.horizontal(|ui| {
                 for link in crate::links::LINKS {
                     let button = ui_kit::button(ui, solidcraft_ui_text::tr(link.label), ui_kit::Button::Normal).backing_on_hover_text(link.url);

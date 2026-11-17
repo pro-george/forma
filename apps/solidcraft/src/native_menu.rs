@@ -183,7 +183,7 @@ fn menu_bar(app: &SolveApp, recent: &[String]) -> MenuBar {
     let window = vec![item(app.tr_label("Agent Chat"), &FileAction::AgentChat)];
     let help = HELP.iter().map(|h| Item::action(HELP_ID, help_label(app, h), "").with(json!({ "item": h }))).collect();
     MenuBar {
-        title: "SolidCraft".into(),
+        title: "Forma".into(),
         version: env!("CARGO_PKG_VERSION").into(),
         app: vec![item(&more("ui.preferences"), &FileAction::Settings), item(&more("ui.keyboard_shortcuts"), &FileAction::Shortcuts)],
         quit: item(&format!("{} SolidCraft", app.tr("ui.quit")), &FileAction::Quit),
