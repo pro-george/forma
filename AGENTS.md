@@ -31,11 +31,12 @@ own rules further down still apply to that code. Forma-specific facts first:
   slots, parametric ready-made parts such as the relief vase) and Artea Studio (studio.artea.ro's
   lampshade configurator). Its full history is on the `forma-ts` branch. Port features from it onto
   the Rust engine one at a time; do not develop new features there, except Artea Studio.
-- Deploy: `.github/workflows/pages.yml` builds `apps/solidcraft-web` with trunk at `/forma/` and
-  Artea Studio at `/`, copies `examples/forma/<name>/<name>.sc` to `/forma/designs/`, and publishes
-  `gh-pages` under studio.artea.ro, from `main` and `main-sc` only. `forma-check.yml` builds the web
-  app from `forma-next` and keeps it as an artifact without deploying. Upstream's other workflows
-  are removed on purpose.
+- Deploy: `.github/workflows/pages.yml` runs on pushes to `forma-next`: it builds
+  `apps/solidcraft-web` with trunk at `/forma/` and Artea Studio at `/`, copies
+  `examples/forma/<name>/<name>.sc` to `/forma/designs/`, and hands the site to GitHub Pages as an
+  artifact (Pages source = GitHub Actions; the `github-pages` environment must allow `forma-next`).
+  Not a `gh-pages` push: the wasm file is over git's 100 MB a file. `forma-check.yml` runs the look
+  crate's tests. Upstream's other workflows are removed on purpose.
 - Looking at the app here: `cargo build --profile ci -j 1 -p solidcraft` (the dev profile runs out of
   memory on a small machine), then run it under `Xvfb` with `--control <port>` and take
   `ui.screenshot`; `--theme-file <path>` follows a theme file without rebuilding. The context's lock

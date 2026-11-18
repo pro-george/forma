@@ -1,30 +1,34 @@
 name: Deploy to GitHub Pages
 
-# Builds the Forma web app (SolidCraft's browser build, served at /forma/) and
-# Artea Studio (served at the root, studio.artea.ro) and pushes the static site
-# to the gh-pages branch, which GitHub Pages serves under the custom domain.
+# Builds the Forma web app (served at /forma/) and Artea Studio (served at the root) and
+# publishes them as studio.artea.ro. The site is handed to GitHub Pages as a build artifact
+# (Settings → Pages → Source = GitHub Actions), not pushed to a gh-pages branch: the web app's
+# wasm file is over the 100 MB a git push accepts. The custom domain is the one set in
+# Settings → Pages.
 
 on:
   push:
-    branches: [main, main-sc]
-    paths-ignore: ["tests/**", "docs/**", "examples/**", "packaging/**", "**/*.md"]
+    branches: [forma-next]
+    paths-ignore: ["tests/**", "docs/**", "packaging/**", "**/*.md"]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
   TRUNK_VERSION: v0.21.14
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -69,9 +73,16 @@ jobs:
             n=$(basename "$d"); [ -f "$d/$n.sc" ] && cp "$d/$n.sc" "site/forma/designs/$n.sc"
           done
           touch site/.nojekyll
-      - uses: peaceiris/actions-gh-pages@v4
+      - uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          cname: studio.artea.ro
-          force_orphan: true
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
