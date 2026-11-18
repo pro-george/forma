@@ -41,7 +41,7 @@
     <!-- Forma: how much of the app has arrived (the script below fills these in). -->
     <div id="forma_loading_bar" aria-hidden="true"><i></i></div><span id="forma_loading_note" aria-hidden="true"></span></div>
   <script>
-    // Forma: the app is one large file, about 55 MB over the wire on a first visit, so the loading
+    // Forma: the app is one large file, tens of megabytes over the wire on a first visit, so the loading
     // screen says how much of it has arrived. Its size comes from build.json (`bytes`, written by
     // `cargo xtask web-offline`): a compressed response's own Content-Length is not the size of
     // what is read. Whatever goes wrong in here, the app loads exactly as it would without it.

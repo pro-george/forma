@@ -47,6 +47,11 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Build the web app
         working-directory: apps/solidcraft-web
+        # Optimised for size ("s"), not speed (the workspace's 3): the wasm file is what a first
+        # visit waits for. Measured on v0.43: 176 MB (55 MB gzipped) at 3, 117 MB (38 MB) at "s",
+        # 106 MB (34 MB) at "z"; replaying the KUMO base's commands took 102 s, 112 s and 151 s.
+        env:
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: s
         run: trunk build --release --public-url /
 
       # --- Artea Studio (TypeScript, legacy-ts/) ---

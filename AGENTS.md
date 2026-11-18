@@ -39,8 +39,12 @@ own rules further down still apply to that code. Forma-specific facts first:
   until November 2026, redirects to the root (`deploy/forma-moved/`) and serves the service
   worker unbuilt so kept copies retire. The app's worker has the whole origin as its scope, so
   anything else published under the root must be named in `OUTSIDE` in `apps/solidcraft-web/sw.js`,
-  or its pages answer 503 once the worker is installed. `forma-check.yml` runs the look crate's
-  tests. Upstream's other workflows are removed on purpose.
+  or its pages answer 503 once the worker is installed. The web build is optimised for size
+  (`CARGO_PROFILE_RELEASE_OPT_LEVEL=s` in the workflow; the numbers behind that are in its
+  comment), and the loading screen shows the download's progress from `bytes` in `build.json`.
+  `forma-check.yml` runs the look crate's tests. Upstream's other workflows are removed on purpose.
+- Preferences carry `forma_look`: a browser or settings file saved before Forma's own look moves
+  to the Artea theme once (`prefs::adopt_forma_look`). Raise `FORMA_LOOK` only to move everyone again.
 - Looking at the app here: `cargo build --profile ci -j 1 -p solidcraft` (the dev profile runs out of
   memory on a small machine), then run it under `Xvfb` with `--control <port>` and take
   `ui.screenshot`; `--theme-file <path>` follows a theme file without rebuilding. The context's lock
