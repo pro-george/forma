@@ -1,0 +1,49 @@
+name: Web app size test
+
+# An experiment, not a deploy: builds the web app optimised for size instead of speed and
+# reports how large the wasm file comes out, keeping each build as an artifact to time.
+
+on:
+  push:
+    branches: [forma-size]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  TRUNK_VERSION: v0.21.14
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        opt: [s, z]
+    name: opt-level ${{ matrix.opt }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: ${{ matrix.opt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install trunk
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSL "https://github.com/trunk-rs/trunk/releases/download/${TRUNK_VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Build the web app
+        working-directory: apps/solidcraft-web
+        run: trunk build --release --public-url /
+      - name: Sizes
+        run: |
+          f=$(ls dist/web/*_bg.wasm)
+          echo "opt-level ${{ matrix.opt }}: raw $(stat -c %s "$f") bytes, gzip $(gzip -6 -c "$f" | wc -c) bytes" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forma-web-opt-${{ matrix.opt }}
+          path: dist/web
+          retention-days: 3
