@@ -243,6 +243,46 @@ pub fn release_stale_input(ctx: &egui::Context, raw: &mut egui::RawInput) -> boo
     true
 }
 
+fn pointer_away_id() -> Id {
+    Id::unique("sc_window_pointer_away")
+}
+
+/// Whether this frame's events bring the pointer or the focus back to the window after it was
+/// away. Keeps the "away" state between frames in the context's temporary data.
+pub fn pointer_returns(ctx: &egui::Context, raw: &egui::RawInput) -> bool {
+    let mut away = ctx.data(|d| d.get_temp::<bool>(pointer_away_id())).unwrap_or(false);
+    let mut returns = false;
+    for event in &raw.events {
+        match event {
+            egui::Event::PointerGone | egui::Event::WindowFocused(false) => away = true,
+            egui::Event::WindowFocused(true) => {
+                away = false;
+                returns = true;
+            }
+            egui::Event::PointerMoved(_) | egui::Event::PointerButton { .. } if away => {
+                away = false;
+                returns = true;
+            }
+            _ => {}
+        }
+    }
+    ctx.data_mut(|d| d.insert_temp(pointer_away_id(), away));
+    returns
+}
+
+/// When the pointer or the focus comes back to the window, have the window set its cursor again.
+/// A Wayland compositor keeps showing the cursor of the program the pointer was over last until
+/// the window sets its own; egui only sets a cursor when it changes, so the same arrow as before
+/// would never be sent. Making the cursor visible, which it already is, sends the current one
+/// again and changes nothing on the systems that never lost it. Returns whether it did.
+pub fn reapply_cursor_on_return(ctx: &egui::Context, raw: &egui::RawInput) -> bool {
+    let returns = pointer_returns(ctx, raw);
+    if returns {
+        ctx.send_viewport_cmd(ViewportCommand::CursorVisible(true));
+    }
+    returns
+}
+
 /// Minimize, Maximize/Restore and Close at the right end of `bar`, full bar height, flush with
 /// the window's edge so a maximized window's corner hits Close. The one clicked, as the action
 /// for the app to run.

@@ -34,12 +34,12 @@ for path in "${own[@]}"; do
     git checkout -q HEAD -- "$path"
   fi
 done
-# Upstream-only paths stay out, except Forma's one workflow.
+# Upstream-only paths stay out, except Forma's own workflows.
 for path in "${gone[@]}"; do
   git rm -r -q --cached --ignore-unmatch -- "$path" >/dev/null
   rm -rf -- "$path"
 done
-git checkout -q HEAD -- .github/workflows/pages.yml
+git checkout -q HEAD -- .github/workflows/pages.yml .github/workflows/forma-check.yml
 
 echo
 echo "forma-merge: $ref merged, uncommitted. Still to resolve:"

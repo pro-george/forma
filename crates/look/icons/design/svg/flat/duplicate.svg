@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Duplicate</title>
+  <path d="M40 22L40 14A4 4 0 0 0 36 10L14 10A4 4 0 0 0 10 14L10 36A4 4 0 0 0 14 40L22 40" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M28 24L50 24A4 4 0 0 1 54 28L54 50A4 4 0 0 1 50 54L28 54A4 4 0 0 1 24 50L24 28A4 4 0 0 1 28 24Z" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

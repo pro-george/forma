@@ -547,8 +547,8 @@ pub fn crash_draft(report: &serde_json::Value) -> Draft {
     let what = match kind {
         Some("command_panic") => "An internal error stopped a command (the design was left unchanged)",
         Some("kernel_panic_recovered") => "The geometry kernel hit an internal error (caught; the operation failed)",
-        Some("unclean_exit") => "An earlier SolidCraft session ended without recording a clean exit",
-        _ => "SolidCraft hit an internal error",
+        Some("unclean_exit") => "An earlier Forma session ended without recording a clean exit",
+        _ => "Forma hit an internal error", // Forma: the product's name
     };
     let detection = if kind == Some("unclean_exit") {
         "\n\nDetected on a later launch; the exact exit time was not recorded. A system shutdown or forced stop can also cause an unclean exit."
@@ -590,7 +590,7 @@ pub fn crash_draft(report: &serde_json::Value) -> Draft {
         },
         s("id"),
         block(&format!(
-            "SolidCraft {} ({}, built {})\nOS: {} {}\n{}",
+            "Forma {} ({}, built {})\nOS: {} {}\n{}",
             field(app, "version"),
             field(app, "commit"),
             field(app, "built"),

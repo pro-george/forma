@@ -464,8 +464,9 @@ impl Rows<'_> {
         }
         let mut drag_started = false;
         if self.active && shown {
-            let (now, modifiers, delay) =
-                self.ui.input(|i| (i.time, i.modifiers, self.ui.ctx().options(|o| o.input_options.max_double_click_delay)));
+            // Two calls: the context's lock is not re-entrant, so `options` cannot be read inside `input`.
+            let delay = self.ui.ctx().options(|o| o.input_options.max_double_click_delay);
+            let (now, modifiers) = self.ui.input(|i| (i.time, i.modifiers));
             if drawn.fold {
                 events.push(Event::Fold { node: id, open: !row.fold.unwrap_or(false) });
             }

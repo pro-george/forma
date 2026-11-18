@@ -97,7 +97,7 @@ impl Download {
         if ok && app.session.path.as_deref() == Some(path.as_str()) {
             crate::adopt_linked_design(&mut app.session, name);
         } else if !ok && !cancelled {
-            app.set_status("Could not open design link: the downloaded file is not a valid SolidCraft design", true);
+            app.set_status("Could not open design link: the downloaded file is not a valid Forma design", true);
         }
         let _ = vfs::remove(&path);
     }

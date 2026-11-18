@@ -984,6 +984,7 @@ The original adapters in `crates/engine/src/cmd/render/library.rs`, the generate
 | crates/look/icons/design/svg/flat/disclosure_closed.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/disclosure_open.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/display.svg | SolidCraft contributors | original icon master (64 grid) | MIT OR Apache-2.0 |
+| crates/look/icons/design/svg/flat/duplicate.svg | Forma (George, Pro Creative) | single-colour application/navigation icon master (64 grid), original Forma artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/export_tray.svg | SolidCraft contributors | original icon master (64 grid) | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/eye.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/fit.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
@@ -998,6 +999,12 @@ The original adapters in `crates/engine/src/cmd/render/library.rs`, the generate
 | crates/look/icons/design/svg/flat/nav_settings.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/orbit.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/pan.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
+| crates/look/icons/design/svg/flat/panel_dock_bottom.svg | Forma (George, Pro Creative) | single-colour application/navigation icon master (64 grid), original Forma artwork | MIT OR Apache-2.0 |
+| crates/look/icons/design/svg/flat/panel_dock_left.svg | Forma (George, Pro Creative) | single-colour application/navigation icon master (64 grid), original Forma artwork | MIT OR Apache-2.0 |
+| crates/look/icons/design/svg/flat/panel_dock_right.svg | Forma (George, Pro Creative) | single-colour application/navigation icon master (64 grid), original Forma artwork | MIT OR Apache-2.0 |
+| crates/look/icons/design/svg/flat/panel_float.svg | Forma (George, Pro Creative) | single-colour application/navigation icon master (64 grid), original Forma artwork | MIT OR Apache-2.0 |
+| crates/look/icons/design/svg/flat/panel_popout.svg | Forma (George, Pro Creative) | single-colour application/navigation icon master (64 grid), original Forma artwork | MIT OR Apache-2.0 |
+| crates/look/icons/design/svg/flat/panel_reset_height.svg | Forma (George, Pro Creative) | single-colour application/navigation icon master (64 grid), original Forma artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/perspective.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/plus.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/prefs_appearance.svg | SolidCraft contributors | original icon master (64 grid) | MIT OR Apache-2.0 |
@@ -1013,6 +1020,7 @@ The original adapters in `crates/engine/src/cmd/render/library.rs`, the generate
 | crates/look/icons/design/svg/flat/prefs_sketch.svg | SolidCraft contributors | original icon master (64 grid) | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/prefs_tools.svg | SolidCraft contributors | original icon master (64 grid) | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/redo.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
+| crates/look/icons/design/svg/flat/reopen.svg | Forma (George, Pro Creative) | single-colour application/navigation icon master (64 grid), original Forma artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/save.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/select_bodies.svg | SolidCraft contributors | original icon master (64 grid) | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/select_components.svg | SolidCraft contributors | original icon master (64 grid) | MIT OR Apache-2.0 |
@@ -1039,10 +1047,12 @@ The original adapters in `crates/engine/src/cmd/render/library.rs`, the generate
 | crates/look/icons/design/svg/flat/style_wireframe.svg | SolidCraft contributors | original icon master (64 grid) | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/suppress.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/undo.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
+| crates/look/icons/design/svg/flat/window.svg | Forma (George, Pro Creative) | single-colour application/navigation icon master (64 grid), original Forma artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/flat/zoom.svg | SolidCraft contributors | single-colour application/navigation icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/model/accessibility.svg | SolidCraft contributors | two-tone modelling icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/model/activate.svg | SolidCraft contributors | two-tone modelling icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/model/agent_chat.svg | SolidCraft contributors | original icon master (64 grid) | MIT OR Apache-2.0 |
+| crates/look/icons/design/svg/model/airfoil.svg | Forma (George, Pro Creative) | two-tone modelling icon master (64 grid), original Forma artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/model/align.svg | SolidCraft contributors | two-tone modelling icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/model/appearance.svg | SolidCraft contributors | two-tone modelling icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |
 | crates/look/icons/design/svg/model/arc3.svg | SolidCraft contributors | two-tone modelling icon master (64 grid), original SolidCraft artwork | MIT OR Apache-2.0 |

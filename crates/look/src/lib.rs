@@ -27,11 +27,13 @@ pub static GLYPHS: solidcraft_ui_kit::icons::glyphs::Glyphs = solidcraft_ui_kit:
     brand_mark: glyphs::brand_mark_silhouette,
 };
 
-/// Make Forma's icons and glyphs the ones the kit draws: at startup, before the first frame, and
-/// in every test context. Calling it again does nothing.
+/// Make Forma's icons, glyphs and built-in theme files the ones the kit uses: at startup, before
+/// the first frame and before any theme is read, and in every test context. Calling it again
+/// does nothing.
 pub fn install_tables() {
     solidcraft_ui_kit::icons::install(&icons::SET);
     solidcraft_ui_kit::icons::glyphs::install(&GLYPHS);
+    solidcraft_ui_kit::theme_files::install_builtin(themes::BUILTIN);
 }
 
 /// The whole look for one egui context: the tables and the bundled faces.

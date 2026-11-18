@@ -187,7 +187,7 @@ pub static DESIGN_SAVE_OPTIONS: &[OptionSpec] = &[
     OptionSpec {
         param: "format",
         label: "Format",
-        kind: OptionKind::Choice { choices: &[("container", "SolidCraft container"), ("json", "Plain JSON design")], default: 0 },
+        kind: OptionKind::Choice { choices: &[("container", "Forma container"), ("json", "Plain JSON design")], default: 0 },
     },
     OptionSpec {
         param: "compression",
@@ -204,7 +204,7 @@ pub static DESIGN_SAVE_OPTIONS: &[OptionSpec] = &[
 pub static FORMATS: &[FormatSpec] = &[
     FormatSpec {
         id: "design",
-        label: "SolidCraft design",
+        label: "Forma design", // Forma: the product's name
         extensions: &[crate::DESIGN_EXTS[0], crate::DESIGN_EXTS[1], crate::DESIGN_EXTS[2], "json"],
         role: Role::Design,
         import: Some(ImportSpec { target: ImportTarget::Design, options: &[], native_only: false }),

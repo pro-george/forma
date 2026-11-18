@@ -54,7 +54,7 @@ pub fn system(app: &SolveApp, ctx: Option<&egui::Context>) -> (serde_json::Map<S
     if !gpu.is_empty() {
         f.insert("gpu".into(), json!(gpu));
     }
-    let mut s = format!("SolidCraft {VERSION} ({COMMIT}, built {BUILD_DATE})\nTarget: {arch}-{os}\nRenderer: {renderer}");
+    let mut s = format!("Forma {VERSION} ({COMMIT}, built {BUILD_DATE})\nTarget: {arch}-{os}\nRenderer: {renderer}");
     if !gpu.is_empty() {
         s.push_str(&format!(", {gpu}"));
     }

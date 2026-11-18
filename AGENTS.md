@@ -33,7 +33,17 @@ own rules further down still apply to that code. Forma-specific facts first:
   the Rust engine one at a time; do not develop new features there, except Artea Studio.
 - Deploy: `.github/workflows/pages.yml` builds `apps/solidcraft-web` with trunk at `/forma/` and
   Artea Studio at `/`, copies `examples/forma/<name>/<name>.sc` to `/forma/designs/`, and publishes
-  `gh-pages` under studio.artea.ro. Upstream's other workflows are removed on purpose.
+  `gh-pages` under studio.artea.ro, from `main` and `main-sc` only. `forma-check.yml` builds the web
+  app from `forma-next` and keeps it as an artifact without deploying. Upstream's other workflows
+  are removed on purpose.
+- Looking at the app here: `cargo build --profile ci -j 1 -p solidcraft` (the dev profile runs out of
+  memory on a small machine), then run it under `Xvfb` with `--control <port>` and take
+  `ui.screenshot`; `--theme-file <path>` follows a theme file without rebuilding. The context's lock
+  is not re-entrant: never call `ctx.options`, `ctx.data` or another context accessor inside an
+  `input(|i| ...)` closure, the first frame hangs.
+- `solidcraft_look::install_tables()` hands the kit Forma's icons, glyphs and built-in theme files;
+  a test that reads themes calls it first. Theme `order` numbers are unique across `crates/look/themes`.
+- SolidCraft's Ko-fi and Discord links are not shown (`crates/ui-egui/src/links.rs`, `LINKS` is empty).
 - Upstream's tests of the kit's inner workings (`crates/ui-kit/src/*_tests.rs` and the interface
   crate's tests that name kit handles) were written against upstream's kit: some no longer
   compile or pass against Forma's. Fix or retire them as the kit is worked on; do not bend the

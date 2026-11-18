@@ -52,3 +52,11 @@ bom = "list"
 # Render workspace drafts: shared meanings; owner review remains Open.
 # Removing a look override returns the body to its material look.
 render_remove_override = "render_from_material"
+
+# Forma: names the interface asks for that reuse a master Forma already has.
+model = "box"
+render = "ws_render"
+animation = "ws_animate"
+search = "zoom"
+plane_auto = "plane"
+constrain = "joint"

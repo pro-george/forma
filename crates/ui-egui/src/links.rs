@@ -38,7 +38,11 @@ pub struct Link {
     pub hide: fn(&mut Prefs),
 }
 
-pub const LINKS: &[Link] = &[
+// Forma: SolidCraft's donation and community links are its own; Forma shows none of them.
+pub const LINKS: &[Link] = &[];
+/// SolidCraft's links, kept so the table merges cleanly with upstream.
+#[allow(dead_code, reason = "Forma shows no support links; see LINKS")]
+const SOLIDCRAFT_LINKS: &[Link] = &[
     Link {
         id: "kofi",
         url: KOFI_URL,

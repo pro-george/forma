@@ -1,5 +1,5 @@
 {
-  "order": 11,
+  "order": 2,
   "provenance": "Forma's own dark theme, from the Artea identity: its night ground with floral white, lime and terracotta",
   "base": "dark",
   "colors": {
@@ -30,7 +30,7 @@
     "body_selected": "#c9824f",
     "border": "#33291f",
     "box_crossing": "#89cf8e",
-    "box_window": "#6daff7",
+    "box_window": "#e3a877",
     "chip": "#e3a877",
     "construction_geom": "#ceb687",
     "construction_plane": "#ceb68740",
@@ -130,7 +130,7 @@
       "#f5eee6",
       "#e3a877"
     ],
-    "manipulator": "#7abfff",
+    "manipulator": "#e3a877",
     "mesh_accent": "#cfc152",
     "mesh_fill": "#cfc152",
     "mesh_ink": "#cfc152",
@@ -138,7 +138,7 @@
     "on_accent": "#1c1309",
     "origin_plane": "#9d928538",
     "origin_plane_edge": "#9d9285c8",
-    "origin_plane_hover": "#6daff770",
+    "origin_plane_hover": "#e3a87760",
     "origin_point": "#e6dccd",
     "overlay": "#211a14eb",
     "panel": "#211a14",
@@ -146,13 +146,13 @@
     "preview_add": "#4c78a7",
     "preview_cut": "#f850526e",
     "preview_new": "#e6af2b",
-    "preview_sketch": "#8eca96",
+    "preview_sketch": "#b5d48a",
     "profile_fill": "#6daff71c",
     "render_accent": "#f38bb7",
     "render_fill": "#f38bb7",
     "render_ink": "#f38bb7",
     "render_soft": "#3d2c36",
-    "rubber_band": "#7abfff",
+    "rubber_band": "#e3a877",
     "section_cap": "#ceb687",
     "sel_edge": "#e3a877",
     "sel_edge_rim": "#7a4b28",
@@ -166,22 +166,22 @@
     "sheet_ink": "#6daff7",
     "sheet_soft": "#253242",
     "sketch": "#6daff7",
-    "sketch_accent": "#8eca96",
+    "sketch_accent": "#b5d48a",
     "sketch_centerline": "#e6dccd",
     "sketch_construction": "#ceb687",
     "sketch_fixed": "#fffaf2",
-    "sketch_ink": "#8eca96",
+    "sketch_ink": "#b5d48a",
     "sketch_locked": "#89cf8e",
     "sketch_lost": "#f85052",
     "sketch_point": "#fffaf2",
     "sketch_point_free": "#6daff7",
     "sketch_projected": "#998cb3",
-    "sketch_soft": "#2b3730",
+    "sketch_soft": "#252a1a",
     "subheading_bg": "#251d16",
-    "surface_accent": "#ceb687",
-    "surface_fill": "#ceb687",
-    "surface_ink": "#ceb687",
-    "surface_soft": "#36342e",
+    "surface_accent": "#7fc1bd",
+    "surface_fill": "#7fc1bd",
+    "surface_ink": "#9fd3cf",
+    "surface_soft": "#1b2826",
     "tab_on_fill_dark": "#16110d",
     "text": "#f5eee6",
     "text_dim": "#b9af9f",
@@ -197,7 +197,10 @@
     ],
     "viewport_bottom": "#120e0a",
     "viewport_top": "#1c1611",
-    "warning": "#e6af2b"
+    "warning": "#e6af2b",
+    "file_rail": "#211a14",
+    "file_rail_ink": "#f5eee6",
+    "file_rail_hover": "#33291f"
   },
   "format": "solidcraft-theme/1",
   "name": "Artea Night",
@@ -239,14 +242,14 @@
     "passive-3": "#6f6859",
     "guide": "#a6a093",
     "solid": [
-      "#a0d7fb",
-      "#65bdf3",
-      "#4aa3d8"
+      "#f6d3b8",
+      "#e3a877",
+      "#c98652"
     ],
     "surface": [
-      "#fcc28e",
-      "#dea572",
-      "#c38c59"
+      "#bfe3e0",
+      "#7fc1bd",
+      "#5aa39f"
     ],
     "mesh": [
       "#e8cd7d",
@@ -259,9 +262,9 @@
       "#a08fc4"
     ],
     "sketch": [
-      "#b0dbc0",
-      "#94bea4",
-      "#7ba58b"
+      "#d5e8b8",
+      "#a9c47a",
+      "#86a356"
     ],
     "constraint": [
       "#febbb9",
@@ -269,9 +272,9 @@
       "#e57071"
     ],
     "construction": [
-      "#fcc28e",
-      "#dea572",
-      "#c38c59"
+      "#d3dde6",
+      "#9db1c2",
+      "#7a90a3"
     ]
   }
 }

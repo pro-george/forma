@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Open panel in its own window</title>
+  <path d="M28 14L16 14A4 4 0 0 0 12 18L12 48A4 4 0 0 0 16 52L46 52A4 4 0 0 0 50 48L50 36" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M30 34L52 12M38 12L52 12L52 26" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

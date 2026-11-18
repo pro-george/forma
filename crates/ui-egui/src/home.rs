@@ -845,7 +845,10 @@ fn rail(app: &SolveApp) -> Vec<start_page::RailItem<'_, FileAction>> {
         }));
     }
     // Support and community links, always listed; the status bar's buttons are optional.
-    rail.push(start_page::RailItem::Separator);
+    // Forma: no divider above an empty list of links.
+    if !crate::links::LINKS.is_empty() {
+        rail.push(start_page::RailItem::Separator);
+    }
     for link in crate::links::LINKS {
         rail.push(start_page::RailItem::Entry(start_page::RailEntry {
             id: format!("home:{}", link.id).into(),

@@ -1,5 +1,5 @@
 {
-  "order": 10,
+  "order": 1,
   "provenance": "Forma's own theme, from the Artea identity: floral white, dark slate grey, lime and terracotta",
   "base": "light",
   "colors": {
@@ -30,7 +30,7 @@
     "body_selected": "#e5a779",
     "border": "#e4dbcd",
     "box_crossing": "#257231",
-    "box_window": "#015ba6",
+    "box_window": "#b5642a",
     "chip": "#b5642a",
     "construction_geom": "#7d6535",
     "construction_plane": "#7d653540",
@@ -130,7 +130,7 @@
       "#f5eee6",
       "#e3a877"
     ],
-    "manipulator": "#004c9b",
+    "manipulator": "#b5642a",
     "mesh_accent": "#7e6900",
     "mesh_fill": "#7e6900",
     "mesh_ink": "#6b5903",
@@ -138,7 +138,7 @@
     "on_accent": "#f8f9f4",
     "origin_plane": "#726a5d38",
     "origin_plane_edge": "#726a5dc8",
-    "origin_plane_hover": "#015ba670",
+    "origin_plane_hover": "#b5642a60",
     "origin_point": "#45472f",
     "overlay": "#fffcf7eb",
     "panel": "#faf6f0",
@@ -146,13 +146,13 @@
     "preview_add": "#4f8fd6",
     "preview_cut": "#c715296e",
     "preview_new": "#e6af2b",
-    "preview_sketch": "#2d713b",
+    "preview_sketch": "#4f7326",
     "profile_fill": "#015ba614",
     "render_accent": "#ac1f6a",
     "render_fill": "#ac1f6a",
     "render_ink": "#ac1f6a",
     "render_soft": "#eadedf",
-    "rubber_band": "#004c9b",
+    "rubber_band": "#b5642a",
     "section_cap": "#8a6a3a",
     "sel_edge": "#b5642a",
     "sel_edge_rim": "#ecb490",
@@ -166,22 +166,22 @@
     "sheet_ink": "#015ba6",
     "sheet_soft": "#dee2e3",
     "sketch": "#015ba6",
-    "sketch_accent": "#2d713b",
+    "sketch_accent": "#4f7326",
     "sketch_centerline": "#45472f",
     "sketch_construction": "#7d6535",
     "sketch_fixed": "#1c1d10",
-    "sketch_ink": "#2d713b",
+    "sketch_ink": "#4f7326",
     "sketch_locked": "#257231",
     "sketch_lost": "#b3261e",
     "sketch_point": "#1c1d10",
     "sketch_point_free": "#015ba6",
     "sketch_projected": "#705e91",
-    "sketch_soft": "#e1e3dc",
+    "sketch_soft": "#e6ebd9",
     "subheading_bg": "#f6f0e7",
-    "surface_accent": "#7d6535",
-    "surface_fill": "#7d6535",
-    "surface_ink": "#6a562e",
-    "surface_soft": "#e7e3db",
+    "surface_accent": "#2f6f73",
+    "surface_fill": "#2f6f73",
+    "surface_ink": "#265c5f",
+    "surface_soft": "#dfe9e6",
     "tab_on_fill_dark": "#1c1d10",
     "text": "#30321d",
     "text_dim": "#5a5c4a",
@@ -197,7 +197,10 @@
     ],
     "viewport_bottom": "#e9e0d2",
     "viewport_top": "#f8f3eb",
-    "warning": "#956000"
+    "warning": "#956000",
+    "file_rail": "#30321d",
+    "file_rail_ink": "#f5eee6",
+    "file_rail_hover": "#45472f"
   },
   "format": "solidcraft-theme/1",
   "name": "Artea",
@@ -239,14 +242,14 @@
     "passive-3": "#8c8876",
     "guide": "#7b7a66",
     "solid": [
-      "#dbe9fe",
-      "#81b3fa",
-      "#1875eb"
+      "#f4dccb",
+      "#d98b55",
+      "#b5642a"
     ],
     "surface": [
-      "#fde3c4",
-      "#daa662",
-      "#a06f28"
+      "#cfe6e4",
+      "#74b3b0",
+      "#2f6f73"
     ],
     "mesh": [
       "#fee7a2",
@@ -259,9 +262,9 @@
       "#8b62bf"
     ],
     "sketch": [
-      "#b1fdc5",
-      "#72c78b",
-      "#388e56"
+      "#dfecc6",
+      "#9dbd68",
+      "#4f7326"
     ],
     "constraint": [
       "#fee0dd",
@@ -269,9 +272,9 @@
       "#d73339"
     ],
     "construction": [
-      "#fde3c4",
-      "#daa662",
-      "#a06f28"
+      "#dde4ea",
+      "#8fa5b8",
+      "#4d6478"
     ]
   }
 }

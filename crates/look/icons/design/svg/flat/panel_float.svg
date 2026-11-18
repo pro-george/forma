@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Float panel</title>
+  <path d="M40 12L50 12A4 4 0 0 1 54 16L54 48A4 4 0 0 1 50 52L14 52A4 4 0 0 1 10 48L10 38" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M12 10L28 10A3 3 0 0 1 31 13L31 25A3 3 0 0 1 28 28L12 28A3 3 0 0 1 9 25L9 13A3 3 0 0 1 12 10Z" fill="currentColor" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/>
+</svg>

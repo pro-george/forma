@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Airfoil</title>
+  <path d="M6 34C8 22 22 16 36 20C46 23 54 30 59 38C48 38 36 40 22 40C12 40 6 38 6 34Z" fill="#b9ddf8"/>
+  <path d="M6 34C8 22 22 16 36 20C46 23 54 30 59 38C48 38 36 40 22 40C12 40 6 38 6 34Z" fill="none" stroke="#236ead" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M6 34C20 29 40 30 59 38" fill="none" stroke="#6f879c" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="6" cy="34" r="3.2" fill="#34465b"/>
+  <circle cx="59" cy="38" r="3.2" fill="#34465b"/>
+</svg>
