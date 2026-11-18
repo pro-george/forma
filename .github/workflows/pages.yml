@@ -1,7 +1,8 @@
 name: Deploy to GitHub Pages
 
-# Builds the Forma web app (served at /forma/) and Artea Studio (served at the root) and
-# publishes them as studio.artea.ro. The site is handed to GitHub Pages as a build artifact
+# Builds the Forma web app (served at the root) and Artea Studio (served at /lampi/) and
+# publishes them as studio.artea.ro. /forma/, the app's address until November 2026, redirects
+# to the root. The site is handed to GitHub Pages as a build artifact
 # (Settings → Pages → Source = GitHub Actions), not pushed to a gh-pages branch: the web app's
 # wasm file is over the 100 MB a git push accepts. The custom domain is the one set in
 # Settings → Pages.
@@ -46,7 +47,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Build the web app
         working-directory: apps/solidcraft-web
-        run: trunk build --release --public-url /forma/
+        run: trunk build --release --public-url /
 
       # --- Artea Studio (TypeScript, legacy-ts/) ---
       - uses: pnpm/action-setup@v4
@@ -60,18 +61,26 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm --filter @forma/core build
-          BASE_PATH=/ pnpm --filter artea-studio build
+          BASE_PATH=/lampi/ pnpm --filter artea-studio build
 
       - name: Assemble the site
         run: |
-          mkdir -p site/forma
-          cp -r legacy-ts/apps/artea-studio/dist/. site/
-          cp -r dist/web/. site/forma/
-          # Forma's ready-made designs, opened with ?open=/forma/designs/<name>.sc
-          mkdir -p site/forma/designs
+          mkdir -p site/lampi site/designs site/forma/designs
+          cp -r dist/web/. site/
+          cp -r legacy-ts/apps/artea-studio/dist/. site/lampi/
+          # Forma's ready-made designs, opened with ?open=/designs/<name>.sc. The copy under
+          # /forma/ keeps links made before the move working.
           for d in examples/forma/*/; do
-            n=$(basename "$d"); [ -f "$d/$n.sc" ] && cp "$d/$n.sc" "site/forma/designs/$n.sc"
+            n=$(basename "$d")
+            if [ -f "$d/$n.sc" ]; then
+              cp "$d/$n.sc" "site/designs/$n.sc"
+              cp "$d/$n.sc" "site/forma/designs/$n.sc"
+            fi
           done
+          # The old address: a redirect to the root, and the app's service worker unbuilt, which
+          # makes the worker a browser kept for /forma/ drop its files and unregister.
+          cp deploy/forma-moved/index.html site/forma/index.html
+          cp apps/solidcraft-web/sw.js site/forma/sw.js
           touch site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:

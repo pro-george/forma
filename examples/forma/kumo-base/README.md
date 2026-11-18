@@ -9,15 +9,15 @@ parameters. Changing `H` in the Parameters panel reproduces the whole family.
 
 ## Open it in Forma
 
-https://studio.artea.ro/forma/?open=/forma/designs/kumo-base.sc opens the saved design straight in
-the browser app (the Pages workflow copies `kumo-base.sc` to `/forma/designs/`); the body comes from
+https://studio.artea.ro/?open=/designs/kumo-base.sc opens the saved design straight in
+the browser app (the Pages workflow copies `kumo-base.sc` to `/designs/`); the body comes from
 the file's cache, so it is on screen in seconds, and the parameters are live.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `kumo_commands.json` | The 89 engine commands that build the part (parameters, sketches, revolve, sweep, patterns, cuts). Replay in the browser console on studio.artea.ro/forma: `const {commands} = await (await fetch('kumo_commands.json')).json(); for (const c of commands) await solidcraft.execute(c.command, c.params)` |
+| `kumo_commands.json` | The 89 engine commands that build the part (parameters, sketches, revolve, sweep, patterns, cuts). Replay in the browser console on studio.artea.ro: `const {commands} = await (await fetch('kumo_commands.json')).json(); for (const c of commands) await solidcraft.execute(c.command, c.params)` |
 | `build2.cjs` | The Playwright script that drove the live app to build and measure the part (`node build2.cjs`; `FAMILY=1` also checks H = 50 and 175) |
 | `export.cjs` | Replays `kumo_commands.json` and downloads the design as `.sc`, `.3mf`, `.step`, `.stl` |
 | `kumo-base.sc` | The saved design, with its geometry cache |

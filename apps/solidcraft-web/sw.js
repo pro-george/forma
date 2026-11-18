@@ -247,10 +247,16 @@ async function asset(event) {
   return kept || fetch(event.request);
 }
 
+// Forma: on studio.artea.ro the app is at the site's root and other things live under it: Artea
+// Studio (lampi/) and the app's old address (forma/, now a redirect). Their pages and files are
+// not this app's, so the worker leaves them to the network.
+const OUTSIDE = ["lampi/", "forma/"];
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (RETIRE || request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
   const path = request.url.split(/[?#]/)[0];
+  if (OUTSIDE.some((dir) => path.startsWith(url(dir)) || path === url(dir).slice(0, -1))) return;
   const start = request.mode === "navigate" && (path === url("") || path === url("index.html"));
   event.respondWith(start ? launchOrKept(event) : asset(event));
 });

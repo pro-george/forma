@@ -7,7 +7,7 @@ const UNION = process.env.UNION !== '0';          // union the ribs into the bas
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--enable-unsafe-webgpu'] });
   const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
   p.setDefaultTimeout(1500000);
-  await p.goto('https://studio.artea.ro/forma/?webgl', { waitUntil: 'networkidle', timeout: 120000 }).catch(() => {});
+  await p.goto('https://studio.artea.ro/?webgl', { waitUntil: 'networkidle', timeout: 120000 }).catch(() => {});
   await p.waitForTimeout(12000);
   const log = [];
   const X = async (cmd, params) => { const t0 = Date.now(); try { const r = await p.evaluate(([c, q]) => window.solidcraft.execute(c, q), [cmd, params || {}]); const line = `✓ ${cmd} (${Date.now() - t0} ms) ${JSON.stringify(r).slice(0, 200)}`; console.log(line); log.push({ cmd, params, ms: Date.now() - t0, result: r }); return r; } catch (e) { console.log(`✗ ${cmd}:`, e.message.split('\n')[0].slice(0, 300)); throw e; } };

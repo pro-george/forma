@@ -32,11 +32,15 @@ own rules further down still apply to that code. Forma-specific facts first:
   lampshade configurator). Its full history is on the `forma-ts` branch. Port features from it onto
   the Rust engine one at a time; do not develop new features there, except Artea Studio.
 - Deploy: `.github/workflows/pages.yml` runs on pushes to `forma-next`: it builds
-  `apps/solidcraft-web` with trunk at `/forma/` and Artea Studio at `/`, copies
-  `examples/forma/<name>/<name>.sc` to `/forma/designs/`, and hands the site to GitHub Pages as an
+  `apps/solidcraft-web` with trunk at the site's root and Artea Studio at `/lampi/`, copies
+  `examples/forma/<name>/<name>.sc` to `/designs/`, and hands the site to GitHub Pages as an
   artifact (Pages source = GitHub Actions; the `github-pages` environment must allow `forma-next`).
-  Not a `gh-pages` push: the wasm file is over git's 100 MB a file. `forma-check.yml` runs the look
-  crate's tests. Upstream's other workflows are removed on purpose.
+  Not a `gh-pages` push: the wasm file is over git's 100 MB a file. `/forma/`, the app's address
+  until November 2026, redirects to the root (`deploy/forma-moved/`) and serves the service
+  worker unbuilt so kept copies retire. The app's worker has the whole origin as its scope, so
+  anything else published under the root must be named in `OUTSIDE` in `apps/solidcraft-web/sw.js`,
+  or its pages answer 503 once the worker is installed. `forma-check.yml` runs the look crate's
+  tests. Upstream's other workflows are removed on purpose.
 - Looking at the app here: `cargo build --profile ci -j 1 -p solidcraft` (the dev profile runs out of
   memory on a small machine), then run it under `Xvfb` with `--control <port>` and take
   `ui.screenshot`; `--theme-file <path>` follows a theme file without rebuilding. The context's lock

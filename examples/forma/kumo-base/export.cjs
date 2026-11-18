@@ -6,7 +6,7 @@ const fs = require('fs');
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--enable-unsafe-webgpu'] });
   const ctx = await b.newContext({ acceptDownloads: true });
   const p = await ctx.newPage();
-  await p.goto('https://studio.artea.ro/forma/?webgl', { waitUntil: 'networkidle', timeout: 120000 }).catch(() => {});
+  await p.goto('https://studio.artea.ro/?webgl', { waitUntil: 'networkidle', timeout: 120000 }).catch(() => {});
   await p.waitForFunction(() => window.solidcraft && window.solidcraft.execute, null, { timeout: 180000 });
   const X = async (cmd, params) => { const t0 = Date.now(); const r = await p.evaluate(([c, q]) => window.solidcraft.execute(c, q), [cmd, params || {}]); console.log(`✓ ${cmd} (${Date.now() - t0} ms)`); return r; };
   await X('file.new', {});
