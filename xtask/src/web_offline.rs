@@ -53,7 +53,9 @@ pub fn generate(root: &Path, dir: &Path) -> Result<(String, usize), String> {
     if !files.iter().any(|(name, _)| name == "index.html") {
         return Err(format!("web-offline: {} has no index.html", dir.display()));
     }
-    let manifest: Vec<Value> = files.iter().map(|(name, bytes)| json!({ "file": name, "sha256": sha256(bytes) })).collect();
+    // Forma: `bytes` lets the loading screen say how much of the app has arrived (index.html).
+    let manifest: Vec<Value> =
+        files.iter().map(|(name, bytes)| json!({ "file": name, "sha256": sha256(bytes), "bytes": bytes.len() })).collect();
     let manifest = Value::Array(manifest);
     let digest = sha256(manifest.to_string().as_bytes());
     let version = format!("{}-{}", env!("CARGO_PKG_VERSION"), digest.get(..16).unwrap_or(&digest));
@@ -169,7 +171,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(n, 2, "on-demand files aren't listed");
         assert_eq!(build["version"], version.as_str());
-        assert_eq!(build["files"][1], json!({ "file": "snippets/a.js", "sha256": sha256(b"abc") }));
+        assert_eq!(build["files"][1], json!({ "file": "snippets/a.js", "sha256": sha256(b"abc"), "bytes": 3 }));
         assert_eq!(build["files"][0]["file"], "index.html");
     }
 }

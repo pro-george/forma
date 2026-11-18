@@ -1419,6 +1419,8 @@ impl SolveApp {
         }
         self.view_gizmo.load(v.get("view_gizmo"));
         if let Some(mut p) = v.get("preferences").filter(|p| p.is_object()).map(prefs::lenient) {
+            // Forma: a file saved before Forma's own look carries SolidCraft's default theme.
+            prefs::adopt_forma_look(v.get("preferences"), &mut p);
             if !prefs::MSAA.contains(&p.msaa) {
                 p.msaa = prefs::Prefs::default().msaa;
             }

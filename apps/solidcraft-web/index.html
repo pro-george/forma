@@ -37,7 +37,69 @@
 </head>
 <body>
   <canvas id="solidcraft_canvas"></canvas>
-  <div id="solidcraft_loading" role="status"><img src="loading-logo.svg" alt=""><span class="sr-only">Loading Forma&hellip;</span></div>
+  <div id="solidcraft_loading" role="status"><img src="loading-logo.svg" alt=""><span class="sr-only">Loading Forma&hellip;</span>
+    <!-- Forma: how much of the app has arrived (the script below fills these in). -->
+    <div id="forma_loading_bar" aria-hidden="true"><i></i></div><span id="forma_loading_note" aria-hidden="true"></span></div>
+  <script>
+    // Forma: the app is one large file, about 55 MB over the wire on a first visit, so the loading
+    // screen says how much of it has arrived. Its size comes from build.json (`bytes`, written by
+    // `cargo xtask web-offline`): a compressed response's own Content-Length is not the size of
+    // what is read. Whatever goes wrong in here, the app loads exactly as it would without it.
+    (() => {
+      const real = window.fetch;
+      const bar = document.querySelector("#forma_loading_bar i");
+      const note = document.getElementById("forma_loading_note");
+      if (!real || !bar || !note || typeof ReadableStream !== "function") return;
+      window.fetch = function (input) {
+        const address = typeof input === "string" ? input : input instanceof URL ? input.href : input && input.url;
+        const path = address ? address.split(/[?#]/)[0] : "";
+        if (!/_bg\.wasm$/.test(path)) return real.apply(this, arguments);
+        window.fetch = real; // Only the app's own file, once.
+        let total = 0;
+        let got = 0;
+        const show = () => {
+          if (total) {
+            const part = Math.min(1, got / total);
+            bar.style.width = (part * 100).toFixed(1) + "%";
+            note.textContent = part < 1 ? Math.floor(part * 100) + "%" : "Starting\u2026";
+          } else if (got) {
+            note.textContent = Math.round(got / 1048576) + " MB";
+          }
+        };
+        real("build.json", { cache: "no-cache" })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((build) => {
+            const name = path.split("/").pop();
+            const entry = build && Array.isArray(build.files) && build.files.find((f) => f.file === name);
+            total = (entry && Number(entry.bytes)) || 0;
+            show();
+          })
+          .catch(() => {});
+        return real.apply(this, arguments).then((response) => {
+          if (!response.ok || !response.body) return response;
+          const reader = response.body.getReader();
+          const body = new ReadableStream({
+            async pull(controller) {
+              const { done, value } = await reader.read();
+              if (done) {
+                got = total || got;
+                show();
+                controller.close();
+              } else {
+                got += value.byteLength;
+                show();
+                controller.enqueue(value);
+              }
+            },
+            cancel(reason) {
+              return reader.cancel(reason);
+            },
+          });
+          return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+        });
+      };
+    })();
+  </script>
   <script>
     // Offline use and updates (sw.js; written into release builds by `cargo xtask web-offline`).
     if ("serviceWorker" in navigator) {

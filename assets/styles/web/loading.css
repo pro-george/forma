@@ -5,3 +5,7 @@
     #solidcraft_loading.done { opacity: 0; pointer-events: none; }
     #solidcraft_loading img { width: min(40vmin, 240px); height: auto; }
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    /* Forma: the share of the app that has arrived, under the mark. */
+    #forma_loading_bar { width: min(40vmin, 240px); height: 3px; margin-top: 28px; border-radius: 2px; background: #30321d1f; overflow: hidden; }
+    #forma_loading_bar i { display: block; width: 0; height: 100%; border-radius: 2px; background: #b5642a; transition: width 200ms linear; }
+    #forma_loading_note { margin-top: 10px; min-height: 1.3em; font-variant-numeric: tabular-nums; color: #5a5c4a; }

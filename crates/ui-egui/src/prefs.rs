@@ -1335,6 +1335,10 @@ preference_settings! {
     /// built-in one (`gruvbox-dark`, …) or one of `custom_themes` (#2255).
     // Forma: starts on its own theme (crates/look/themes/artea.json); upstream starts on "dark".
     theme: String = "artea".into(), PAGE_APPEARANCE;
+    /// Forma: the look these preferences were saved under. A saved file without it comes from
+    /// before Forma had its own look, when `theme` held SolidCraft's default rather than a
+    /// choice; `adopt_forma_look` moves such a file to Forma's theme, once.
+    forma_look: u32 = FORMA_LOOK;
     /// A picture behind the model in place of the view's background; empty for none.
     background_image: String = String::new(), PAGE_APPEARANCE;
     /// Theme used when the operating system is light; unknown ids resolve to Light.
@@ -4348,6 +4352,19 @@ fn limit_toolbar_tabs(mut p: Prefs) -> Prefs {
     let allowed: Vec<&str> = crate::workspace::choosable_tabs().collect();
     p.hidden_toolbar_tabs = known_once(std::mem::take(&mut p.hidden_toolbar_tabs), &allowed);
     p
+}
+
+/// Forma: the look a build saves its preferences under (see `Prefs::forma_look`).
+pub const FORMA_LOOK: u32 = 1;
+
+/// Forma: preferences saved before Forma had its own look (`saved` has no `forma_look`) start on
+/// Forma's theme; ones saved since keep the theme their user chose. `saved` is the stored
+/// object `loaded` was read from.
+pub fn adopt_forma_look(saved: Option<&serde_json::Value>, loaded: &mut Prefs) {
+    if saved.and_then(|saved| saved.get("forma_look")).is_none() {
+        loaded.theme = Prefs::default().theme;
+    }
+    loaded.forma_look = FORMA_LOOK;
 }
 
 /// Saved preferences, keeping every one that still reads. A value this version doesn't
@@ -12186,6 +12203,24 @@ mod tests {
         assert_eq!(Prefs::default().agent_chat_turn_limit, 0);
         assert_eq!(migrate(lenient(&json!({"agent_chat_turn_limit": 24}))).agent_chat_turn_limit, 0, "the old default reads as no limit");
         assert_eq!(lenient(&json!({"agent_chat_turn_limit": 10})).agent_chat_turn_limit, 10);
+    }
+
+    /// Forma: a file saved before Forma's own look (no `forma_look`) held SolidCraft's default
+    /// theme, not a choice, and moves to Forma's; a file saved since keeps its theme.
+    #[test]
+    fn preferences_saved_before_formas_look_move_to_its_theme_once() {
+        let old = json!({"theme": "dark", "language": "en"});
+        let mut loaded = lenient(&old);
+        assert_eq!(loaded.theme, "dark");
+        adopt_forma_look(Some(&old), &mut loaded);
+        assert_eq!((loaded.theme.as_str(), loaded.forma_look), ("artea", FORMA_LOOK));
+        // Saved again, it carries the mark, and a theme chosen afterwards stays.
+        loaded.theme = "light".into();
+        let saved = serde_json::to_value(&loaded).unwrap();
+        let mut again = lenient(&saved);
+        adopt_forma_look(Some(&saved), &mut again);
+        assert_eq!(again.theme, "light");
+        assert_eq!(Prefs::default().forma_look, FORMA_LOOK, "a new install is on Forma's look");
     }
 
     #[test]
