@@ -671,7 +671,7 @@ pub const ELEMENTS: &[Element] = &[
                 |ui, ()| {
                     layout_preview(
                         ui,
-                        LayoutPreview { compact: true, labels: false, history: 2, translucent: false, dialog_left: true },
+                        LayoutPreview { compact: true, labels: false, history_in_browser: true },
                         "Where the panels go",
                     )
                 },

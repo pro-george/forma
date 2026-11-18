@@ -308,7 +308,7 @@ mod tests {
     fn live_layout_preview_follows_each_choice_in_both_themes() {
         use crate::LayoutPreview;
         let previous = solidcraft_theme::is_dark();
-        let baseline = LayoutPreview { compact: false, labels: true, history: 0, translucent: false, dialog_left: false };
+        let baseline = LayoutPreview { compact: false, labels: true, history_in_browser: false };
         for dark in [false, true] {
             solidcraft_theme::set_dark(dark);
             let draw = |state| {
@@ -324,20 +324,17 @@ mod tests {
             for state in [
                 LayoutPreview { compact: true, ..baseline },
                 LayoutPreview { labels: false, ..baseline },
-                LayoutPreview { history: 1, ..baseline },
-                LayoutPreview { history: 2, ..baseline },
-                LayoutPreview { history: 3, ..baseline },
-                LayoutPreview { translucent: true, ..baseline },
-                LayoutPreview { dialog_left: true, ..baseline },
+                LayoutPreview { history_in_browser: true, ..baseline },
             ] {
                 assert_ne!(original, draw(state), "each actual choice changes the schematic");
             }
-            let _ = draw(LayoutPreview { compact: false, labels: false, history: 2, translucent: true, dialog_left: true });
+            // History's own bar along the bottom: under the Browser and the dialog, covering neither.
+            let _ = draw(baseline);
             let browser = solidcraft_ui_registry::rect_of("prefs:layout_preview:browser").unwrap();
             let history = solidcraft_ui_registry::rect_of("prefs:layout_preview:history").unwrap();
             let dialog = solidcraft_ui_registry::rect_of("prefs:layout_preview:dialog").unwrap();
-            assert!(browser.contains_rect(dialog), "the left-column dialog remains inside the Browser region");
-            assert!(!dialog.intersects(history), "the dialog cannot cover the Under browser History caption");
+            assert!(!dialog.intersects(browser), "the dialog stays clear of the Browser");
+            assert!(!history.intersects(browser) && !history.intersects(dialog), "History's bar covers neither");
         }
         solidcraft_theme::set_dark(previous);
     }

@@ -7,9 +7,11 @@ const HANDLES: Handles<'static> = Handles {
     file: &["t:file"],
     file_rect: &["t:file"],
     button: &["t:"],
+    plugins: "t:plugins",
     separator: "t:separator:",
     search: "t:search",
     report: "t:report",
+    pill: "t:pill:",
     settings: "t:settings",
     version: "t:version",
 };
@@ -49,6 +51,8 @@ impl BarRig {
             home: BarButton { id: "home", icon: "home", tip: "Home", enabled: true, narrow: false, wide_only: false },
             file: "File",
             file_open: false,
+            plugins: None,
+            pills: Vec::new(),
             actions: vec![button("save", true, false), button("undo", false, true)],
             quick: 2,
             help: BarButton { id: "help", icon: "help", tip: "Help", enabled: true, narrow: false, wide_only: false },
@@ -114,12 +118,24 @@ fn a_compact_bar_keeps_only_what_fits() {
     assert!(solidcraft_ui_registry::handle_at("t:version").is_none(), "no version on a narrow bar");
 }
 
-const TAB_HANDLES: TabHandles<'static> =
-    TabHandles { tab: "t:tab:", close: "t:close:", more: "t:more", new: "t:new", rename: "t:rename", menu_row: "t:menu:", more_row: "t:list:" };
+const TAB_HANDLES: TabHandles<'static> = TabHandles {
+    tab: "t:tab:",
+    close: "t:close:",
+    more: "t:more",
+    new: "t:new",
+    rename: "t:rename",
+    menu_row: "t:menu:",
+    more_row: "t:list:",
+    view: "t:view:",
+    view_close: "t:view_close:",
+    view_new: "t:view_new",
+    view_more: "t:view_more",
+    switcher: "t:switcher",
+};
 
 const TAB_MENU: [TabMenuRow<'static>; 2] = [
-    TabMenuRow { id: "close", label: "Close", key_on_selected: "", needs_others: false },
-    TabMenuRow { id: "others", label: "Close Others", key_on_selected: "", needs_others: true },
+    TabMenuRow::new("close", "Close", ""),
+    TabMenuRow::new("others", "Close Others", "").needing_others(),
 ];
 
 /// Three document tabs, the first selected, in a strip 600 wide.
@@ -145,7 +161,7 @@ impl TabsRig {
             focused: true,
             ..Default::default()
         };
-        let tab = |name: &'static str| DocTab { name, list_name: name, dirty: false, place: "Not saved yet" };
+        let tab = |name: &'static str| DocTab { name, list_name: name, dirty: false, place: "Not saved yet", security: None, views: &[] };
         let mut strip = TabStrip {
             tabs: vec![tab("One"), tab("Two"), tab("Three")],
             selected: 0,
@@ -160,6 +176,14 @@ impl TabsRig {
             new_tip: "New",
             id: egui::Id::unique("test_tabs"),
             handles: TAB_HANDLES,
+            views_as_tabs: false,
+            view_text: ViewText { close_view: "Close view", close_design: "Close design", new_view: "New view", more: "All views", switch_view: "Switch view" },
+            view_menu: &[],
+            view_right_row: "",
+            view_rename: None,
+            plus_menu: &[],
+            switcher_menu: &[],
+            tear_off_below: 0.0,
         };
         let mut actions = Vec::new();
         crate::test_support::raw_frame(&self.ctx, input, |ui| {
