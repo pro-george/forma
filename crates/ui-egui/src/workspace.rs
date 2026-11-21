@@ -47,6 +47,8 @@ pub const TAB_ACCENTS: TabTable = TabTable::new(&[
     tab_style("FORM", AccentRamp::Form, Some("form")),
     tab_style("SHEET METAL", AccentRamp::Sheet, None),
     tab_style("WELDMENTS", AccentRamp::Main, None),
+    // Forma: the Architecture workspace's one tab.
+    tab_style("ARCHITECTURE", AccentRamp::Main, None),
     tab_style("ASSEMBLE", AccentRamp::Main, None),
     tab_style("INSERT", AccentRamp::Main, None),
     tab_style("INSPECT", AccentRamp::Main, None),
@@ -471,7 +473,18 @@ pub const SECTIONS: &[Section] = &[
     Section { tab: "WELDMENTS", panel: "SKETCH", promoted: 1, ids: &["sketch.create"] },
     Section { tab: "WELDMENTS", panel: "CREATE", promoted: 2, ids: &["frame.member", "frame.end_cap"] },
     Section { tab: "WELDMENTS", panel: "CONFIGURE", promoted: 2, ids: CONFIGURE },
+    // Forma: the Architecture workspace. A plan is a sketch or a room's sizes; walls rise from
+    // it, doors and windows go into them, and every element's numbers are parameters.
+    Section { tab: "ARCHITECTURE", panel: "PLAN", promoted: 2, ids: &["arch.level", "sketch.create"] },
+    Section { tab: "ARCHITECTURE", panel: "WALLS", promoted: 1, ids: &["arch.wall"] },
+    Section { tab: "ARCHITECTURE", panel: "OPENINGS", promoted: 2, ids: &["arch.door", "arch.window"] },
+    Section { tab: "ARCHITECTURE", panel: "ELEMENT", promoted: 2, ids: &["arch.edit", "arch.delete"] },
+    Section { tab: "ARCHITECTURE", panel: "CONFIGURE", promoted: 2, ids: CONFIGURE },
 ];
+
+/// Forma: the Architecture workspace's tabs: its own, Sketch while a plan is open, then Inspect
+/// and View from the design tabs.
+pub const ARCHITECTURE_TABS: &[&str] = &["ARCHITECTURE", "INSPECT", "VIEW"];
 
 // Migration data only: Render commands remain registered, but have no live ribbon sections.
 const LEGACY_RENDER_SECTIONS: &[Section] = &[
@@ -785,6 +798,7 @@ pub fn tab_icon(tab: &str) -> &'static str {
         "INSPECT" => "measure",
         "MANAGE" => "params",
         "VIEW" => "camera",
+        "ARCHITECTURE" => "arch_wall",
         _ => SPECIALTY_TABS.iter().find(|o| o.tab == tab).map_or("", |o| o.icon),
     }
 }
@@ -816,6 +830,14 @@ pub fn visible_tabs(app: &crate::SolveApp) -> Vec<&'static str> {
     if crate::render_workspace::active(app) {
         return Vec::new();
     }
+    // Forma: the Architecture workspace shows its own tabs.
+    if app.ui.architecture {
+        let mut tabs = ARCHITECTURE_TABS.to_vec();
+        if app.session.active_sketch.is_some() || app.preferences.sketch_tab_always {
+            tabs.insert(1, "SKETCH");
+        }
+        return tabs;
+    }
     let mut tabs: Vec<_> = TABS.iter().copied().filter(|tab| tab_turned_on(app, tab)).collect();
     if app.preferences.sketch_tab_always {
         // Right after MODEL, whether a sketch is open or not (#7904).
@@ -832,6 +854,9 @@ pub fn visible_tabs(app: &crate::SolveApp) -> Vec<&'static str> {
 /// while Model is hidden; none when every tab is hidden.
 fn home_tab(app: &crate::SolveApp) -> &'static str {
     let tabs = visible_tabs(app);
+    if app.ui.architecture {
+        return "ARCHITECTURE";
+    }
     if tabs.contains(&"MODEL") { "MODEL" } else { tabs.first().copied().unwrap_or_default() }
 }
 
@@ -890,6 +915,27 @@ pub fn sync_context(app: &mut crate::SolveApp) {
     if !visible_tabs(app).contains(&app.ui.tab.as_str()) {
         app.ui.tab = home_tab(app).into();
     }
+}
+
+/// Forma: show a workspace by name: `design`, `architecture` (Design's model with the
+/// Architecture ribbon) or `render`.
+pub fn enter(app: &mut crate::SolveApp, workspace: &str) -> Result<(), String> {
+    let architecture = workspace == "architecture";
+    if workspace == "render" {
+        crate::render_workspace::enter(app, true)?;
+        app.ui.architecture = false;
+        return Ok(());
+    }
+    if crate::render_workspace::active(app) {
+        crate::render_workspace::enter(app, false)?;
+    }
+    if app.ui.architecture != architecture {
+        app.ui.architecture = architecture;
+        app.ui.tab = home_tab(app).into();
+        app.ui.sketch_return_tab = None;
+        sync_context(app);
+    }
+    Ok(())
 }
 
 pub fn select_command_tab(app: &mut crate::SolveApp, id: &str) {

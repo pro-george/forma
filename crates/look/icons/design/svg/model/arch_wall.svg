@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Wall</title>
+  <path d="M8 21L38 6L46 10L16 25Z" fill="#b9ddf8"/>
+  <path d="M16 25L46 10L46 42L16 57Z" fill="#328bd3"/>
+  <path d="M8 21L16 25L16 57L8 53Z" fill="#236ead"/>
+  <path d="M8 21L38 6L46 10L46 42L16 57L8 53Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M8 21L16 25L46 10M16 25L16 57" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

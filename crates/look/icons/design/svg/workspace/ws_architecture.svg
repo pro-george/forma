@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Ws architecture</title>
+  <path d="M8 30L32 9L56 30L56 56L8 56Z" fill="#e2e8ef"/>
+  <path d="M27 56L27 40L37 40L37 56Z" fill="#328bd3"/>
+  <path d="M14 34L22 34L22 42L14 42ZM42 34L50 34L50 42L42 42Z" fill="#b9ddf8"/>
+  <path d="M8 30L32 9L56 30L56 56L8 56Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M27 56L27 40L37 40L37 56M14 34L22 34L22 42L14 42ZM42 34L50 34L50 42L42 42Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M4 33L32 8L60 33" fill="none" stroke="#236ead" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

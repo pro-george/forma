@@ -56,6 +56,8 @@ mod tests;
 // The contracts, by command file.
 pub mod align;
 pub mod appearance;
+// Forma: architecture.
+pub mod arch;
 pub mod bom;
 pub mod browser;
 pub mod canvas;

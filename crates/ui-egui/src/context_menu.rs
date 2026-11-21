@@ -386,8 +386,15 @@ pub fn items(app: &SolveApp, target: &Target) -> Vec<Item> {
         Target::Timeline { feature } => crate::timeline::feature_items(app, *feature),
         Target::Workspace => {
             let rendering = crate::render_workspace::active(app);
+            // Forma: Architecture sits between Design and Render.
+            let architecture = !rendering && app.ui.architecture;
             let mut v = vec![
-                act("ui.workspace.design", "Design", "ws_design").with(json!({"workspace":"design"})).key(if rendering { "" } else { "current" }),
+                act("ui.workspace.design", "Design", "ws_design")
+                    .with(json!({"workspace":"design"}))
+                    .key(if rendering || architecture { "" } else { "current" }),
+                act("ui.workspace.architecture", "Architecture", "ws_architecture")
+                    .with(json!({"workspace":"architecture"}))
+                    .key(if architecture { "current" } else { "" }),
                 act("ui.workspace.render", "Render", "ws_render")
                     .with(json!({"workspace":"render"}))
                     .key(if rendering { "current" } else { "" })
@@ -1910,9 +1917,9 @@ pub fn run_item(app: &mut SolveApp, item: &Item, at: Pos2) {
             }
         }
         "ui.historyShowHidden" => app.tree.history_show_hidden = p["show"].as_bool().unwrap_or(false),
-        "ui.workspace" | "ui.workspace.design" | "ui.workspace.render" => {
+        "ui.workspace" | "ui.workspace.design" | "ui.workspace.render" | "ui.workspace.architecture" => {
             if let Some(workspace) = p.get("workspace").and_then(Value::as_str)
-                && let Err(e) = crate::render_workspace::enter(app, workspace == "render")
+                && let Err(e) = crate::workspace::enter(app, workspace)
             {
                 app.set_status(e, true);
             }
@@ -3017,6 +3024,12 @@ fn workspace_style(item: &Item) -> Option<crate::ui_kit::WorkspaceStyle> {
         "Design" => {
             WorkspaceStyle { slug: "design", description: "ui.workspace_design_description", tabs: Some("ui.workspace_design_tabs"), ramp: None }
         }
+        "Architecture" => WorkspaceStyle {
+            slug: "architecture",
+            description: "ui.workspace_architecture_description",
+            tabs: Some("ui.workspace_architecture_tabs"),
+            ramp: None,
+        },
         "Render" => WorkspaceStyle {
             slug: "render",
             description: "ui.workspace_render_description",

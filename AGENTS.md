@@ -57,6 +57,14 @@ own rules further down still apply to that code. Forma-specific facts first:
   crate's tests that name kit handles) were written against upstream's kit: some no longer
   compile or pass against Forma's. Fix or retire them as the kit is worked on; do not bend the
   kit to a test that only pinned upstream's pixels.
+- Architecture: the `arch.*` commands (`crates/engine/src/cmd/arch.rs`) build walls, doors,
+  windows and levels from ordinary features (plan sketch, thin extrude, cut, planes at an angle),
+  each element a timeline folder whose numbers are design parameters (`Front_width`); its record
+  lives in the design's properties under `ro.artea.forma.arch.<prefix>`. The Architecture
+  workspace is `ui.architecture` (`workspace::enter`, `ARCHITECTURE_TABS`, the ARCHITECTURE
+  sections) with its dialogs in `crates/ui-egui/src/dialogs_arch.rs`. Its tests are the
+  integration test `crates/engine/tests/architecture.rs`: the engine's own test crate runs out of
+  memory on an 8 GB machine, an integration test does not.
 - Forma's own standing rules: no prices anywhere in Forma; 3MF for Bambu Studio must carry per-part
   extruder slots (see `legacy-ts/packages/core/src/export/threemf.ts` for the proven layout); units
   are mm, Z up.

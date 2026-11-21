@@ -41,6 +41,8 @@ pub mod design_views;
 mod dialog_descriptor;
 pub mod dialogs;
 pub mod dialogs_appearance;
+// Forma: the Architecture workspace's dialogs.
+pub mod dialogs_arch;
 pub mod dialogs_assembly;
 pub mod dialogs_constrain;
 pub mod dialogs_coupling;
@@ -393,6 +395,8 @@ pub struct UiState {
     pub layout: ui_kit::LayoutMode,
     /// Ribbon tab; SHEET METAL and the contextual SKETCH join the seven design tabs.
     pub tab: String,
+    /// Forma: the Architecture workspace is shown (its ribbon tabs in place of the design tabs).
+    pub architecture: bool,
     /// The toolbar tab a sketch was started from; finishing the sketch goes back to it (#3250).
     /// Not saved: it only lives while a sketch is open.
     #[serde(skip)]
@@ -465,6 +469,7 @@ impl Default for UiState {
         UiState {
             layout: Default::default(),
             tab: "MODEL".into(),
+            architecture: false,
             ribbon_context: None,
             sketch_return_tab: None,
             ribbon_open: false,

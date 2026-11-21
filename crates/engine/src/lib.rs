@@ -2328,6 +2328,19 @@ impl Session {
         // Only joints newly hidden by the computation (e.g. an import's rigid group) join
         // the live view. A joint shown meanwhile must not inherit the worker's old hide.
         prepared.computed.visibility.hidden_joints.retain(|joint| !prepared.source.visibility.hidden_joints.contains(joint));
+        // Forma: construction geometry and sketches the computation newly hid (the planes and
+        // axes an architecture element builds on) stay hidden too, as its joints do.
+        let was = &prepared.source.visibility;
+        for name in prepared.computed.visibility.hidden_origin.iter().filter(|n| !was.hidden_origin.contains(n)) {
+            if !self.visibility.hidden_origin.contains(name) {
+                self.visibility.hidden_origin.push(name.clone());
+            }
+        }
+        for id in prepared.computed.visibility.hidden_sketches.iter().filter(|id| !was.hidden_sketches.contains(id)) {
+            if !self.visibility.hidden_sketches.contains(id) {
+                self.visibility.hidden_sketches.push(*id);
+            }
+        }
         for step in &prepared.steps {
             crash::accepted_command(self, &step.before, &step.after, &step.id, &step.params, step.changed);
         }

@@ -9,6 +9,12 @@ use crate::ui_kit::BackingTooltipExt as _;
 /// The commands that have help text. Each one needs a `help.<id>` message in the catalogs.
 pub const DOCUMENTED: &[&str] = &[
     "appearance.assign",
+    "arch.delete",
+    "arch.door",
+    "arch.edit",
+    "arch.level",
+    "arch.wall",
+    "arch.window",
     "assembly.bom",
     "assembly.constraint.create",
     "canvas.decal",

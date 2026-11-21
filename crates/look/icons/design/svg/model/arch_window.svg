@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Window</title>
+  <path d="M6 8L58 8L58 58L6 58ZM16 16L48 16L48 46L16 46Z" fill="#e2e8ef" fill-rule="evenodd"/>
+  <path d="M16 16L48 16L48 46L16 46Z" fill="#b9ddf8"/>
+  <path d="M6 8L58 8L58 58L6 58ZM16 16L48 16L48 46L16 46Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round" fill-rule="evenodd"/>
+  <path d="M32 16L32 46M16 31L48 31" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M12 46L52 46L52 51L12 51Z" fill="#328bd3" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

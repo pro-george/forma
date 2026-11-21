@@ -308,6 +308,8 @@ pub(crate) struct Shortcut {
 pub(crate) enum Workspace {
     Design,
     Render,
+    /// Forma: walls, doors, windows and levels.
+    Architecture,
 }
 
 /// `ui.workspace {workspace?}`: without one, the workspace shown.

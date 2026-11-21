@@ -20,6 +20,8 @@ macro_rules! planned {
     };
 }
 
+// Forma: walls, doors, windows and levels.
+mod arch;
 mod bom;
 pub(crate) mod browser;
 mod cell_grid;
@@ -392,6 +394,8 @@ pub fn command_specs() -> Vec<&'static CommandSpec> {
     v.extend(mass_properties::COMMANDS.iter());
     v.extend(browser::COMMANDS.iter());
     v.extend(notes::COMMANDS.iter());
+    // Forma: architecture.
+    v.extend(arch::COMMANDS.iter());
     v.extend(delete::COMMANDS.iter());
     v.extend(edit::COMMANDS.iter());
     v.extend(selection::COMMANDS.iter());

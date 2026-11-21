@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Door</title>
+  <path d="M6 8L58 8L58 58L6 58ZM22 20L42 20L42 58L22 58Z" fill="#e2e8ef" fill-rule="evenodd"/>
+  <path d="M22 20L34 25L34 61L22 58Z" fill="#328bd3"/>
+  <path d="M6 8L58 8L58 58L6 58ZM22 20L42 20L42 58L22 58Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round" fill-rule="evenodd"/>
+  <path d="M22 20L34 25L34 61L22 58Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="31" cy="42" r="1.9" fill="#34465b"/>
+</svg>
