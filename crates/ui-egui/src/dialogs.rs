@@ -1451,7 +1451,7 @@ impl Dialog {
             Kind::SketchModify(k) => return k.previews(),
             Kind::Plastic(k) => return k.previews(),
             Kind::Frame(_) | Kind::EndCap(_) => return true,
-            Kind::Arch(k) => return k.mode != crate::dialogs_arch::Mode::Delete,
+            Kind::Arch(k) => return !matches!(k.mode, crate::dialogs_arch::Mode::Delete | crate::dialogs_arch::Mode::Maquette),
             Kind::Part(_) | Kind::PartSize(_) | Kind::InsertDrawing(_) | Kind::InsertAirfoil(_) => return true,
             // Web previews run synchronously; a modelled thread can take seconds.
             Kind::Thread { .. } => return !cfg!(target_arch = "wasm32") && self.extra.get("modeled").and_then(Value::as_bool).unwrap_or(false),
@@ -4124,6 +4124,7 @@ pub(crate) fn action_labels(kind: &Kind) -> (&'static str, &'static str) {
         Kind::ConfirmDelete { .. } => ("Delete", "Cancel"),
         Kind::SaveMesh(k) => (crate::dialogs_save_mesh::button(k), "Cancel"),
         Kind::ViewDxf { .. } => ("Export DXF…", "Cancel"),
+        Kind::Arch(k) if k.mode == crate::dialogs_arch::Mode::Maquette => ("Export 3MF…", "Cancel"),
         _ => ("OK", "Cancel"),
     }
 }
@@ -5404,6 +5405,12 @@ pub(crate) fn run_dialog(app: &mut SolveApp, d: &Dialog) -> Result<(), String> {
     }
     if let Kind::ViewNavigator(form) = &d.kind {
         return crate::view_gizmo::run_dialog(app, form, &d.inputs);
+    }
+    // Forma: a scale model asks for a file name, then exports.
+    if let Kind::Arch(k) = &d.kind
+        && k.mode == crate::dialogs_arch::Mode::Maquette
+    {
+        return crate::dialogs_arch::run_maquette(app, k);
     }
     // Saving asks for a file name first; `Err("")` is the user backing out of that.
     if let Kind::SaveMesh(k) = &d.kind {

@@ -49,6 +49,8 @@ pub mod test_support {
     pub use crate::dxf_out::{DxfEntity, DxfLayer, legacy_dxf_baseline};
 }
 mod threemf;
+// Forma: 3MF with a filament slot per part.
+mod threemf_slots;
 pub mod urdf;
 pub mod vfs;
 
@@ -77,6 +79,7 @@ pub use obj::read_obj;
 pub use threemf::{
     MAX_3MF_BYTES, MeshObject, model_xml, model_xml_parts, model_xml_with, read_3mf, weld, write_3mf, write_3mf_parts, write_3mf_with,
 };
+pub use threemf_slots::{SlotObject, SlotPart, write_3mf_slots};
 pub use urdf::{UrdfOptions, UrdfPackage, urdf};
 mod vrml_in;
 pub use vrml_in::{MAX_VRML_BYTES, VrmlMesh, is_vrml_path, read_vrml};
@@ -506,6 +509,22 @@ pub fn export_mesh(b: &solidcraft_kernel::Body) -> Result<Mesh> {
 /// [`export_mesh`] at `quality` (never finer than 1 µm).
 pub fn export_mesh_at(b: &solidcraft_kernel::Body, quality: MeshQuality) -> Result<Mesh> {
     Ok(b.mesh(&solidcraft_kernel::MeshTolerance::chord((b.size() * quality.share()).max(1e-3)))?)
+}
+
+/// Forma: a body as a part of a printed object: welded watertight, at `1 / scale`, moved so
+/// `origin` (in the design) lands on `at` (in print millimetres), on filament `slot`.
+pub fn slot_part(state: &ModelState, body: &str, scale: f64, origin: [f64; 3], at: [f64; 3], slot: u8, quality: MeshQuality) -> Result<SlotPart> {
+    let b = state.bodies.iter().find(|b| b.name == body).ok_or(IoError::Empty)?;
+    if !(scale.is_finite() && scale > 0.0) {
+        return Err(IoError::Invalid(format!("print scale {scale} is not a positive number")));
+    }
+    let m = export_mesh_at(&b.body, quality)?;
+    let (positions, triangles) = weld(&m.positions, &m.triangles, weld_eps(&b.body));
+    let positions = positions
+        .iter()
+        .map(|p| Vec3::new((p.x - origin[0]) / scale + at[0], (p.y - origin[1]) / scale + at[1], (p.z - origin[2]) / scale + at[2]))
+        .collect();
+    Ok(SlotPart { name: body.to_string(), positions, triangles, slot })
 }
 
 /// Distance within which an exported mesh's vertices are welded (STL, 3MF and OBJ alike).

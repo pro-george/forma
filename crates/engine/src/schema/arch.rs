@@ -299,3 +299,109 @@ pub struct ArchList {
     /// parameters' current expressions under `values`.
     pub elements: Vec<serde_json::Value>,
 }
+
+/// Filament slots (1…16) for each kind of part of a printed scale model.
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct MaquetteSlots {
+    /// Walls (default 1).
+    #[serde(default)]
+    pub walls: Option<u8>,
+    /// Floor and ceiling slabs (default 1).
+    #[serde(default)]
+    pub slabs: Option<u8>,
+    /// Door and window frames and window sashes (default 2).
+    #[serde(default)]
+    pub frames: Option<u8>,
+    /// Door leaves (default 2).
+    #[serde(default)]
+    pub leaves: Option<u8>,
+    /// Glass (default 3).
+    #[serde(default)]
+    pub glass: Option<u8>,
+    /// Roofs (default 4).
+    #[serde(default)]
+    pub roof: Option<u8>,
+    /// Every other body (default 1).
+    #[serde(default)]
+    pub other: Option<u8>,
+}
+
+/// Prepare the building as a scale model to print: scaled, its thin parts thickened, split by
+/// level and roof and into pieces that fit the plate, each part on its filament slot.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct MaquetteParams {
+    /// The scale's denominator: 100 prints at 1:100 (default 100; 1…10000).
+    #[serde(default)]
+    pub scale: Option<f64>,
+    /// The thinnest wall the printer makes, in print millimetres (default 0.8). Thinner walls,
+    /// slabs, frames, sashes, leaves and glass are thickened to it; smaller parts (handles) left
+    /// out.
+    #[serde(default)]
+    pub min_thickness: Option<f64>,
+    /// Print doors and windows closed (default true).
+    #[serde(default)]
+    pub close_openings: Option<bool>,
+    /// A piece per level (default true).
+    #[serde(default)]
+    pub levels: Option<bool>,
+    /// Roofs and the slabs on top of walls as pieces of their own, to lift off (default true).
+    #[serde(default)]
+    pub roof: Option<bool>,
+    /// The printer's plate, [width, depth] in millimetres (default [256, 256]); a piece larger
+    /// than it is cut into pieces that fit.
+    #[serde(default)]
+    pub plate: Option<[f64; 2]>,
+    /// Holes for 1.75 mm filament pins across the cuts, where walls are thick enough (default
+    /// true).
+    #[serde(default)]
+    pub pins: Option<bool>,
+    #[serde(default)]
+    pub slots: Option<MaquetteSlots>,
+    /// Where to write the 3MF; without it, only what would be made is reported.
+    #[serde(default, deserialize_with = "present")]
+    pub path: Option<String>,
+}
+
+/// A thin parameter made thicker for the print.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Thickened {
+    pub parameter: String,
+    /// Its value, and the value printed (design millimetres).
+    pub from: f64,
+    pub to: f64,
+}
+
+/// A piece of the printed model: an object of the slicer, of one or more parts.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct MaquettePiece {
+    pub name: String,
+    /// Its plate, from 1.
+    pub plate: usize,
+    /// Its printed size in millimetres.
+    pub size: [f64; 3],
+    /// Its parts' bodies, each with its filament slot.
+    pub parts: Vec<(String, u8)>,
+}
+
+/// What `arch.maquette` made.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct MaquetteMade {
+    pub scale: f64,
+    pub pieces: Vec<MaquettePiece>,
+    pub plates: usize,
+    pub thickened: Vec<Thickened>,
+    /// Bodies too small to print at this scale, left out.
+    pub omitted: Vec<String>,
+    /// Cuts made so pieces fit the plate, and pin holes made across them.
+    pub cuts: usize,
+    pub pins: usize,
+    /// Pieces taller than the printer can be told about here: their names.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tall: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bytes: Option<usize>,
+}

@@ -26,6 +26,13 @@ const SLAB_AT: &[&str] = &["base", "top"];
 const EXTENTS: &[&str] = &["auto", "inside", "outside", "line"];
 const ROOF_TYPES: &[&str] = &["flat", "shed", "gable", "hip"];
 
+/// A scale model's scales (denominators; the last choice is a scale typed in) and plates
+/// (width × depth; the last is typed in).
+const SCALES: &[f64] = &[50.0, 100.0, 200.0, 500.0];
+const PLATES: &[[f64; 2]] = &[[256.0, 256.0], [180.0, 180.0], [350.0, 320.0]];
+/// The parts that take a filament slot, as `arch.maquette` names them, and their defaults.
+const SLOT_PARTS: &[(&str, usize)] = &[("walls", 1), ("slabs", 1), ("frames", 2), ("leaves", 2), ("glass", 3), ("roof", 4)];
+
 const DOOR_TYPES: &[&str] = &["single", "double", "sliding", "opening"];
 const WINDOW_TYPES: &[&str] = &["fixed", "casement", "double", "sliding"];
 
@@ -38,6 +45,7 @@ pub enum Mode {
     Level,
     Slab,
     Roof,
+    Maquette,
     Edit,
     Delete,
 }
@@ -88,6 +96,19 @@ pub struct Arch {
     pub hollow: bool,
     /// Edit: what the slab or roof had, so only what changes is sent (a change rebuilds it).
     pub loaded: Option<(usize, usize, usize, bool)>,
+    /// A scale model: an index into `SCALES` (its length: `scale_text`), the thinnest wall, an
+    /// index into `PLATES` (its length: `plate_text`), its pieces and pins, and each part's
+    /// filament slot (index 0 is slot 1).
+    pub scale: usize,
+    pub scale_text: String,
+    pub min_thickness: String,
+    pub plate: usize,
+    pub plate_text: [String; 2],
+    pub close_openings: bool,
+    pub split_levels: bool,
+    pub lift_roof: bool,
+    pub pins: bool,
+    pub slots: [usize; 6],
     pub name: String,
     /// What the picks found: the wall element and its plan line.
     pub wall: Option<String>,
@@ -137,6 +158,16 @@ impl Arch {
             overhang: "300 mm".into(),
             hollow: false,
             loaded: None,
+            scale: 1,
+            scale_text: "100".into(),
+            min_thickness: "0.8 mm".into(),
+            plate: 0,
+            plate_text: ["256 mm".into(), "256 mm".into()],
+            close_openings: true,
+            split_levels: true,
+            lift_roof: true,
+            pins: true,
+            slots: [0, 0, 1, 1, 2, 3],
             name: String::new(),
             wall: None,
             segment: None,
@@ -156,6 +187,7 @@ impl Arch {
             Mode::Level => "arch.level",
             Mode::Slab => "arch.slab",
             Mode::Roof => "arch.roof",
+            Mode::Maquette => "arch.maquette",
             Mode::Edit => "arch.edit",
             Mode::Delete => "arch.delete",
         }
@@ -170,6 +202,7 @@ impl Arch {
             Mode::Level => "ui.arch.title_level",
             Mode::Slab => "ui.arch.title_slab",
             Mode::Roof => "ui.arch.title_roof",
+            Mode::Maquette => "ui.arch.title_maquette",
             Mode::Edit => "ui.arch.title_edit",
             Mode::Delete => "ui.arch.title_delete",
         }
@@ -200,6 +233,7 @@ pub fn start(_app: &SolveApp, id: &str) -> Option<(Kind, Vec<SelInput>)> {
         "arch.door" => (Mode::Door, vec![SelInput::new("ui.arch.wall_face", FACES, false)]),
         "arch.window" => (Mode::Window, vec![SelInput::new("ui.arch.wall_face", FACES, false)]),
         "arch.level" => (Mode::Level, Vec::new()),
+        "arch.maquette" => (Mode::Maquette, Vec::new()),
         "arch.slab" => (Mode::Slab, vec![SelInput::new("ui.arch.wall_or_body", FACES | BODIES, false)]),
         "arch.roof" => (Mode::Roof, vec![SelInput::new("ui.arch.wall_or_body", FACES | BODIES, false)]),
         "arch.edit" => (Mode::Edit, vec![SelInput::new("ui.arch.element", FACES | BODIES, false)]),
@@ -418,6 +452,7 @@ pub fn rows(app: &SolveApp, ui: &mut egui::Ui, a: &mut Arch, inputs: &[SelInput]
             enter |= cover_rows(app, ui, a, a.mode == Mode::Roof);
             enter |= text_row(ui, &tr("ui.arch.name"), &mut a.name, &tr("ui.arch.name_hint")).0;
         }
+        Mode::Maquette => enter |= maquette_rows(app, ui, a),
         Mode::Level => {
             enter |= expr_row(ui, &tr("ui.arch.elevation"), &mut a.elevation);
             enter |= text_row(ui, &tr("ui.arch.name"), &mut a.name, &tr("ui.arch.name_hint")).0;
@@ -459,6 +494,103 @@ pub fn rows(app: &SolveApp, ui: &mut egui::Ui, a: &mut Arch, inputs: &[SelInput]
         },
     }
     enter
+}
+
+/// A scale model's rows.
+fn maquette_rows(app: &SolveApp, ui: &mut egui::Ui, a: &mut Arch) -> bool {
+    let tr = |id: &str| app.tr(id).to_string();
+    let mut enter = false;
+    let mut scales: Vec<String> = SCALES.iter().map(|d| format!("1:{d}")).collect();
+    scales.push(tr("ui.arch.custom"));
+    let scales: Vec<&str> = scales.iter().map(String::as_str).collect();
+    choice_row(ui, &tr("ui.arch.scale"), "arch_scale", &mut a.scale, &scales);
+    if a.scale >= SCALES.len() {
+        enter |= text_row(ui, &tr("ui.arch.scale_custom"), &mut a.scale_text, "100").0;
+    }
+    enter |= expr_row(ui, &tr("ui.arch.min_thickness"), &mut a.min_thickness);
+    text(ui, &tr("ui.arch.min_thickness_hint"), Text::Hint("arch_min_hint"));
+    let mut plates: Vec<String> = PLATES.iter().map(|[w, d]| format!("{w} × {d} mm")).collect();
+    plates.push(tr("ui.arch.custom"));
+    let plates: Vec<&str> = plates.iter().map(String::as_str).collect();
+    choice_row(ui, &tr("ui.arch.plate"), "arch_plate", &mut a.plate, &plates);
+    if a.plate >= PLATES.len() {
+        let [w, d] = &mut a.plate_text;
+        enter |= expr_row(ui, &tr("ui.width"), w);
+        enter |= expr_row(ui, &tr("ui.depth"), d);
+    }
+    for (label, on) in [
+        ("ui.arch.close_openings", &mut a.close_openings),
+        ("ui.arch.split_levels", &mut a.split_levels),
+        ("ui.arch.lift_roof", &mut a.lift_roof),
+        ("ui.arch.pins", &mut a.pins),
+    ] {
+        form_row(ui, &tr(label), |ui| crate::dialogs::check(ui, on));
+    }
+    text(ui, &tr("ui.arch.slots_hint"), Text::Hint("arch_slots_hint"));
+    let numbers: Vec<String> = (1..=8).map(|n| n.to_string()).collect();
+    let numbers: Vec<&str> = numbers.iter().map(String::as_str).collect();
+    for ((part, _), slot) in SLOT_PARTS.iter().zip(a.slots.iter_mut()) {
+        choice_row(ui, &tr(&format!("ui.arch.slot_{part}")), &format!("arch_slot_{part}"), slot, &numbers);
+    }
+    enter
+}
+
+/// `arch.maquette`'s parameters from the dialog (no `path`: the file dialog gives it).
+fn maquette_params(a: &Arch) -> Result<Value, String> {
+    let scale = match SCALES.get(a.scale) {
+        Some(d) => *d,
+        None => {
+            let t = a.scale_text.trim();
+            let t = t.strip_prefix("1:").unwrap_or(t).trim();
+            t.parse::<f64>().ok().filter(|d| d.is_finite() && (1.0..=10_000.0).contains(d)).ok_or_else(|| "scale: 1…10000".to_string())?
+        }
+    };
+    let min = crate::prefs::parse_length_mm(&a.min_thickness, 1.0).ok_or_else(|| "minimum thickness".to_string())?;
+    let plate = match PLATES.get(a.plate) {
+        Some(p) => *p,
+        None => {
+            let w = crate::prefs::parse_length_mm(&a.plate_text[0], 1.0).ok_or_else(|| "plate width".to_string())?;
+            let d = crate::prefs::parse_length_mm(&a.plate_text[1], 1.0).ok_or_else(|| "plate depth".to_string())?;
+            [w, d]
+        }
+    };
+    let mut slots = serde_json::Map::new();
+    for ((part, _), slot) in SLOT_PARTS.iter().zip(a.slots.iter()) {
+        slots.insert(part.to_string(), json!(slot + 1));
+    }
+    Ok(json!({
+        "scale": scale, "min_thickness": min, "plate": plate, "close_openings": a.close_openings, "levels": a.split_levels,
+        "roof": a.lift_roof, "pins": a.pins, "slots": slots,
+    }))
+}
+
+/// Export: ask where to save, then make the scale model there and say what it made.
+pub fn run_maquette(app: &mut SolveApp, a: &Arch) -> Result<(), String> {
+    let params = maquette_params(a)?;
+    let scale = params["scale"].as_f64().unwrap_or(100.0);
+    let name = format!("{} 1-{scale}", app.session.doc.name);
+    app.pick_save(&format!("{name}.3mf"), &["3mf"], move |app, path| {
+        let Some(path) = path else { return };
+        let _language = solidcraft_ui_text::scope(&app.preferences.language);
+        let mut params = params;
+        params["path"] = json!(path);
+        let Ok(r) = app.run("arch.maquette", params) else { return };
+        let count = |k: &str| r[k].as_array().map_or(0, Vec::len);
+        let n = |k: &str| r[k].as_u64().unwrap_or(0).to_string();
+        let line = solidcraft_ui_text::format(
+            "ui.arch.maquette_done",
+            &[
+                ("pieces", &count("pieces").to_string()),
+                ("plates", &n("plates")),
+                ("thickened", &count("thickened").to_string()),
+                ("omitted", &count("omitted").to_string()),
+                ("pins", &n("pins")),
+                ("path", &path),
+            ],
+        );
+        app.set_status(line, false);
+    });
+    Ok(())
 }
 
 /// A slab's or roof's own rows.
@@ -599,6 +731,13 @@ pub fn commands(app: &SolveApp, a: &Arch, inputs: &[SelInput]) -> Result<Vec<(St
             opening_params(a, &mut put);
         }
         Mode::Level => put("elevation", json!(a.elevation.trim())),
+        Mode::Maquette => {
+            if let Value::Object(m) = maquette_params(a)? {
+                for (k, v) in m {
+                    put(&k, v);
+                }
+            }
+        }
         Mode::Slab | Mode::Roof => {
             let wall = a.wall.as_ref().ok_or_else(|| tr("ui.arch.pick_wall_cover"))?;
             put("wall", json!(wall));

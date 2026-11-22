@@ -46,14 +46,14 @@ fn wall_of(s: &Session, cmd: &str, name: &str) -> Result<Record> {
 }
 
 /// A plan line's id and its ends in the plan sketch's own coordinates (mm).
-struct PlanLine {
-    id: String,
-    a: [f64; 2],
-    b: [f64; 2],
+pub(super) struct PlanLine {
+    pub(super) id: String,
+    pub(super) a: [f64; 2],
+    pub(super) b: [f64; 2],
 }
 
 /// The straight lines among `curves`, and whether every curve is one.
-fn plan_lines(s: &Session, cmd: &str, plan: &str, curves: &[String]) -> Result<(Vec<PlanLine>, bool)> {
+pub(super) fn plan_lines(s: &Session, cmd: &str, plan: &str, curves: &[String]) -> Result<(Vec<PlanLine>, bool)> {
     let id = s.doc.features.iter().find(|f| f.name == plan).map(|f| f.id).ok_or_else(|| bad(cmd, format!("no plan sketch named `{plan}`")))?;
     let state = s.model.state();
     let ss = state.sketch(id).ok_or_else(|| bad(cmd, format!("{plan} has no solved geometry")))?;

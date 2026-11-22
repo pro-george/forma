@@ -494,6 +494,91 @@ fn roofs_flat_shed_gable_and_hip_stand_on_the_wall_and_follow_their_parameters()
     assert!(s.execute("arch.roof", &json!({ "wall": "Wall 1", "eaves": ["l9"] })).is_err());
 }
 
+/// A house: the room with a door left open, a window, a floor and a gable roof, and a storey
+/// above on its own level.
+fn house(s: &mut Session) {
+    room(s);
+    run(s, "arch.door", json!({ "wall": "Wall 1", "segment": "l1", "position": 800, "angle": "60 deg" }));
+    run(s, "arch.window", json!({ "wall": "Wall 1", "segment": "l2", "position": 1500 }));
+    run(s, "arch.slab", json!({ "wall": "Wall 1" }));
+    run(s, "arch.level", json!({ "elevation": "2700 mm" }));
+    run(s, "arch.wall", json!({ "points": [[0, 0], [5000, 0], [5000, 4000], [0, 4000]], "closed": true, "level": "Level 1", "name": "Upstairs" }));
+    run(s, "arch.roof", json!({ "wall": "Upstairs" }));
+}
+
+#[test]
+fn a_scale_model_is_thickened_split_by_level_and_roof_and_leaves_the_design_alone() {
+    let mut s = Session::default();
+    house(&mut s);
+    let before = s.doc.clone();
+    let r = run(&mut s, "arch.maquette", json!({ "scale": 100 }));
+    // At 1:100 a 0.8 mm wall is 80 mm: frames, the leaf, the sash and the glass thicken; the
+    // 250 mm walls and 200 mm slab do not; the handle is too small and stays out.
+    let thick: Vec<&str> = r["thickened"].as_array().map(|a| a.iter().filter_map(|t| t["parameter"].as_str()).collect()).unwrap_or_default();
+    for p in ["Door1_frame", "Door1_leaf", "Window1_frame", "Window1_leaf", "Window1_glass"] {
+        assert!(thick.contains(&p), "{p} in {thick:?}");
+    }
+    assert!(!thick.iter().any(|p| p.starts_with("Wall1") || p.starts_with("Slab1")), "{thick:?}");
+    assert!(r["omitted"].as_array().is_some_and(|a| a.iter().any(|b| b == "Door 1 handle")), "{}", r["omitted"]);
+    // Pieces: the ground floor, the storey above, and the roof to lift off.
+    let piece = |name: &str| r["pieces"].as_array().and_then(|a| a.iter().find(|p| p["name"] == name)).cloned().unwrap_or_default();
+    let ground = piece("Ground");
+    let slot = |piece: &Value, body: &str| piece["parts"].as_array().and_then(|a| a.iter().find(|p| p[0] == body)).map(|p| p[1].clone());
+    assert_eq!(slot(&ground, "Wall 1"), Some(json!(1)));
+    assert_eq!(slot(&ground, "Slab 1"), Some(json!(1)));
+    assert_eq!(slot(&ground, "Door 1 frame"), Some(json!(2)));
+    assert_eq!(slot(&ground, "Door 1 leaf"), Some(json!(2)));
+    assert_eq!(slot(&ground, "Window 1 glass"), Some(json!(3)));
+    // 5250 × 4250, from the slab's underside (-200) to the wall's top (2700): 1:100.
+    let size: Vec<f64> = ground["size"].as_array().map(|a| a.iter().filter_map(Value::as_f64).collect()).unwrap_or_default();
+    assert_eq!(size, [52.5, 42.5, 29.0]);
+    assert_eq!(slot(&piece("Level 1"), "Upstairs"), Some(json!(1)));
+    assert_eq!(slot(&piece("Roof 1"), "Roof 1"), Some(json!(4)));
+    assert_eq!(r["plates"], 1);
+    assert_eq!(r["cuts"], 0);
+    // The design is as it was: its door still open, its frames as drawn.
+    assert!(std::sync::Arc::ptr_eq(&s.doc, &before));
+
+    // Written: a slicer object per piece (its parts are components of it).
+    let path = std::env::temp_dir().join(format!("forma-maquette-{}.3mf", std::process::id()));
+    let path_s = path.to_string_lossy().to_string();
+    let r = run(&mut s, "arch.maquette", json!({ "scale": 100, "path": path_s, "slots": { "glass": 5 } }));
+    assert!(r["bytes"].as_u64().is_some_and(|b| b > 1000), "{r}");
+    let bytes = std::fs::read(&path).unwrap_or_default();
+    let (objects, _) = solidcraft_io::read_3mf(&bytes).unwrap_or_default();
+    assert_eq!(objects.len(), 3, "{:?}", objects.iter().map(|o| &o.name).collect::<Vec<_>>());
+    let _ = std::fs::remove_file(&path);
+
+    // One piece for the whole building when asked.
+    let r = run(&mut s, "arch.maquette", json!({ "scale": 100, "levels": false, "roof": false }));
+    assert_eq!(r["pieces"].as_array().map(Vec::len), Some(1), "{}", r["pieces"]);
+    assert!(s.execute("arch.maquette", &json!({ "scale": 0 })).is_err());
+    assert!(s.execute("arch.maquette", &json!({ "plate": [10, 10] })).is_err());
+}
+
+#[test]
+fn a_scale_model_larger_than_the_plate_is_cut_into_pieces_that_fit_with_pin_holes() {
+    let mut s = Session::default();
+    room(&mut s);
+    // At 1:50 the room is 105 × 85 mm; a 100 × 70 plate (90 × 60 to use) takes it in 2 × 2.
+    let r = run(&mut s, "arch.maquette", json!({ "scale": 50, "plate": [100, 70] }));
+    assert_eq!(r["cuts"], 2, "{r}");
+    let names: Vec<&str> = r["pieces"].as_array().map(|a| a.iter().filter_map(|p| p["name"].as_str()).collect()).unwrap_or_default();
+    for n in ["Ground 1-1", "Ground 2-1", "Ground 1-2", "Ground 2-2"] {
+        assert!(names.contains(&n), "{n} in {names:?}");
+    }
+    for p in r["pieces"].as_array().into_iter().flatten() {
+        let size: Vec<f64> = p["size"].as_array().map(|a| a.iter().filter_map(Value::as_f64).collect()).unwrap_or_default();
+        assert!(size[0] <= 90.0 && size[1] <= 60.0, "{p}");
+    }
+    // 250 mm walls are 5 mm at 1:50: room for a 1.9 mm hole each side of a pin; two pins in each
+    // wall each cut crosses.
+    assert_eq!(r["pins"], 8, "{r}");
+    // At 1:100 they are 2.5 mm: no pins.
+    let r = run(&mut s, "arch.maquette", json!({ "scale": 100, "plate": [50, 50] }));
+    assert_eq!(r["pins"], 0, "{r}");
+}
+
 #[test]
 fn hostile_architecture_params_never_panic() {
     let mut s = Session::default();

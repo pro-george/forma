@@ -479,6 +479,7 @@ pub const SECTIONS: &[Section] = &[
     Section { tab: "ARCHITECTURE", panel: "STRUCTURE", promoted: 3, ids: &["arch.wall", "arch.slab", "arch.roof"] },
     Section { tab: "ARCHITECTURE", panel: "OPENINGS", promoted: 2, ids: &["arch.door", "arch.window"] },
     Section { tab: "ARCHITECTURE", panel: "ELEMENT", promoted: 2, ids: &["arch.edit", "arch.delete"] },
+    Section { tab: "ARCHITECTURE", panel: "PRINT", promoted: 1, ids: &["arch.maquette"] },
     Section { tab: "ARCHITECTURE", panel: "CONFIGURE", promoted: 2, ids: CONFIGURE },
 ];
 

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Scale Model</title>
+  <path d="M4 46L32 58L60 46L32 34Z" fill="#b9ddf8" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M18 42L18 26L32 32L32 48Z" fill="#236ead"/>
+  <path d="M32 32L46 26L46 42L32 48Z" fill="#328bd3"/>
+  <path d="M18 26L28 12L42 18L46 26L32 32Z" fill="#b9ddf8"/>
+  <path d="M18 42L18 26L28 12L42 18L46 26L46 42L32 48Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M18 26L32 32L46 26M32 32L32 48M28 12L32 32" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

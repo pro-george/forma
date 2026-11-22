@@ -62,7 +62,10 @@ own rules further down still apply to that code. Forma-specific facts first:
   each element a timeline folder whose numbers are design parameters (`Front_width`; a wall's
   alignment is `<Wall>_align`, 1 inside … -1 outside, and openings sit on a plane at its middle;
   slabs and roofs, `cmd/arch_cover.rs`, are the plan's area joined with or cut by a band the
-  wall's shape, roof slopes cut above planes turned about the plan lines); its record
+  wall's shape, roof slopes cut above planes turned about the plan lines; `arch.maquette`,
+  `cmd/arch_print.rs`, makes a scale model on a scratch copy of the session, thickening by
+  parameter, and writes it with `solidcraft_io::write_3mf_slots`, each part on its filament
+  slot); its record
   lives in the design's properties under `ro.artea.forma.arch.<prefix>`. The Architecture
   workspace is `ui.architecture` (`workspace::enter`, `ARCHITECTURE_TABS`, the ARCHITECTURE
   sections) with its dialogs in `crates/ui-egui/src/dialogs_arch.rs`. Its tests are the

@@ -53,6 +53,9 @@ const MAX_POINTS: usize = 200;
 // Forma: slabs and roofs.
 #[path = "arch_cover.rs"]
 mod cover;
+// Forma: the building as a scale model to print.
+#[path = "arch_print.rs"]
+mod print;
 
 pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("arch.wall", "Wall", crate::checked!("arch.wall", wall))
@@ -122,6 +125,19 @@ pub static COMMANDS: &[CommandSpec] = &[
         .contract(&ELEMENT)
         .output(output_schema_for::<ArchDeleted>)
         .params("element: name (a wall takes its doors, windows, slabs and roofs; a level its walls) → deleted: [names]"),
+    CommandSpec::new("arch.maquette", "Scale Model", crate::checked!("arch.maquette", print::maquette))
+        .icon("arch_maquette")
+        .contract(&print::MAQUETTE)
+        .output(output_schema_for::<crate::schema::arch::MaquetteMade>)
+        .noundo()
+        .params(
+            "scale?: denominator (100 for 1:100); min_thickness?: print mm (0.8: thinner walls, slabs, frames, leaves, sashes and glass are \
+             thickened, smaller parts left out); close_openings?: bool (true); levels?: a piece per level (true); roof?: roofs and slabs on top \
+             as pieces to lift off (true); plate?: [w, d] mm (256 × 256: larger pieces are cut to fit); pins?: holes for 1.75 mm filament pins \
+             across cuts where walls allow (true); slots?: {walls, slabs, frames, leaves, glass, roof, other} filament slots (1, 1, 2, 2, 3, 4, \
+             1); path?: where to write the 3MF, each part on its slot (without it, only the report) → pieces, plates, thickened, omitted, cuts, \
+             pins. The design itself is not changed",
+        ),
     CommandSpec::new("arch.list", "List Architecture Elements", crate::checked!("arch.list", list))
         .icon("list")
         .contract(&LIST)
@@ -662,6 +678,8 @@ fn opening(s: &mut Session, cmd: &str, kind: Kind, o: OpeningParams, rebuilt: Op
             par(s, "leaf", e(&o.leaf).as_deref(), d_leaf, Unit::Length)?,
         )
     };
+    // A window's glass, a parameter so a print can thicken it.
+    let glass_t = if kind == Kind::Window && !bare { par(s, "glass", None, "24 mm", Unit::Length)? } else { String::new() };
     let angle = if hinged { par(s, "angle", o.angle.as_ref().map(|a| a.0.as_str()), "0 deg", Unit::Angle)? } else { String::new() };
     let open = if sliding { par(s, "open", o.open.as_ref().map(|a| a.0.as_str()), "0", Unit::Number)? } else { String::new() };
 
@@ -762,7 +780,7 @@ fn opening(s: &mut Session, cmd: &str, kind: Kind, o: OpeningParams, rebuilt: Op
                 let r = run(s, "construct.plane.at_angle", json!({ "base": plane, "axis": axis, "angle": a_expr, "name": turned }))?;
                 made.add(&r);
                 made.hidden.push(turned.clone());
-                panel(s, &mut made, kind, &turned, &name, &n, (a, b, &iy0, &iy1), *at_start, (&leaf, &sash_depth), (&mut leaves, &mut glass, &mut handles))?;
+                panel(s, &mut made, kind, &turned, &name, &n, (a, b, &iy0, &iy1), *at_start, (&leaf, &sash_depth, &glass_t), (&mut leaves, &mut glass, &mut handles))?;
             }
         } else if sliding {
             match kind {
@@ -781,7 +799,7 @@ fn opening(s: &mut Session, cmd: &str, kind: Kind, o: OpeningParams, rebuilt: Op
                     let a = format!("{ix0} - 30 mm + {shift}");
                     let b = format!("{ix1} + 30 mm + {shift}");
                     let top = format!("{y1} - {f} + 30 mm");
-                    panel(s, &mut made, kind, &track, &name, "", (&a, &b, &iy0, &top), hinge == "start", (&leaf, &leaf), (&mut leaves, &mut glass, &mut handles))?;
+                    panel(s, &mut made, kind, &track, &name, "", (&a, &b, &iy0, &top), hinge == "start", (&leaf, &leaf, &glass_t), (&mut leaves, &mut glass, &mut handles))?;
                 }
                 Kind::Window => {
                     // Two sashes on two tracks inside the frame; the one at the end slides back.
@@ -798,7 +816,7 @@ fn opening(s: &mut Session, cmd: &str, kind: Kind, o: OpeningParams, rebuilt: Op
                         let r = run(s, "construct.plane.offset", json!({ "base": plane, "offset": format!("{sign}{depth} / 4"), "name": track }))?;
                         made.add(&r);
                         made.hidden.push(track.clone());
-                        panel(s, &mut made, kind, &track, &name, &n, (&a, &b, &iy0, &iy1), true, (&leaf, &sash_depth), (&mut leaves, &mut glass, &mut handles))?;
+                        panel(s, &mut made, kind, &track, &name, &n, (&a, &b, &iy0, &iy1), true, (&leaf, &sash_depth, &glass_t), (&mut leaves, &mut glass, &mut handles))?;
                     }
                 }
             }
@@ -807,7 +825,7 @@ fn opening(s: &mut Session, cmd: &str, kind: Kind, o: OpeningParams, rebuilt: Op
             let g = format!("{name} glass");
             sketch(s, &mut made, &plane, &g, &[rect(&ix0, &iy0, &ix1, &iy1)])?;
             let before = made.bodies.len();
-            slab(s, &mut made, &g, "24 mm", &g)?;
+            slab(s, &mut made, &g, &glass_t, &g)?;
             glass.extend(made.bodies[before..].iter().cloned());
         }
     }
@@ -844,7 +862,7 @@ fn opening(s: &mut Session, cmd: &str, kind: Kind, o: OpeningParams, rebuilt: Op
 
 /// One leaf (door) or sash with its glass (window), on `plane`, over x `a`…`b`, y `y0`…`y1`
 /// in its frame; `hinge_at_start` puts a door's handle at the other edge. `sizes` is (leaf
-/// thickness or sash face width, sash depth).
+/// thickness or sash face width, sash depth, glass thickness).
 #[allow(clippy::too_many_arguments)]
 fn panel(
     s: &mut Session,
@@ -855,7 +873,7 @@ fn panel(
     n: &str,
     (a, b, y0, y1): (&str, &str, &str, &str),
     hinge_at_start: bool,
-    (leaf, depth): (&str, &str),
+    (leaf, depth, glass_t): (&str, &str, &str),
     (leaves, glass, handles): (&mut Vec<String>, &mut Vec<String>, &mut Vec<String>),
 ) -> Result<()> {
     match kind {
@@ -882,7 +900,7 @@ fn panel(
             let gk = format!("{name} glass{n} outline");
             sketch(s, made, plane, &gk, &[rect(&format!("{a} + {leaf}"), &format!("{y0} + {leaf}"), &format!("{b} - {leaf}"), &format!("{y1} - {leaf}"))])?;
             let before = made.bodies.len();
-            slab(s, made, &gk, "24 mm", &format!("{name} glass{n}"))?;
+            slab(s, made, &gk, glass_t, &format!("{name} glass{n}"))?;
             glass.extend(made.bodies[before..].iter().cloned());
         }
     }
