@@ -59,7 +59,8 @@ own rules further down still apply to that code. Forma-specific facts first:
   kit to a test that only pinned upstream's pixels.
 - Architecture: the `arch.*` commands (`crates/engine/src/cmd/arch.rs`) build walls, doors,
   windows and levels from ordinary features (plan sketch, thin extrude, cut, planes at an angle),
-  each element a timeline folder whose numbers are design parameters (`Front_width`); its record
+  each element a timeline folder whose numbers are design parameters (`Front_width`; a wall's
+  alignment is `<Wall>_align`, 1 inside … -1 outside, and openings sit on a plane at its middle); its record
   lives in the design's properties under `ro.artea.forma.arch.<prefix>`. The Architecture
   workspace is `ui.architecture` (`workspace::enter`, `ARCHITECTURE_TABS`, the ARCHITECTURE
   sections) with its dialogs in `crates/ui-egui/src/dialogs_arch.rs`. Its tests are the

@@ -86,7 +86,7 @@ pub use solver::{
     solve_after_edit, solve_after_link_move, solve_after_value_edit, solve_holding, solve_with,
 };
 pub use text::{MAX_TEXT_CHARS, TextAlign, TextMetrics, TextStyle, TextVerticalAlign, text_geometry, text_geometry_in, text_geometry_styled};
-pub use thin::{MAX_THIN_SEGMENTS, thin_wall_regions};
+pub use thin::{MAX_THIN_SEGMENTS, thin_wall_inside_left, thin_wall_regions};
 pub use wire::{MAX_FIT_POINTS, MAX_WIRE_POINTS, Wire, WireArc, WireCurve, WireSpace, arc_from_3_points, arc_polyline, arc_sweep, fit_polyline};
 
 #[cfg(test)]

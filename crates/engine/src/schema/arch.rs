@@ -11,6 +11,20 @@ use super::types::{AngleExpr, LengthExpr, NumberExpr, present};
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct PlanPoint(pub [LengthExpr; 2]);
 
+/// Where a wall lies against its plan line.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum WallAlign {
+    /// `center` (the default), `inside` (the whole thickness on the plan's inner side: a closed
+    /// plan's enclosed area, an open one's the side it bends toward, a straight one's left; the
+    /// line is the wall's outer face), `outside` (the line is the inner face: a room keeps its
+    /// drawn size inside), `left` or `right` (of the wall's first line, looking along it as
+    /// drawn).
+    Named(String),
+    /// A fraction from -1 (all outside) through 0 (centred) to 1 (all inside).
+    Fraction(f64),
+}
+
 /// Raise a wall along a line in plan.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[schemars(deny_unknown_fields)]
@@ -30,9 +44,12 @@ pub struct WallParams {
     /// The wall's height (default 2700 mm).
     #[serde(default, deserialize_with = "present")]
     pub height: Option<LengthExpr>,
-    /// The wall's thickness, centred on its line (default 250 mm).
+    /// The wall's thickness (default 250 mm).
     #[serde(default, deserialize_with = "present")]
     pub thickness: Option<LengthExpr>,
+    /// Where the wall lies against its line (default `center`).
+    #[serde(default, deserialize_with = "present")]
+    pub align: Option<WallAlign>,
     /// The plane the plan is drawn on: a level made by `arch.level`, or XY (the default).
     #[serde(default, deserialize_with = "present")]
     pub level: Option<String>,
@@ -129,6 +146,9 @@ pub struct ArchEditParams {
     pub leaf: Option<LengthExpr>,
     #[serde(default, deserialize_with = "present")]
     pub thickness: Option<LengthExpr>,
+    /// A wall: where it lies against its line; its doors and windows stay centred in it.
+    #[serde(default, deserialize_with = "present")]
+    pub align: Option<WallAlign>,
     #[serde(default, deserialize_with = "present")]
     pub elevation: Option<LengthExpr>,
 }

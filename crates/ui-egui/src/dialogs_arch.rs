@@ -18,6 +18,9 @@ use crate::ui_kit::{Text, choice_row, expr_row, row as form_row, text, text_row}
 /// Where the elements' records live in the design's properties (the engine's `arch::META`).
 const META: &str = "ro.artea.forma.arch.";
 
+/// Where a wall lies against its line (the engine's `align` names), then a number set by hand.
+const ALIGNS: &[&str] = &["center", "inside", "outside", "left", "right"];
+
 const DOOR_TYPES: &[&str] = &["single", "double", "sliding", "opening"];
 const WINDOW_TYPES: &[&str] = &["fixed", "casement", "double", "sliding"];
 
@@ -42,6 +45,11 @@ pub struct Arch {
     pub room_depth: String,
     pub height: String,
     pub thickness: String,
+    /// Where a wall lies against its line: an index into `ALIGNS`, or `ALIGNS.len()` for a
+    /// number set by hand on the parameter (left alone).
+    pub align: usize,
+    /// Edit: the alignment the wall had, sent again only when changed.
+    pub align_loaded: Option<usize>,
     /// The plane its plan is on: 0 is XY, then the levels in name order.
     pub level: usize,
     /// A door's or window's type (an index into its kind's types).
@@ -84,6 +92,8 @@ impl Arch {
             room_depth: "4000 mm".into(),
             height: "2700 mm".into(),
             thickness: "250 mm".into(),
+            align: 0,
+            align_loaded: None,
             level: 0,
             kind_type: usize::from(window),
             position: "600 mm".into(),
@@ -256,6 +266,12 @@ fn load(app: &SolveApp, a: &mut Arch, record: &Value) {
     };
     get("height", if record["kind"] == "wall" { &mut a.height } else { &mut a.opening_height });
     get("thickness", &mut a.thickness);
+    if record["kind"] == "wall" {
+        // A wall from before alignment has none: it is centred.
+        let named = record["align"].as_str().unwrap_or("center");
+        a.align = ALIGNS.iter().position(|x| *x == named).unwrap_or(ALIGNS.len());
+        a.align_loaded = Some(a.align);
+    }
     get("position", &mut a.position);
     get("width", &mut a.width);
     get("sill", &mut a.sill);
@@ -324,6 +340,7 @@ pub fn rows(app: &SolveApp, ui: &mut egui::Ui, a: &mut Arch, inputs: &[SelInput]
             }
             enter |= expr_row(ui, &tr("ui.height"), &mut a.height);
             enter |= expr_row(ui, &tr("ui.thickness"), &mut a.thickness);
+            align_rows(app, ui, a);
             let levels = levels(app);
             if levels.len() > 1 {
                 let labels: Vec<&str> = levels.iter().map(String::as_str).collect();
@@ -352,6 +369,7 @@ pub fn rows(app: &SolveApp, ui: &mut egui::Ui, a: &mut Arch, inputs: &[SelInput]
                 });
                 enter |= expr_row(ui, &tr("ui.height"), &mut a.height);
                 enter |= expr_row(ui, &tr("ui.thickness"), &mut a.thickness);
+                align_rows(app, ui, a);
             }
             Some(_) => {
                 form_row(ui, &tr("ui.arch.name"), |ui| {
@@ -371,6 +389,20 @@ pub fn rows(app: &SolveApp, ui: &mut egui::Ui, a: &mut Arch, inputs: &[SelInput]
         },
     }
     enter
+}
+
+/// A wall's alignment: the choice, and what it means.
+fn align_rows(app: &SolveApp, ui: &mut egui::Ui, a: &mut Arch) {
+    let tr = |id: &str| app.tr(id).to_string();
+    let mut labels: Vec<String> = ALIGNS.iter().map(|x| tr(&format!("ui.arch.align_{x}"))).collect();
+    // A number set by hand on the parameter stays one of the choices until another is made.
+    if a.align == ALIGNS.len() {
+        labels.push(tr("ui.arch.align_custom"));
+    }
+    let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
+    choice_row(ui, &tr("ui.arch.align"), "arch_align", &mut a.align, &labels);
+    let hint = ALIGNS.get(a.align).copied().unwrap_or("custom");
+    text(ui, &tr(&format!("ui.arch.align_{hint}_hint")), Text::Hint("arch_align_hint"));
 }
 
 /// A door's or window's own rows.
@@ -440,6 +472,7 @@ pub fn commands(app: &SolveApp, a: &Arch, inputs: &[SelInput]) -> Result<Vec<(St
             }
             put("height", json!(a.height.trim()));
             put("thickness", json!(a.thickness.trim()));
+            put("align", json!(ALIGNS.get(a.align).copied().unwrap_or("center")));
             if let Some(level) = levels(app).get(a.level).filter(|l| *l != "XY") {
                 put("level", json!(level));
             }
@@ -459,6 +492,11 @@ pub fn commands(app: &SolveApp, a: &Arch, inputs: &[SelInput]) -> Result<Vec<(St
             if a.element_kind.as_deref() == Some("wall") {
                 put("height", json!(a.height.trim()));
                 put("thickness", json!(a.thickness.trim()));
+                if Some(a.align) != a.align_loaded
+                    && let Some(named) = ALIGNS.get(a.align)
+                {
+                    put("align", json!(named));
+                }
             } else {
                 opening_params(a, &mut put);
             }

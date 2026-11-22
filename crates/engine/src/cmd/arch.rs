@@ -2,12 +2,17 @@
 //! so a design stays an ordinary design: it opens anywhere, exports as any other, and every
 //! piece can be edited by hand.
 //!
-//! - A wall (`arch.wall`) is a thin extrude along a plan sketch, centred on its lines, its
-//!   height and thickness design parameters (`Wall1_height`, `Wall1_thickness`).
+//! - A wall (`arch.wall`) is a thin extrude along a plan sketch, its height, thickness and
+//!   alignment design parameters (`Wall1_height`, `Wall1_thickness`, `Wall1_align`). The
+//!   alignment says where the wall lies against its line, from 1 (all on the plan's inner side,
+//!   the line its outer face) through 0 (centred) to -1 (all outside, the line its inner face):
+//!   the extrude takes `thickness * (1 + align) / 2` inside and `thickness * (1 - align) / 2`
+//!   outside, so changing it is changing a parameter.
 //! - A door or window (`arch.door`, `arch.window`) sits in one straight line of a wall's plan. Its
 //!   features are drawn on a plane square to the plan that holds that line, whose frame starts at
 //!   the line's first point and runs along it, so the opening keeps its distance from that point
-//!   when the plan changes: the opening is cut through the wall, the frame is a thin extrude
+//!   when the plan changes. A second plane, offset from it by the wall's alignment, runs down
+//!   the middle of the wall, and the rest is drawn on that: the opening is cut through the wall, the frame is a thin extrude
 //!   inside it, and each leaf or sash is drawn on a plane turned about its hinge (a construction
 //!   axis on a sketch line), so its opening angle is a parameter too. A sliding one is drawn on
 //!   a plane beside the wall and moves by a fraction.
@@ -27,7 +32,7 @@ use serde_json::{Value, json};
 use super::CommandSpec;
 use crate::params::bad;
 use crate::schema::arch::{
-    ArchDeleted, ArchEditParams, ArchElementMade, ArchElementParams, ArchList, ArchListParams, LevelParams, OpeningParams, WallParams,
+    ArchDeleted, ArchEditParams, ArchElementMade, ArchElementParams, ArchList, ArchListParams, LevelParams, OpeningParams, WallAlign, WallParams,
 };
 use crate::schema::{TypedContract, output_schema_for};
 use crate::{Result, Session};
@@ -52,7 +57,8 @@ pub static COMMANDS: &[CommandSpec] = &[
         .output(output_schema_for::<ArchElementMade>)
         .params(
             "points: [[x,y]…] (plan, at least two; numbers or length expressions), closed?: bool, or sketch: plan sketch name, curves?: [ids]; \
-             height?: expr (2700 mm), thickness?: expr (250 mm, centred on the line), level?: plane name (XY), name? → element, kind, parameters, bodies, group",
+             height?: expr (2700 mm), thickness?: expr (250 mm), align?: center|inside|outside|left|right or -1…1 (center; inside: the line is the outer face, \
+             outside: the inner face), level?: plane name (XY), name? → element, kind, parameters, bodies, group",
         ),
     CommandSpec::new("arch.door", "Door", crate::checked!("arch.door", door))
         .icon("arch_door")
@@ -83,7 +89,8 @@ pub static COMMANDS: &[CommandSpec] = &[
         .output(output_schema_for::<ArchElementMade>)
         .params(
             "element: name; any of the element's numbers (height, thickness, position, width, sill, angle, open, frame, depth, leaf, elevation) change \
-             its parameters; type, hinge, swing, wall or segment rebuild it",
+             its parameters; a wall's align (center|inside|outside|left|right or -1…1) moves it about its line, its doors and windows with it; \
+             type, hinge, swing, wall or segment rebuild a door or window",
         ),
     CommandSpec::new("arch.delete", "Delete Element", crate::checked!("arch.delete", delete))
         .icon("delete")
@@ -124,6 +131,10 @@ struct Record {
     sketch: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     curves: Vec<String>,
+    /// Where a wall lies against its line, as last asked: `center`, `inside`, `outside`, `left`,
+    /// `right` or `custom` (its `align` parameter holds the number).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    align: Option<String>,
     /// The plane a wall's plan is drawn on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     level: Option<String>,
@@ -362,6 +373,60 @@ const LEAF_COLOR: &str = "#c9a27a";
 const GLASS_COLOR: &str = "#bcd8e6";
 const HANDLE_COLOR: &str = "#30321d";
 
+/// For each of a wall's plan curves, whether the wall's inner side lies to the left of the curve
+/// as drawn (`None` for one of no length).
+fn inside_left(s: &Session, cmd: &str, plan: &str, curves: &[String]) -> Result<Vec<Option<bool>>> {
+    let id = s.doc.features.iter().find(|f| f.name == plan).map(|f| f.id).ok_or_else(|| bad(cmd, format!("no plan sketch named `{plan}`")))?;
+    let state = s.model.state();
+    let ss = state.sketch(id).ok_or_else(|| bad(cmd, format!("{plan} has no solved geometry")))?;
+    let segs = curves
+        .iter()
+        .map(|c| {
+            let ci = ss.sketch.curve_index(c).ok_or_else(|| bad(cmd, format!("{plan} has no curve `{c}`")))?;
+            Ok(ss.sketch.exact_segs(ci).unwrap_or_else(|| ss.sketch.segs(ci)))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    crate::sketch::thin_wall_inside_left(&segs).map_err(|e| bad(cmd, e.to_string()))
+}
+
+/// A wall's alignment as the number its `align` parameter holds, and the name it was asked by.
+/// `first_left` is whether the inner side lies left of the wall's first line, for `left` and
+/// `right`.
+fn align_of(cmd: &str, given: Option<&WallAlign>, first_left: bool) -> Result<(String, String)> {
+    let named = |f: f64, label: &str| Ok((format!("{f}"), label.to_string()));
+    match given {
+        None => named(0.0, "center"),
+        Some(WallAlign::Named(n)) => match n.trim().to_ascii_lowercase().as_str() {
+            "center" | "centre" | "centered" | "centred" => named(0.0, "center"),
+            "inside" | "interior" => named(1.0, "inside"),
+            "outside" | "exterior" => named(-1.0, "outside"),
+            "left" => named(if first_left { 1.0 } else { -1.0 }, "left"),
+            "right" => named(if first_left { -1.0 } else { 1.0 }, "right"),
+            _ => Err(bad(cmd, "`align` is center, inside, outside, left, right or a number from -1 to 1")),
+        },
+        Some(WallAlign::Fraction(f)) => {
+            if !(f.is_finite() && (-1.0..=1.0).contains(f)) {
+                return Err(bad(cmd, "a numeric `align` runs from -1 (outside) to 1 (inside)"));
+            }
+            let label = if *f == 0.0 {
+                "center"
+            } else if *f == 1.0 {
+                "inside"
+            } else if *f == -1.0 {
+                "outside"
+            } else {
+                "custom"
+            };
+            named(*f, label)
+        }
+    }
+}
+
+/// The thin extrude's fields for a wall `thickness` thick aligned by the parameter `align`.
+fn wall_sides(thickness: &str, align: &str) -> (String, String) {
+    (format!("{thickness} * (1 + {align}) / 2"), format!("{thickness} * (1 - {align}) / 2"))
+}
+
 fn wall(s: &mut Session, p: &Value) -> Result<Value> {
     const CMD: &str = "arch.wall";
     let w: WallParams = parse(CMD, p)?;
@@ -412,11 +477,22 @@ fn wall(s: &mut Session, p: &Value) -> Result<Value> {
     if curves.is_empty() || curves.len() > 1000 {
         return Err(bad(CMD, "the wall needs 1…1000 plan curves"));
     }
+    let first_left = inside_left(s, CMD, &plan, &curves)?.into_iter().flatten().next().unwrap_or(true);
+    let (fraction, align_label) = align_of(CMD, w.align.as_ref(), first_left)?;
+    let align = ensure(
+        s,
+        &format!("{prefix}_align"),
+        Some(&fraction),
+        "0",
+        Unit::Number,
+        &format!("{name}: where the wall lies against its line, 1 inside, 0 centred, -1 outside"),
+    )?;
+    let (inner, outer) = wall_sides(&thickness, &align);
     let r = run(
         s,
         "solid.extrude",
-        json!({ "sketch": plan, "thin": true, "curves": curves, "thickness": thickness, "side": "center", "distance": height,
-                "operation": "new_body", "name": name, "body_name": name }),
+        json!({ "sketch": plan, "thin": true, "curves": curves, "thickness": inner, "thickness2": outer, "side": "two_sides",
+                "distance": height, "operation": "new_body", "name": name, "body_name": name }),
     )?;
     made.add(&r);
     paint(s, &made.bodies, WALL_COLOR, 1.0)?;
@@ -428,10 +504,11 @@ fn wall(s: &mut Session, p: &Value) -> Result<Value> {
         prefix,
         sketch: Some(plan),
         curves,
+        align: Some(align_label),
         level: Some(level),
         group,
         bodies: made.bodies.clone(),
-        params: BTreeMap::from([("height".into(), height), ("thickness".into(), thickness)]),
+        params: BTreeMap::from([("height".into(), height), ("thickness".into(), thickness), ("align".into(), align)]),
         ..Record::default()
     };
     save(s, &record)?;
@@ -563,10 +640,28 @@ fn opening(s: &mut Session, cmd: &str, kind: Kind, o: OpeningParams, rebuilt: Op
     let y0 = sill.clone();
     let y1 = format!("{sill} + {h}");
     let mut made = Made::default();
-    let plane = format!("{name} plane");
-    let r = run(s, "construct.plane.perpendicular", json!({ "plane": level, "line": { "sketch": plan, "curve": segment }, "name": plane }))?;
+    let line_plane = format!("{name} plane");
+    let r = run(s, "construct.plane.perpendicular", json!({ "plane": level, "line": { "sketch": plan, "curve": segment }, "name": line_plane }))?;
     made.add(&r);
-    made.hidden.push(plane.clone());
+    made.hidden.push(line_plane.clone());
+    // The wall's middle: the line's plane moved by the wall's alignment (its normal points to
+    // the line's right; the wall's inner side is left of a line its chain runs along).
+    let plane = match wall.params.get("align") {
+        Some(align) => {
+            let k = wall.curves.iter().position(|c| *c == segment);
+            let left = inside_left(s, cmd, &plan, &wall.curves)?;
+            let left = k.and_then(|k| left.get(k).copied().flatten()).unwrap_or(true);
+            let half = format!("{wall_t} * {align} / 2");
+            let offset = if left { format!("-({half})") } else { half };
+            let centre = format!("{name} centre");
+            let r = run(s, "construct.plane.offset", json!({ "base": line_plane, "offset": offset, "name": centre }))?;
+            made.add(&r);
+            made.hidden.push(centre.clone());
+            centre
+        }
+        // A wall made before alignment is centred on its line.
+        None => line_plane,
+    };
     let cut = format!("{name} opening");
     sketch(s, &mut made, &plane, &cut, &[rect(&x0, &y0, &x1, &y1)])?;
     let r = run(
@@ -816,7 +911,13 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
 fn edit(s: &mut Session, p: &Value) -> Result<Value> {
     const CMD: &str = "arch.edit";
     let e: ArchEditParams = parse(CMD, p)?;
-    let r = record(s, CMD, &e.element)?;
+    let mut r = record(s, CMD, &e.element)?;
+    if let Some(a) = &e.align {
+        if r.kind != "wall" {
+            return Err(bad(CMD, format!("a {} has no alignment; a wall's does", r.kind)));
+        }
+        r = realign(s, CMD, r, a)?;
+    }
     let len = |x: &Option<crate::schema::LengthExpr>| x.as_ref().map(|v| v.0.as_str().to_string());
     let numbers: Vec<(&str, Option<String>)> = vec![
         ("height", len(&e.height)),
@@ -872,6 +973,49 @@ fn edit(s: &mut Session, p: &Value) -> Result<Value> {
         run(s, "parameters.change", json!({ "name": param, "expression": v }))?;
     }
     reply(&r)
+}
+
+/// Move a wall about its line; its doors and windows follow, being drawn on its middle.
+fn realign(s: &mut Session, cmd: &str, mut r: Record, given: &WallAlign) -> Result<Record> {
+    let plan = r.sketch.clone().ok_or_else(|| bad(cmd, "the wall has no plan sketch"))?;
+    let first_left = inside_left(s, cmd, &plan, &r.curves)?.into_iter().flatten().next().unwrap_or(true);
+    let (fraction, label) = align_of(cmd, Some(given), first_left)?;
+    if let Some(param) = r.params.get("align") {
+        run(s, "parameters.change", json!({ "name": param, "expression": fraction }))?;
+        r.align = Some(label);
+        save(s, &r)?;
+        return Ok(r);
+    }
+    // A wall made before alignment: its extrude takes two sides, and its doors and windows are
+    // rebuilt on its middle.
+    let thickness = r.params.get("thickness").cloned().ok_or_else(|| bad(cmd, format!("{} has no thickness parameter", r.name)))?;
+    let align = ensure(
+        s,
+        &format!("{}_align", r.prefix),
+        Some(&fraction),
+        "0",
+        Unit::Number,
+        &format!("{}: where the wall lies against its line, 1 inside, 0 centred, -1 outside", r.name),
+    )?;
+    let feature = s.doc.features.iter().find(|f| f.name == r.name).map(|f| f.id).ok_or_else(|| bad(cmd, format!("{}'s extrude is gone", r.name)))?;
+    let (inner, outer) = wall_sides(&thickness, &align);
+    run(s, "timeline.edit", json!({ "feature": feature, "set": { "thin.side": "two_sides", "thin.thickness": inner, "thin.thickness2": outer } }))?;
+    r.params.insert("align".into(), align);
+    r.align = Some(label);
+    save(s, &r)?;
+    for o in records(s).into_iter().filter(|o| o.wall.as_deref() == Some(r.name.as_str())) {
+        let kind = if o.kind == "door" { Kind::Door } else { Kind::Window };
+        remove_features(s, &o)?;
+        let params: OpeningParams = parse(
+            cmd,
+            &json!({ "wall": r.name, "segment": o.segment, "type": o.kind_type, "hinge": o.hinge, "swing": o.swing })
+                .as_object()
+                .map(|m| Value::Object(m.iter().filter(|(_, v)| !v.is_null()).map(|(k, v)| (k.clone(), v.clone())).collect()))
+                .unwrap_or(Value::Null),
+        )?;
+        opening(s, if kind == Kind::Door { "arch.door" } else { "arch.window" }, kind, params, Some(&o))?;
+    }
+    Ok(r)
 }
 
 fn list(s: &mut Session, p: &Value) -> Result<Value> {

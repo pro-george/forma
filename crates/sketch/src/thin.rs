@@ -153,6 +153,9 @@ struct Chain {
     segs: Vec<Seg2>,
     /// The vertex at each segment's start and end.
     vertices: Vec<(usize, usize)>,
+    /// Forma: each segment's index in the segments walked, and whether it runs against the way
+    /// it was drawn.
+    run: Vec<(usize, bool)>,
 }
 
 /// The segments walked into chains: maximal runs through vertices where exactly two segments
@@ -251,9 +254,41 @@ fn chains(segs: &[(usize, Seg2)]) -> Result<Vec<Chain>> {
             .map(|(e, rev)| ends.get(*e).map(|&(a, b)| if *rev { (b, a) } else { (a, b) }))
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| bad("wall chain"))?;
-        out.push(Chain { segs: oriented(&run), vertices });
+        out.push(Chain { segs: oriented(&run), vertices, run });
     }
     Ok(out)
+}
+
+/// Forma: for each of `curves` (as [`thin_wall_regions`] takes them), whether a thin wall's
+/// `inside` lies to the left of the curve as it was drawn: false when the chain it belongs to
+/// runs against it. `None` for a curve of no length.
+pub fn thin_wall_inside_left(curves: &[Vec<Seg2>]) -> Result<Vec<Option<bool>>> {
+    let mut segs: Vec<(usize, Seg2)> = Vec::new();
+    for (k, curve) in curves.iter().enumerate() {
+        for s in curve {
+            if !seg_is_finite(s) {
+                return Err(bad("a wall curve is not finite"));
+            }
+            if s.length() > 1e-9 {
+                segs.push((k, *s));
+            }
+            if segs.len() > MAX_THIN_SEGMENTS {
+                return Err(SketchError::TooLarge);
+            }
+        }
+    }
+    let mut left = vec![None; curves.len()];
+    for chain in chains(&segs)? {
+        for (e, reversed) in &chain.run {
+            if let Some((k, _)) = segs.get(*e)
+                && let Some(slot) = left.get_mut(*k)
+                && slot.is_none()
+            {
+                *slot = Some(!reversed);
+            }
+        }
+    }
+    Ok(left)
 }
 
 /// Whether `q` lies in the band `left` thick to the left of `s` and `right` thick to its right,
