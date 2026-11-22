@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Roof</title>
+  <path d="M20 10L48 22L58 44L30 32Z" fill="#328bd3"/>
+  <path d="M20 10L30 32L6 42Z" fill="#236ead"/>
+  <path d="M20 10L48 22L58 44L30 32L6 42Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M20 10L30 32" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M10 46L10 54L34 54L34 38M30 54L54 54L54 46" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

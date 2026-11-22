@@ -50,6 +50,10 @@ pub const META: &str = "ro.artea.forma.arch";
 /// How many points a wall's line may have.
 const MAX_POINTS: usize = 200;
 
+// Forma: slabs and roofs.
+#[path = "arch_cover.rs"]
+mod cover;
+
 pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("arch.wall", "Wall", crate::checked!("arch.wall", wall))
         .icon("arch_wall")
@@ -83,6 +87,26 @@ pub static COMMANDS: &[CommandSpec] = &[
         .contract(&LEVEL)
         .output(output_schema_for::<ArchElementMade>)
         .params("elevation?: expr above XY (3000 mm); name? → a plane to draw a storey's walls on (arch.wall level)"),
+    CommandSpec::new("arch.slab", "Slab", crate::checked!("arch.slab", cover::slab))
+        .icon("arch_slab")
+        .contract(&cover::SLAB)
+        .output(output_schema_for::<ArchElementMade>)
+        .params(
+            "wall: wall name (its closed plan), or points: [[x,y]…] (a closed outline), or sketch: plan sketch name, curves?: [ids]; at?: base|top (base: \
+             its top at the level, a floor; top: on the wall); extent?: inside|outside|line (to the wall's inner face, its outer face or the plan line; \
+             default inside at the base, outside on top); thickness?: expr (200 mm); top?: expr (its top face above the level); level?: without a wall \
+             (XY); name?",
+        ),
+    CommandSpec::new("arch.roof", "Roof", crate::checked!("arch.roof", cover::roof))
+        .icon("arch_roof")
+        .contract(&cover::ROOF)
+        .output(output_schema_for::<ArchElementMade>)
+        .params(
+            "wall: wall name; type?: flat|shed|gable|hip (gable); pitch?: angle (30 deg, a shed's 15 deg); overhang?: expr past the wall's outer face \
+             (300 mm); thickness?: a flat roof's, or a hollow one's shell (200 mm); hollow?: bool (pitched: a shell open underneath; default solid); \
+             eaves?: [plan line ids] the slopes rise from (default: a shed's longest line, a gable's two longest parallel ones, every line of a hip, \
+             which needs a convex plan); name?",
+        ),
     CommandSpec::new("arch.edit", "Edit Element", crate::checked!("arch.edit", edit))
         .icon("edit")
         .contract(&EDIT)
@@ -90,13 +114,14 @@ pub static COMMANDS: &[CommandSpec] = &[
         .params(
             "element: name; any of the element's numbers (height, thickness, position, width, sill, angle, open, frame, depth, leaf, elevation) change \
              its parameters; a wall's align (center|inside|outside|left|right or -1…1) moves it about its line, its doors and windows with it; \
-             type, hinge, swing, wall or segment rebuild a door or window",
+             type, hinge, swing, wall or segment rebuild a door or window; a slab's top, thickness (numbers), at, extent (rebuild); a roof's pitch, \
+             overhang, thickness (numbers), type, eaves, hollow (rebuild)",
         ),
     CommandSpec::new("arch.delete", "Delete Element", crate::checked!("arch.delete", delete))
         .icon("delete")
         .contract(&ELEMENT)
         .output(output_schema_for::<ArchDeleted>)
-        .params("element: name (a wall takes its doors and windows; a level its walls) → deleted: [names]"),
+        .params("element: name (a wall takes its doors, windows, slabs and roofs; a level its walls) → deleted: [names]"),
     CommandSpec::new("arch.list", "List Architecture Elements", crate::checked!("arch.list", list))
         .icon("list")
         .contract(&LIST)
@@ -110,7 +135,7 @@ pub static COMMANDS: &[CommandSpec] = &[
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 struct Record {
     name: String,
-    /// `wall`, `door`, `window` or `level`.
+    /// `wall`, `door`, `window`, `level`, `slab` or `roof`.
     kind: String,
     /// The start of its parameters' names (`Door1` for `Door1_width`).
     prefix: String,
@@ -135,6 +160,12 @@ struct Record {
     /// `right` or `custom` (its `align` parameter holds the number).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     align: Option<String>,
+    /// A slab: how far it reaches against its wall (`inside`, `outside` or `line`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    extent: Option<String>,
+    /// A roof shelled open underneath.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hollow: Option<bool>,
     /// The plane a wall's plan is drawn on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     level: Option<String>,
@@ -919,6 +950,22 @@ fn edit(s: &mut Session, p: &Value) -> Result<Value> {
         r = realign(s, CMD, r, a)?;
     }
     let len = |x: &Option<crate::schema::LengthExpr>| x.as_ref().map(|v| v.0.as_str().to_string());
+    // A slab or roof: what changes its shape rebuilds it; its numbers are parameters.
+    if r.kind == "slab" {
+        if e.at.is_some() || (e.extent.is_some() && e.extent != r.extent) {
+            cover::slab_rebuild(s, &r, e.at.clone(), e.extent.clone())?;
+            r = record(s, CMD, &e.element)?;
+        }
+    } else if r.kind == "roof" {
+        let hollow_changed = e.hollow.is_some_and(|h| h != r.hollow.unwrap_or(false));
+        if (e.kind.is_some() && e.kind != r.kind_type) || (e.eaves.is_some() && e.eaves.as_ref() != Some(&r.curves)) || hollow_changed {
+            cover::roof_rebuild(s, &r, e.kind.clone(), e.eaves.clone(), e.hollow)?;
+            r = record(s, CMD, &e.element)?;
+        }
+    } else if e.at.is_some() || e.extent.is_some() || e.eaves.is_some() || e.hollow.is_some() {
+        return Err(bad(CMD, format!("a {} has no at, extent, eaves or hollow", r.kind)));
+    }
+    let covering = r.kind == "slab" || r.kind == "roof";
     let numbers: Vec<(&str, Option<String>)> = vec![
         ("height", len(&e.height)),
         ("thickness", len(&e.thickness)),
@@ -931,12 +978,19 @@ fn edit(s: &mut Session, p: &Value) -> Result<Value> {
         ("leaf", len(&e.leaf)),
         ("angle", e.angle.as_ref().map(|v| v.0.as_str().to_string())),
         ("open", e.open.as_ref().map(|v| v.0.as_str().to_string())),
+        ("top", len(&e.top)),
+        ("overhang", len(&e.overhang)),
+        ("pitch", e.pitch.as_ref().map(|v| v.0.as_str().to_string())),
     ];
-    let structural = (e.kind.is_some() && e.kind != r.kind_type)
-        || (e.hinge.is_some() && e.hinge != r.hinge)
-        || (e.swing.is_some() && e.swing != r.swing)
-        || (e.wall.is_some() && e.wall != r.wall)
-        || (e.segment.is_some() && e.segment != r.segment);
+    let structural = !covering
+        && ((e.kind.is_some() && e.kind != r.kind_type)
+            || (e.hinge.is_some() && e.hinge != r.hinge)
+            || (e.swing.is_some() && e.swing != r.swing)
+            || (e.wall.is_some() && e.wall != r.wall)
+            || (e.segment.is_some() && e.segment != r.segment));
+    if covering && (e.hinge.is_some() || e.swing.is_some() || e.wall.is_some() || e.segment.is_some()) {
+        return Err(bad(CMD, format!("a {} has no hinge, swing, wall or segment to change", r.kind)));
+    }
     if structural {
         let kind = match r.kind.as_str() {
             "door" => Kind::Door,
@@ -1003,7 +1057,7 @@ fn realign(s: &mut Session, cmd: &str, mut r: Record, given: &WallAlign) -> Resu
     r.params.insert("align".into(), align);
     r.align = Some(label);
     save(s, &r)?;
-    for o in records(s).into_iter().filter(|o| o.wall.as_deref() == Some(r.name.as_str())) {
+    for o in records(s).into_iter().filter(|o| o.wall.as_deref() == Some(r.name.as_str()) && (o.kind == "door" || o.kind == "window")) {
         let kind = if o.kind == "door" { Kind::Door } else { Kind::Window };
         remove_features(s, &o)?;
         let params: OpeningParams = parse(

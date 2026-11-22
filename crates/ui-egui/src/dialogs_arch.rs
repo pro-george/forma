@@ -21,6 +21,11 @@ const META: &str = "ro.artea.forma.arch.";
 /// Where a wall lies against its line (the engine's `align` names), then a number set by hand.
 const ALIGNS: &[&str] = &["center", "inside", "outside", "left", "right"];
 
+/// Where a slab sits, how far it reaches, and the roofs there are (the engine's names).
+const SLAB_AT: &[&str] = &["base", "top"];
+const EXTENTS: &[&str] = &["auto", "inside", "outside", "line"];
+const ROOF_TYPES: &[&str] = &["flat", "shed", "gable", "hip"];
+
 const DOOR_TYPES: &[&str] = &["single", "double", "sliding", "opening"];
 const WINDOW_TYPES: &[&str] = &["fixed", "casement", "double", "sliding"];
 
@@ -31,6 +36,8 @@ pub enum Mode {
     Door,
     Window,
     Level,
+    Slab,
+    Roof,
     Edit,
     Delete,
 }
@@ -68,6 +75,19 @@ pub struct Arch {
     pub depth: String,
     pub leaf: String,
     pub elevation: String,
+    /// A slab: an index into `SLAB_AT`, and into `EXTENTS` (`auto` lets `at` choose).
+    pub slab_at: usize,
+    pub extent: usize,
+    /// A slab's or roof's thickness, and a slab's top face above its level (empty: from `at`).
+    pub cover_thickness: String,
+    pub top: String,
+    /// A roof: an index into `ROOF_TYPES`, its pitch and overhang, and whether it is hollow.
+    pub roof_type: usize,
+    pub pitch: String,
+    pub overhang: String,
+    pub hollow: bool,
+    /// Edit: what the slab or roof had, so only what changes is sent (a change rebuilds it).
+    pub loaded: Option<(usize, usize, usize, bool)>,
     pub name: String,
     /// What the picks found: the wall element and its plan line.
     pub wall: Option<String>,
@@ -108,6 +128,15 @@ impl Arch {
             depth: "100 mm".into(),
             leaf: if window { "60 mm" } else { "40 mm" }.into(),
             elevation: "3000 mm".into(),
+            slab_at: 0,
+            extent: 0,
+            cover_thickness: "200 mm".into(),
+            top: String::new(),
+            roof_type: 2,
+            pitch: "30 deg".into(),
+            overhang: "300 mm".into(),
+            hollow: false,
+            loaded: None,
             name: String::new(),
             wall: None,
             segment: None,
@@ -125,6 +154,8 @@ impl Arch {
             Mode::Door => "arch.door",
             Mode::Window => "arch.window",
             Mode::Level => "arch.level",
+            Mode::Slab => "arch.slab",
+            Mode::Roof => "arch.roof",
             Mode::Edit => "arch.edit",
             Mode::Delete => "arch.delete",
         }
@@ -137,6 +168,8 @@ impl Arch {
             Mode::Door => "ui.arch.title_door",
             Mode::Window => "ui.arch.title_window",
             Mode::Level => "ui.arch.title_level",
+            Mode::Slab => "ui.arch.title_slab",
+            Mode::Roof => "ui.arch.title_roof",
             Mode::Edit => "ui.arch.title_edit",
             Mode::Delete => "ui.arch.title_delete",
         }
@@ -167,6 +200,8 @@ pub fn start(_app: &SolveApp, id: &str) -> Option<(Kind, Vec<SelInput>)> {
         "arch.door" => (Mode::Door, vec![SelInput::new("ui.arch.wall_face", FACES, false)]),
         "arch.window" => (Mode::Window, vec![SelInput::new("ui.arch.wall_face", FACES, false)]),
         "arch.level" => (Mode::Level, Vec::new()),
+        "arch.slab" => (Mode::Slab, vec![SelInput::new("ui.arch.wall_or_body", FACES | BODIES, false)]),
+        "arch.roof" => (Mode::Roof, vec![SelInput::new("ui.arch.wall_or_body", FACES | BODIES, false)]),
         "arch.edit" => (Mode::Edit, vec![SelInput::new("ui.arch.element", FACES | BODIES, false)]),
         "arch.delete" => (Mode::Delete, vec![SelInput::new("ui.arch.element", FACES | BODIES, false)]),
         _ => return None,
@@ -246,6 +281,9 @@ fn take_pick(app: &SolveApp, a: &mut Arch, inputs: &[SelInput]) {
                 a.segment = Some(segment);
             }
         }
+        Mode::Slab | Mode::Roof => {
+            a.wall = (record["kind"] == "wall").then(|| record["name"].as_str().map(str::to_string)).flatten();
+        }
         Mode::Edit | Mode::Delete => {
             a.element = record["name"].as_str().map(str::to_string);
             a.element_kind = record["kind"].as_str().map(str::to_string);
@@ -264,8 +302,24 @@ fn load(app: &SolveApp, a: &mut Arch, record: &Value) {
             *field = v;
         }
     };
+    let covering = record["kind"] == "slab" || record["kind"] == "roof";
     get("height", if record["kind"] == "wall" { &mut a.height } else { &mut a.opening_height });
-    get("thickness", &mut a.thickness);
+    get("thickness", if covering { &mut a.cover_thickness } else { &mut a.thickness });
+    if covering {
+        a.top.clear();
+        get("top", &mut a.top);
+        get("pitch", &mut a.pitch);
+        get("overhang", &mut a.overhang);
+        let at = |list: &[&str], v: &Value| v.as_str().and_then(|t| list.iter().position(|x| *x == t));
+        if record["kind"] == "slab" {
+            a.slab_at = at(SLAB_AT, &record["type"]).unwrap_or(0);
+            a.extent = at(EXTENTS, &record["extent"]).unwrap_or(0);
+        } else {
+            a.roof_type = at(ROOF_TYPES, &record["type"]).unwrap_or(2);
+            a.hollow = record["hollow"].as_bool().unwrap_or(false);
+        }
+        a.loaded = Some((a.slab_at, a.extent, a.roof_type, a.hollow));
+    }
     if record["kind"] == "wall" {
         // A wall from before alignment has none: it is centred.
         let named = record["align"].as_str().unwrap_or("center");
@@ -281,7 +335,9 @@ fn load(app: &SolveApp, a: &mut Arch, record: &Value) {
     get("depth", &mut a.depth);
     get("leaf", &mut a.leaf);
     get("elevation", &mut a.elevation);
-    if let Some(t) = record["type"].as_str() {
+    if let Some(t) = record["type"].as_str()
+        && !covering
+    {
         a.kind_type = a.types().iter().position(|x| *x == t).unwrap_or(0);
     }
     a.hinge = usize::from(record["hinge"] == "end");
@@ -355,6 +411,13 @@ pub fn rows(app: &SolveApp, ui: &mut egui::Ui, a: &mut Arch, inputs: &[SelInput]
             enter |= opening_rows(app, ui, a);
             enter |= text_row(ui, &tr("ui.arch.name"), &mut a.name, &tr("ui.arch.name_hint")).0;
         }
+        Mode::Slab | Mode::Roof => {
+            if a.wall.is_none() {
+                text(ui, &tr("ui.arch.pick_wall_cover"), Text::Hint("arch_pick_wall_cover"));
+            }
+            enter |= cover_rows(app, ui, a, a.mode == Mode::Roof);
+            enter |= text_row(ui, &tr("ui.arch.name"), &mut a.name, &tr("ui.arch.name_hint")).0;
+        }
         Mode::Level => {
             enter |= expr_row(ui, &tr("ui.arch.elevation"), &mut a.elevation);
             enter |= text_row(ui, &tr("ui.arch.name"), &mut a.name, &tr("ui.arch.name_hint")).0;
@@ -370,6 +433,13 @@ pub fn rows(app: &SolveApp, ui: &mut egui::Ui, a: &mut Arch, inputs: &[SelInput]
                 enter |= expr_row(ui, &tr("ui.height"), &mut a.height);
                 enter |= expr_row(ui, &tr("ui.thickness"), &mut a.thickness);
                 align_rows(app, ui, a);
+            }
+            Some(kind @ ("slab" | "roof")) => {
+                let roof = kind == "roof";
+                form_row(ui, &tr("ui.arch.name"), |ui| {
+                    ui.label(a.element.clone().unwrap_or_default());
+                });
+                enter |= cover_rows(app, ui, a, roof);
             }
             Some(_) => {
                 form_row(ui, &tr("ui.arch.name"), |ui| {
@@ -387,6 +457,49 @@ pub fn rows(app: &SolveApp, ui: &mut egui::Ui, a: &mut Arch, inputs: &[SelInput]
                 text(ui, &what, Text::Hint("arch_delete_what"));
             }
         },
+    }
+    enter
+}
+
+/// A slab's or roof's own rows.
+fn cover_rows(app: &SolveApp, ui: &mut egui::Ui, a: &mut Arch, roof: bool) -> bool {
+    let tr = |id: &str| app.tr(id).to_string();
+    let labels = |prefix: &str, list: &[&str]| -> Vec<String> { list.iter().map(|x| tr(&format!("{prefix}{x}"))).collect() };
+    let mut enter = false;
+    if roof {
+        let before = a.roof_type;
+        let names = labels("ui.arch.roof_", ROOF_TYPES);
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        choice_row(ui, &tr("ui.arch.type"), "arch_roof_type", &mut a.roof_type, &names);
+        // A shed's usual pitch is lower; follow it while the pitch is still a default.
+        let shed = ROOF_TYPES.get(a.roof_type) == Some(&"shed");
+        if a.roof_type != before && (a.pitch.trim() == "30 deg" || a.pitch.trim() == "15 deg") {
+            a.pitch = if shed { "15 deg" } else { "30 deg" }.into();
+        }
+        let flat = ROOF_TYPES.get(a.roof_type) == Some(&"flat");
+        if !flat {
+            enter |= expr_row(ui, &tr("ui.arch.pitch"), &mut a.pitch);
+        }
+        enter |= expr_row(ui, &tr("ui.arch.overhang"), &mut a.overhang);
+        if !flat {
+            form_row(ui, &tr("ui.arch.hollow"), |ui| crate::dialogs::check(ui, &mut a.hollow));
+        }
+        if flat || a.hollow {
+            enter |= expr_row(ui, &tr("ui.thickness"), &mut a.cover_thickness);
+        }
+        let hint = if flat { "ui.arch.roof_flat_hint" } else { "ui.arch.roof_pitched_hint" };
+        text(ui, &tr(hint), Text::Hint("arch_roof_hint"));
+    } else {
+        let names = labels("ui.arch.at_", SLAB_AT);
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        choice_row(ui, &tr("ui.arch.at"), "arch_slab_at", &mut a.slab_at, &names);
+        let names = labels("ui.arch.extent_", EXTENTS);
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        choice_row(ui, &tr("ui.arch.extent"), "arch_extent", &mut a.extent, &names);
+        enter |= expr_row(ui, &tr("ui.thickness"), &mut a.cover_thickness);
+        if a.mode == Mode::Edit {
+            enter |= expr_row(ui, &tr("ui.arch.top"), &mut a.top);
+        }
     }
     enter
 }
@@ -486,10 +599,17 @@ pub fn commands(app: &SolveApp, a: &Arch, inputs: &[SelInput]) -> Result<Vec<(St
             opening_params(a, &mut put);
         }
         Mode::Level => put("elevation", json!(a.elevation.trim())),
+        Mode::Slab | Mode::Roof => {
+            let wall = a.wall.as_ref().ok_or_else(|| tr("ui.arch.pick_wall_cover"))?;
+            put("wall", json!(wall));
+            cover_params(a, a.mode == Mode::Roof, None, &mut put);
+        }
         Mode::Edit => {
             let element = a.element.as_ref().ok_or_else(|| tr("ui.arch.pick_element"))?;
             put("element", json!(element));
-            if a.element_kind.as_deref() == Some("wall") {
+            if let Some(kind @ ("slab" | "roof")) = a.element_kind.as_deref() {
+                cover_params(a, kind == "roof", a.loaded, &mut put);
+            } else if a.element_kind.as_deref() == Some("wall") {
                 put("height", json!(a.height.trim()));
                 put("thickness", json!(a.thickness.trim()));
                 if Some(a.align) != a.align_loaded
@@ -503,10 +623,43 @@ pub fn commands(app: &SolveApp, a: &Arch, inputs: &[SelInput]) -> Result<Vec<(St
         }
         Mode::Delete => put("element", json!(a.element.as_ref().ok_or_else(|| tr("ui.arch.pick_element"))?)),
     }
-    if matches!(a.mode, Mode::Wall | Mode::Door | Mode::Window | Mode::Level) && !a.name.trim().is_empty() {
+    if matches!(a.mode, Mode::Wall | Mode::Door | Mode::Window | Mode::Level | Mode::Slab | Mode::Roof) && !a.name.trim().is_empty() {
         put("name", json!(a.name.trim()));
     }
     Ok(vec![(a.command().to_string(), Value::Object(p))])
+}
+
+/// A slab's or roof's parameters; editing (`loaded` holds what it had), only what changed of
+/// what rebuilds it.
+fn cover_params(a: &Arch, roof: bool, loaded: Option<(usize, usize, usize, bool)>, put: &mut impl FnMut(&str, Value)) {
+    let changed = |now: usize, then: Option<usize>| then != Some(now);
+    if roof {
+        let kind = ROOF_TYPES.get(a.roof_type).copied().unwrap_or("gable");
+        if changed(a.roof_type, loaded.map(|l| l.2)) {
+            put("type", json!(kind));
+        }
+        if kind != "flat" {
+            put("pitch", json!(a.pitch.trim()));
+            if loaded.map(|l| l.3) != Some(a.hollow) && (loaded.is_some() || a.hollow) {
+                put("hollow", json!(a.hollow));
+            }
+        }
+        put("overhang", json!(a.overhang.trim()));
+        if kind == "flat" || a.hollow {
+            put("thickness", json!(a.cover_thickness.trim()));
+        }
+    } else {
+        if changed(a.slab_at, loaded.map(|l| l.0)) {
+            put("at", json!(SLAB_AT.get(a.slab_at).copied().unwrap_or("base")));
+        }
+        if a.extent != 0 && changed(a.extent, loaded.map(|l| l.1)) {
+            put("extent", json!(EXTENTS.get(a.extent).copied().unwrap_or("inside")));
+        }
+        put("thickness", json!(a.cover_thickness.trim()));
+        if loaded.is_some() && !a.top.trim().is_empty() && !changed(a.slab_at, loaded.map(|l| l.0)) {
+            put("top", json!(a.top.trim()));
+        }
+    }
 }
 
 /// A door's or window's parameters, as its type uses them.

@@ -373,12 +373,134 @@ fn a_wall_made_before_alignment_takes_it_and_rebuilds_its_openings_in_its_middle
 }
 
 #[test]
+fn slabs_reach_the_walls_inner_or_outer_face_or_the_line_at_the_base_or_on_top() {
+    let mut s = Session::default();
+    room(&mut s);
+    let check = |s: &mut Session, body: &str, v: f64, x: [f64; 2], z: [f64; 2]| {
+        let (vol, min, max) = measure(s, body);
+        close(vol, v);
+        close(min[0], x[0]);
+        close(max[0], x[1]);
+        close(min[2], z[0]);
+        close(max[2], z[1]);
+    };
+    // A floor: its top at the level, reaching the walls' inner faces.
+    let r = run(&mut s, "arch.slab", json!({ "wall": "Wall 1" }));
+    assert_eq!(r["element"], "Slab 1");
+    check(&mut s, "Slab 1", 4750.0 * 3750.0 * 200.0, [125.0, 4875.0], [-200.0, 0.0]);
+    // On top of the walls, covering them to their outer faces.
+    run(&mut s, "arch.slab", json!({ "wall": "Wall 1", "at": "top" }));
+    check(&mut s, "Slab 2", 5250.0 * 4250.0 * 200.0, [-125.0, 5125.0], [2700.0, 2900.0]);
+    // To the plan line, 150 thick, its top 50 below the level.
+    run(&mut s, "arch.slab", json!({ "wall": "Wall 1", "extent": "line", "thickness": 150, "top": "-50 mm", "name": "Screed" }));
+    check(&mut s, "Screed", 5000.0 * 4000.0 * 150.0, [0.0, 5000.0], [-200.0, -50.0]);
+
+    // They follow the wall: thicker, and taller.
+    run(&mut s, "arch.edit", json!({ "element": "Wall 1", "thickness": 300, "height": "3000 mm" }));
+    check(&mut s, "Slab 1", 4700.0 * 3700.0 * 200.0, [150.0, 4850.0], [-200.0, 0.0]);
+    check(&mut s, "Slab 2", 5300.0 * 4300.0 * 200.0, [-150.0, 5150.0], [3000.0, 3200.0]);
+    // A new extent rebuilds it in place; `at` moves its top.
+    run(&mut s, "arch.edit", json!({ "element": "Slab 2", "extent": "inside", "thickness": 100 }));
+    check(&mut s, "Slab 2", 4700.0 * 3700.0 * 100.0, [150.0, 4850.0], [3000.0, 3100.0]);
+    run(&mut s, "arch.edit", json!({ "element": "Slab 1", "at": "top" }));
+    check(&mut s, "Slab 1", 4700.0 * 3700.0 * 200.0, [150.0, 4850.0], [3000.0, 3200.0]);
+
+    // An outline of its own.
+    run(&mut s, "arch.slab", json!({ "points": [[10000, 0], [11000, 0], [11000, 500]] }));
+    check(&mut s, "Slab 3", 1000.0 * 500.0 / 2.0 * 200.0, [10000.0, 11000.0], [-200.0, 0.0]);
+    assert!(s.execute("arch.slab", &json!({ "points": [[0, 0], [1, 0], [1, 1]], "extent": "inside" })).is_err());
+    assert!(s.execute("arch.slab", &json!({ "points": [[0, 0], [1, 0], [1, 1]], "at": "top" })).is_err());
+    assert!(s.execute("arch.edit", &json!({ "element": "Wall 1", "extent": "inside" })).is_err());
+
+    // Deleting the wall takes its slabs; the outline's own stays.
+    run(&mut s, "arch.delete", json!({ "element": "Wall 1" }));
+    assert_eq!(bodies(&mut s), ["Slab 3"]);
+}
+
+#[test]
+fn roofs_flat_shed_gable_and_hip_stand_on_the_wall_and_follow_their_parameters() {
+    let mut s = Session::default();
+    room(&mut s);
+    // With a 300 overhang past the 125 outer half of the wall: 5850 × 4850, from the wall's top.
+    run(&mut s, "arch.roof", json!({ "wall": "Wall 1", "type": "flat", "name": "Flat" }));
+    let (v, min, max) = measure(&mut s, "Flat");
+    close(v, 5850.0 * 4850.0 * 200.0);
+    close(min[0], -425.0);
+    close(max[1], 4425.0);
+    close(min[2], 2700.0);
+    close(max[2], 2900.0);
+    run(&mut s, "arch.delete", json!({ "element": "Flat" }));
+
+    // A gable on the two long lines, 30°: a prism of the triangle 4850 wide.
+    let r = run(&mut s, "arch.roof", json!({ "wall": "Wall 1" }));
+    assert_eq!(r["parameters"]["pitch"], "Roof1_pitch");
+    let gable = |w: f64, l: f64, deg: f64| {
+        let h = w / 2.0 * deg.to_radians().tan();
+        (w * h / 2.0 * l, h)
+    };
+    let (vol, h) = gable(4850.0, 5850.0, 30.0);
+    let (v, min, max) = measure(&mut s, "Roof 1");
+    close(v, vol);
+    close(min[0], -425.0);
+    close(max[0], 5425.0);
+    close(min[1], -425.0);
+    close(max[1], 4425.0);
+    close(min[2], 2700.0);
+    close(max[2], 2700.0 + h);
+
+    // Its parameters: steeper, then no overhang.
+    run(&mut s, "arch.edit", json!({ "element": "Roof 1", "pitch": "45 deg" }));
+    close(measure(&mut s, "Roof 1").0, gable(4850.0, 5850.0, 45.0).0);
+    run(&mut s, "arch.edit", json!({ "element": "Roof 1", "overhang": 0 }));
+    let (vol, h) = gable(4250.0, 5250.0, 45.0);
+    let (v, _, max) = measure(&mut s, "Roof 1");
+    close(v, vol);
+    close(max[2], 2700.0 + h);
+
+    // A hip: the gable less a pyramid at each end.
+    run(&mut s, "arch.edit", json!({ "element": "Roof 1", "type": "hip" }));
+    let (w, l) = (4250.0, 5250.0);
+    let h = w / 2.0;
+    let (v, _, max) = measure(&mut s, "Roof 1");
+    close(v, w * h / 2.0 * (l - w / 3.0));
+    close(max[2], 2700.0 + h);
+
+    // A shed rising from the first line across the whole width.
+    run(&mut s, "arch.edit", json!({ "element": "Roof 1", "type": "shed", "eaves": ["l1"] }));
+    let (v, min, max) = measure(&mut s, "Roof 1");
+    close(v, w * w / 2.0 * l);
+    close(min[2], 2700.0);
+    close(max[2], 2700.0 + w);
+
+    // Hollow: a shell open underneath, the same outside.
+    run(&mut s, "arch.edit", json!({ "element": "Roof 1", "type": "gable", "hollow": true }));
+    let (v, min, max) = measure(&mut s, "Roof 1");
+    let (solid, h) = gable(4250.0, 5250.0, 45.0);
+    assert!(v > 0.0 && v < solid * 0.6, "{v} of {solid}");
+    close(min[2], 2700.0);
+    // Its slopes stand 200 higher, square to them, leaving a fascia at the eaves.
+    close(max[2], 2700.0 + h + 200.0 / 45f64.to_radians().cos());
+
+    // A roof follows the wall's height.
+    run(&mut s, "arch.edit", json!({ "element": "Wall 1", "height": "3000 mm" }));
+    let (_, min, _) = measure(&mut s, "Roof 1");
+    close(min[2], 3000.0);
+
+    // A hip needs every line's slope to keep the rest of the plan: not on an L.
+    run(&mut s, "arch.wall", json!({ "points": [[10000, 0], [14000, 0], [14000, 2000], [12000, 2000], [12000, 4000], [10000, 4000]], "closed": true }));
+    assert!(s.execute("arch.roof", &json!({ "wall": "Wall 2", "type": "hip" })).is_err());
+    run(&mut s, "arch.roof", json!({ "wall": "Wall 2", "type": "flat" }));
+    assert!(s.execute("arch.roof", &json!({ "wall": "Wall 1", "type": "dome" })).is_err());
+    assert!(s.execute("arch.roof", &json!({ "wall": "Wall 1", "eaves": ["l9"] })).is_err());
+}
+
+#[test]
 fn hostile_architecture_params_never_panic() {
     let mut s = Session::default();
     room(&mut s);
     let values = [json!(null), json!(-1), json!(1e300), json!("x".repeat(5000)), json!([]), json!({}), json!("Wall 1"), json!("1 / 0")];
-    for cmd in ["arch.wall", "arch.door", "arch.window", "arch.edit", "arch.delete", "arch.level"] {
-        for key in ["wall", "points", "sketch", "position", "width", "type", "angle", "element", "name", "segment", "elevation", "align"] {
+    for cmd in ["arch.wall", "arch.door", "arch.window", "arch.edit", "arch.delete", "arch.level", "arch.slab", "arch.roof"] {
+        for key in ["wall", "points", "sketch", "position", "width", "type", "angle", "element", "name", "segment", "elevation", "align", "eaves", "pitch", "extent", "at", "top"] {
             for v in &values {
                 let _ = s.execute(cmd, &json!({ key: v }));
                 let _ = s.execute(cmd, &json!({ "wall": "Wall 1", key: v }));

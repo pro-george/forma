@@ -109,6 +109,77 @@ pub struct OpeningParams {
     pub name: Option<String>,
 }
 
+/// Lay a floor or ceiling slab: over a wall's plan, or an outline of its own.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct SlabParams {
+    /// The wall whose plan it covers (a closed plan). Give this, `points` or `sketch`.
+    #[serde(default, deserialize_with = "present")]
+    pub wall: Option<String>,
+    /// An outline of its own in plan, at least three points, closed.
+    #[serde(default, deserialize_with = "present")]
+    pub points: Option<Vec<PlanPoint>>,
+    /// A plan sketch already drawn, with a closed outline.
+    #[serde(default, deserialize_with = "present")]
+    pub sketch: Option<String>,
+    /// With `sketch`: the curves of its outline (default: all that are not construction).
+    #[serde(default, deserialize_with = "present")]
+    pub curves: Option<Vec<String>>,
+    /// `base` (the default: its top at the level, a floor) or `top` (on top of the wall: a
+    /// ceiling or flat roof). Only with `wall`.
+    #[serde(default, deserialize_with = "present")]
+    pub at: Option<String>,
+    /// How far it reaches against the wall: `inside` (to the wall's inner face, the default at the
+    /// base), `outside` (to its outer face, the default on top) or `line` (to the plan line).
+    #[serde(default, deserialize_with = "present")]
+    pub extent: Option<String>,
+    /// The slab's thickness (default 200 mm).
+    #[serde(default, deserialize_with = "present")]
+    pub thickness: Option<LengthExpr>,
+    /// The height of its top face above its level (default from `at`: 0, or the wall's height
+    /// plus the slab's thickness).
+    #[serde(default, deserialize_with = "present")]
+    pub top: Option<LengthExpr>,
+    /// Without `wall`: the plane its outline is drawn on (XY).
+    #[serde(default, deserialize_with = "present")]
+    pub level: Option<String>,
+    /// The slab's name (default `Slab N`); its parameters are named after it.
+    #[serde(default, deserialize_with = "present")]
+    pub name: Option<String>,
+}
+
+/// Put a roof on a wall: flat, shed, gable or hip.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct RoofParams {
+    /// The wall it covers (a closed plan of straight lines for a pitched roof).
+    pub wall: String,
+    /// `flat`, `shed` (one slope, rising from its eave), `gable` (two slopes from opposite
+    /// eaves, the default) or `hip` (a slope from every line of a convex plan).
+    #[serde(default, rename = "type", deserialize_with = "present")]
+    pub kind: Option<String>,
+    /// The slopes' pitch (default 30 deg, a shed's 15 deg).
+    #[serde(default, deserialize_with = "present")]
+    pub pitch: Option<AngleExpr>,
+    /// How far the eaves reach past the wall's outer face (default 300 mm).
+    #[serde(default, deserialize_with = "present")]
+    pub overhang: Option<LengthExpr>,
+    /// A flat roof's thickness, or a hollow pitched roof's (default 200 mm).
+    #[serde(default, deserialize_with = "present")]
+    pub thickness: Option<LengthExpr>,
+    /// A pitched roof as a shell `thickness` thick, open underneath (default: solid, as a
+    /// scale model prints best).
+    #[serde(default)]
+    pub hollow: bool,
+    /// The plan lines the slopes rise from (default by type: a shed's longest line, a gable's
+    /// two longest parallel ones, every line of a hip).
+    #[serde(default, deserialize_with = "present")]
+    pub eaves: Option<Vec<String>>,
+    /// The roof's name (default `Roof N`); its parameters are named after it.
+    #[serde(default, deserialize_with = "present")]
+    pub name: Option<String>,
+}
+
 /// Change an element: its numbers change its parameters; a new type, hinge, swing, wall or
 /// segment rebuilds it.
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -149,6 +220,27 @@ pub struct ArchEditParams {
     /// A wall: where it lies against its line; its doors and windows stay centred in it.
     #[serde(default, deserialize_with = "present")]
     pub align: Option<WallAlign>,
+    /// A slab: its top face's height above its level.
+    #[serde(default, deserialize_with = "present")]
+    pub top: Option<LengthExpr>,
+    /// A slab: `base` or `top` (its top face moves there).
+    #[serde(default, deserialize_with = "present")]
+    pub at: Option<String>,
+    /// A slab: `inside`, `outside` or `line` (rebuilds it).
+    #[serde(default, deserialize_with = "present")]
+    pub extent: Option<String>,
+    /// A roof's pitch.
+    #[serde(default, deserialize_with = "present")]
+    pub pitch: Option<AngleExpr>,
+    /// A roof's overhang.
+    #[serde(default, deserialize_with = "present")]
+    pub overhang: Option<LengthExpr>,
+    /// A pitched roof: hollow or solid (rebuilds it).
+    #[serde(default, deserialize_with = "present")]
+    pub hollow: Option<bool>,
+    /// A roof's eaves (rebuilds it).
+    #[serde(default, deserialize_with = "present")]
+    pub eaves: Option<Vec<String>>,
     #[serde(default, deserialize_with = "present")]
     pub elevation: Option<LengthExpr>,
 }

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Slab</title>
+  <path d="M6 30L32 18L58 30L32 42Z" fill="#b9ddf8"/>
+  <path d="M6 30L32 42L32 50L6 38Z" fill="#236ead"/>
+  <path d="M32 42L58 30L58 38L32 50Z" fill="#328bd3"/>
+  <path d="M6 30L32 18L58 30L58 38L32 50L6 38Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M6 30L32 42L58 30M32 42L32 50" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

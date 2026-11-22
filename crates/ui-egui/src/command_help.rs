@@ -13,6 +13,8 @@ pub const DOCUMENTED: &[&str] = &[
     "arch.door",
     "arch.edit",
     "arch.level",
+    "arch.roof",
+    "arch.slab",
     "arch.wall",
     "arch.window",
     "assembly.bom",

@@ -476,7 +476,7 @@ pub const SECTIONS: &[Section] = &[
     // Forma: the Architecture workspace. A plan is a sketch or a room's sizes; walls rise from
     // it, doors and windows go into them, and every element's numbers are parameters.
     Section { tab: "ARCHITECTURE", panel: "PLAN", promoted: 2, ids: &["arch.level", "sketch.create"] },
-    Section { tab: "ARCHITECTURE", panel: "WALLS", promoted: 1, ids: &["arch.wall"] },
+    Section { tab: "ARCHITECTURE", panel: "STRUCTURE", promoted: 3, ids: &["arch.wall", "arch.slab", "arch.roof"] },
     Section { tab: "ARCHITECTURE", panel: "OPENINGS", promoted: 2, ids: &["arch.door", "arch.window"] },
     Section { tab: "ARCHITECTURE", panel: "ELEMENT", promoted: 2, ids: &["arch.edit", "arch.delete"] },
     Section { tab: "ARCHITECTURE", panel: "CONFIGURE", promoted: 2, ids: CONFIGURE },
